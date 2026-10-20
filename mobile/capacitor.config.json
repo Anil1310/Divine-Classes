@@ -1,0 +1,28 @@
+{
+  "appId": "com.divineclasses.portal",
+  "appName": "Divine Classes",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "url": "https://script.google.com/macros/s/AKfycbzeohya5AzIYqWHERYwLE85Uhx6uxRiGVPRnTEuhwD5/exec",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0f172a"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0f172a",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "spinnerColor": "#4f46e5"
+    },
+    "Keyboard": {
+      "resize": "body"
+    }
+  }
+}

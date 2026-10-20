@@ -869,21 +869,22 @@ def main():
         ]),
         "2": ("VERCEL", [
             (6, "Deploy to Vercel", "Deploy production build to Vercel", "▲"),
-            (7, "Open Live Vercel Site", "Open live Vercel URL in web browser", "↗"),
-            (8, "Delete Vercel Project", "Permanently delete a Vercel project", "×"),
+            (7, "Create & Link Project", "Create and link this project on Vercel automatically", "+"),
+            (8, "Open Live Vercel Site", "Open live Vercel URL in web browser", "↗"),
+            (9, "Delete Vercel Project", "Permanently delete a Vercel project", "×"),
         ]),
         "3": ("NETLIFY", [
-            (9, "Deploy Site", "Deploy a project to Netlify", "▲"),
-            (10, "Connect GitHub Repository", "Set up a Netlify site from a GitHub repository", "↗"),
-            (11, "Delete Netlify Site", "Permanently delete a Netlify project", "×"),
+            (10, "Deploy Site", "Deploy a project to Netlify", "▲"),
+            (11, "Connect GitHub Repository", "Set up a Netlify site from a GitHub repository", "↗"),
+            (12, "Delete Netlify Site", "Permanently delete a Netlify project", "×"),
         ]),
         "4": ("GOOGLE APPS SCRIPT", [
-            (12, "Deploy Apps Script", "Push source and update or create deployment", "↥"),
+            (13, "Deploy Apps Script", "Push source and update or create deployment", "↥"),
         ]),
         "5": ("WORKSPACE", [
-            (13, "Project Status", "View recent commits and live deployment URLs", "≡"),
-            (14, "Switch Project", "Choose another local Git project", "⇄"),
-            (15, "Exit", "Close the automation center", "×"),
+            (14, "Project Status", "View recent commits and live deployment URLs", "≡"),
+            (15, "Switch Project", "Choose another local Git project", "⇄"),
+            (16, "Exit", "Close the automation center", "×"),
         ]),
     }
 
@@ -937,20 +938,22 @@ def main():
         elif choice == "6":
             deploy_vercel(target_project)
         elif choice == "7":
-            open_vercel_site(target_project)
+            create_vercel_project(target_project)
         elif choice == "8":
-            delete_vercel_project(target_project)
+            open_vercel_site(target_project)
         elif choice == "9":
-            deploy_netlify(target_project)
+            delete_vercel_project(target_project)
         elif choice == "10":
-            create_netlify_site(target_project)
+            deploy_netlify(target_project)
         elif choice == "11":
-            delete_netlify(target_project)
+            create_netlify_site(target_project)
         elif choice == "12":
-            deploy_apps_script(target_project)
+            delete_netlify(target_project)
         elif choice == "13":
-            view_status(target_project)
+            deploy_apps_script(target_project)
         elif choice == "14":
+            view_status(target_project)
+        elif choice == "15":
             all_projs = list_desktop_projects()
             print(f"\n{BOLD}Available Desktop Projects:{RESET}")
             for i, p in enumerate(all_projs, start=1):
@@ -963,7 +966,7 @@ def main():
                     print(f"{GREEN}Switched to: {os.path.basename(target_project)}{RESET}")
             except (EOFError, KeyboardInterrupt):
                 pass
-        elif choice in ("15", "q", "exit"):
+        elif choice in ("16", "q", "exit"):
             print(f"\n{GREEN}Goodbye! 👋{RESET}\n")
             break
         else:

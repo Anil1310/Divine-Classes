@@ -29,3 +29,7 @@ npm-debug.log*
 .env.*
 .vercel
 .env*
+
+# Python
+__pycache__/
+*.pyc
