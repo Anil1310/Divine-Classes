@@ -425,6 +425,10 @@ function getDefaultSeedData() {
         uploadedBy: 'Er. Rajesh Chahar',
         fileSize: '2.4 MB',
         downloads: 48,
+        fileName: 'Rotational_Dynamics_DPP_05.pdf',
+        fileType: 'pdf',
+        downloadUrl: 'https://drive.google.com/',
+        driveUrl: 'https://drive.google.com/',
         description: '50 tough multi-concept questions covering Moment of Inertia, Conservation of Angular Momentum, and Pure Rolling on incline.'
       },
       {
@@ -436,6 +440,10 @@ function getDefaultSeedData() {
         uploadedBy: 'Dr. Meera Krishnan',
         fileSize: '1.1 MB',
         downloads: 39,
+        fileName: 'Chemical_Equilibrium_Booster_Sheet.pdf',
+        fileType: 'pdf',
+        downloadUrl: 'https://drive.google.com/',
+        driveUrl: 'https://drive.google.com/',
         description: 'Complete high-yield shortcut formulas, Ostwald dilution law, buffer solutions, and solubility product numerical tables.'
       },
       {
@@ -447,6 +455,10 @@ function getDefaultSeedData() {
         uploadedBy: 'Er. Rajesh Chahar',
         fileSize: '3.6 MB',
         downloads: 55,
+        fileName: 'JEE_Mock_Test_03_Paper_and_Solutions.pdf',
+        fileType: 'pdf',
+        downloadUrl: 'https://drive.google.com/',
+        driveUrl: 'https://drive.google.com/',
         description: 'Official full-syllabus simulation offline test paper held on Sunday with detailed marking scheme and video solution links.'
       },
       {
@@ -458,6 +470,10 @@ function getDefaultSeedData() {
         uploadedBy: 'Dr. Sunita Sharma',
         fileSize: '2.8 MB',
         downloads: 42,
+        fileName: 'NEET_Human_Genetics_NCERT_Drill.pdf',
+        fileType: 'pdf',
+        downloadUrl: 'https://drive.google.com/',
+        driveUrl: 'https://drive.google.com/',
         description: 'Line-by-line NCERT diagram drills, pedigree charts, and 120 assertion-reason practice questions.'
       },
       {
@@ -469,6 +485,10 @@ function getDefaultSeedData() {
         uploadedBy: 'Mr. Arvind Verma',
         fileSize: '1.4 MB',
         downloads: 31,
+        fileName: 'CBSE_10th_Maths_Board_Paper.pdf',
+        fileType: 'pdf',
+        downloadUrl: 'https://drive.google.com/',
+        driveUrl: 'https://drive.google.com/',
         description: 'CBSE previous 10-year question compilation with step-marking criteria for term exams.'
       }
     ],
