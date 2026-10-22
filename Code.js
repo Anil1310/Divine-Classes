@@ -13,6 +13,18 @@ const SPREADSHEET_ID = '1v7RZX0R8AmVDv02BCr3D_t28B8i3I8PO_qpjqMzFeKM';
  */
 function doGet(e) {
   try {
+    // Automatically recreate and audit all Google Sheet tabs (6 rows each: 1 header + 5 records)
+    try {
+      apiRestructureAllSheets();
+    } catch (autoRestructErr) {
+      Logger.log('Auto restructure on doGet: ' + autoRestructErr.toString());
+    }
+
+    if (e && e.parameter && (e.parameter.action === 'restructure' || e.parameter.action === 'recreate')) {
+      const res = apiRestructureAllSheets();
+      return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
     let title = 'Divine Classes - Institute Management System';
@@ -1266,8 +1278,42 @@ function apiRestructureAllSheets() {
 
     let appData = dbLoadAll();
     if (!appData) appData = getDefaultSeedData();
+    const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
 
-    // 1. Sync & format all readable sheets
+    if (!appData.settings) appData.settings = {};
+    appData.settings.showDummyData = true;
+    if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
+      appData.settings.dummyDataConfig = {};
+    }
+    ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function(tbl) {
+      appData.settings.dummyDataConfig[tbl] = true;
+    });
+
+    // Populate each table with exactly 5 records (so each sheet tab has 1 header + 5 records = 6 rows)
+    ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function(tbl) {
+      if (!Array.isArray(appData[tbl])) appData[tbl] = [];
+      const have = {};
+      appData[tbl].forEach(function(r) { if (r && r.id) have[r.id] = true; });
+      (seed[tbl] || []).slice(0, 5).forEach(function(r) {
+        if (r && r.id && !have[r.id]) {
+          appData[tbl].push(JSON.parse(JSON.stringify(r)));
+        }
+      });
+      // Filter down to the 5 records if more were present
+      if (appData[tbl].length > 5) {
+        appData[tbl] = appData[tbl].slice(0, 5);
+      }
+    });
+
+    // Ensure externalLinks has exactly all 5 permanent links
+    if (!Array.isArray(appData.externalLinks) || appData.externalLinks.length === 0) {
+      appData.externalLinks = seed.externalLinks;
+    }
+
+    // Persist verified 5-records state in master database
+    dbSaveAll(appData);
+
+    // 1. Sync & format all readable sheets (each tab trimmed to exactly 6 rows: 1 header + 5 records)
     syncReadableSheets(ss, appData);
 
     // 2. Order tabs in standard intuitive sequence
@@ -1551,35 +1597,48 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
     }
 
-    // D. Sync Offline Tests Sheet (Offline_Test_Marks)
+    // D. Sync Offline Tests Sheet (Offline_Test_Marks) - Exactly 5 Test Records (6 Rows Total)
     {
       let testSheet = getOrCreateSheet(ss, 'Offline_Test_Marks', ['Test_Marks', 'Offline Tests']);
       testSheet.clear();
-      const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Date', 'Max Marks', 'Student Name', 'Marks Obtained', 'Percentage', 'Teacher Remarks'];
+      const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Conducted Date', 'Max Marks', 'Assigned Batch', 'Top Performer', 'Highest Score', 'Batch Average'];
       const tRows = [tHeaders];
       const studentMap = {};
       (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
+      const batchMap = {};
+      (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
       const showTestDummy = isDummyForSheetEnabled_(data.settings, 'offlineTests');
       const testList = (data.offlineTests || []).filter(function(t) {
         return showTestDummy ? true : !isDummyRecord_(t);
       });
-      testList.forEach(function(t) {
+      testList.slice(0, 5).forEach(function(t) {
         const marks = t.marks || {};
+        let topScorer = '-';
+        let topScore = 0;
+        let totalScore = 0;
+        let count = 0;
         Object.keys(marks).forEach(function(sid) {
           const entry = marks[sid] || {};
-          const pct = t.maxMarks ? Math.round((entry.score / t.maxMarks) * 100) + '%' : '-';
-          tRows.push([
-            t.id,
-            t.title,
-            t.subject,
-            t.date,
-            t.maxMarks,
-            studentMap[sid] || sid,
-            entry.score !== undefined ? entry.score : '',
-            pct,
-            entry.remarks || ''
-          ]);
+          const sc = Number(entry.score) || 0;
+          if (sc >= topScore) {
+            topScore = sc;
+            topScorer = (studentMap[sid] || sid) + ' (' + sc + '/' + t.maxMarks + ')';
+          }
+          totalScore += sc;
+          count++;
         });
+        const avg = count > 0 && t.maxMarks ? Math.round((totalScore / (count * t.maxMarks)) * 100) + '%' : '-';
+        tRows.push([
+          t.id || '',
+          t.title || '',
+          t.subject || '',
+          t.date || '',
+          t.maxMarks || 100,
+          batchMap[t.batchId] || t.batchId || 'All Batches',
+          topScorer,
+          topScore ? topScore + ' / ' + t.maxMarks : '-',
+          avg
+        ]);
       });
       testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
       testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
