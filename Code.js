@@ -480,25 +480,20 @@ function getDefaultSeedData() {
  * restores them instantly.
  */
 
-const DUMMY_SEED_ID_SET = (function() {
-  const set = {};
-  // Note: l1-l5 (external study links) are intentionally NOT in this set —
-  // they are always visible, even when dummy/demo data is hidden.
-  ['b1', 'b2', 'b3', 'b4', 'b5',
-    's1', 's2', 's3', 's4', 's5',
-    'm1', 'm2', 'm3', 'm4', 'm5',
-    't1', 't2', 't3', 't4', 't5',
-    'tr1', 'tr2', 'tr3', 'tr4', 'tr5',
-    'g1', 'g2', 'g3', 'g4', 'g5',
-    'f1', 'f2', 'f3', 'f4', 'f5'
-  ].forEach(function(id) { set[id] = true; });
-  return set;
-})();
-
 function isDummyRecord_(rec) {
   if (!rec) return false;
   if (rec.isDummy === true) return true;
-  return DUMMY_SEED_ID_SET[rec.id] === true;
+  if (typeof DUMMY_SEED_ID_SET !== 'undefined' && DUMMY_SEED_ID_SET && DUMMY_SEED_ID_SET[rec.id] === true) return true;
+  var fallbackIds = {
+    'b1': true, 'b2': true, 'b3': true, 'b4': true, 'b5': true,
+    's1': true, 's2': true, 's3': true, 's4': true, 's5': true,
+    'm1': true, 'm2': true, 'm3': true, 'm4': true, 'm5': true,
+    't1': true, 't2': true, 't3': true, 't4': true, 't5': true,
+    'tr1': true, 'tr2': true, 'tr3': true, 'tr4': true, 'tr5': true,
+    'g1': true, 'g2': true, 'g3': true, 'g4': true, 'g5': true,
+    'f1': true, 'f2': true, 'f3': true, 'f4': true, 'f5': true
+  };
+  return fallbackIds[rec.id] === true;
 }
 
 // Removes seed/demo records from the data RETURNED to clients (DB untouched).
