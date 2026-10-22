@@ -800,8 +800,8 @@ if (typeof module !== 'undefined' && module.exports) {
         }
 
         function reStructureGoogleSheets() {
-            if (state.currentRole !== 'developer') {
-                showToast('Access Denied: Only Developer can restructure Google Sheets.', 'error');
+            if (state.currentRole !== 'developer' && state.currentRole !== 'admin') {
+                showToast('Access Denied: Admin or Developer privileges required to restructure Google Sheets.', 'error');
                 return;
             }
             if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.apiRestructureAllSheets) {

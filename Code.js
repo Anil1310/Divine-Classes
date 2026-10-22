@@ -484,13 +484,13 @@ const DUMMY_SEED_ID_SET = (function() {
   const set = {};
   // Note: l1-l5 (external study links) are intentionally NOT in this set —
   // they are always visible, even when dummy/demo data is hidden.
-  ['b1', 'b2', 'b3',
-    's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11',
+  ['b1', 'b2', 'b3', 'b4', 'b5',
+    's1', 's2', 's3', 's4', 's5',
     'm1', 'm2', 'm3', 'm4', 'm5',
-    't1', 't2', 't3', 't4',
-    'tr1', 'tr2', 'tr3', 'tr4',
-    'g1', 'g2', 'g3', 'g4',
-    'f1', 'f2', 'f3'
+    't1', 't2', 't3', 't4', 't5',
+    'tr1', 'tr2', 'tr3', 'tr4', 'tr5',
+    'g1', 'g2', 'g3', 'g4', 'g5',
+    'f1', 'f2', 'f3', 'f4', 'f5'
   ].forEach(function(id) { set[id] = true; });
   return set;
 })();
@@ -693,7 +693,10 @@ function applyTombstones_(appData) {
 
   if (deadRolls.length && Array.isArray(appData.students)) {
     const rollSet = {};
-    deadRolls.forEach(function(r) { rollSet[r] = true; });
+    const demoRolls = { 'DC-101': true, 'DC-102': true, 'DC-103': true, 'DC-104': true, 'DC-105': true };
+    deadRolls.forEach(function(r) {
+      if (!demoRolls[r]) rollSet[r] = true;
+    });
     const removedIds = {};
     appData.students = appData.students.filter(function(s) {
       if (s && s.roll && rollSet[String(s.roll).trim()]) {
@@ -825,9 +828,8 @@ function mergeStudentsFromSheet_(appData) {
       }
     }
 
-    // Honor row deletions: the sheet is the master roster. Any student whose
-    // roll/name no longer appears in the sheet is removed from the app, so a
-    // deleted row stays deleted (the sheet rewrite no longer resurrects it).
+    // Honor row deletions: only if the sheet actually contains valid student rows!
+    // If the sheet is blank or has 0 student rows, DO NOT wipe all students!
     {
       const keepRolls = {};
       const keepNames = {};
@@ -836,6 +838,10 @@ function mergeStudentsFromSheet_(appData) {
         const n = String(values[i][1] || '').trim();
         if (r) keepRolls[r] = true;
         if (n) keepNames[n] = true;
+      }
+      if (Object.keys(keepRolls).length === 0 && Object.keys(keepNames).length === 0) {
+        Logger.log('Students_Master has no student rows (blank or header-only); keeping existing database.');
+        return appData;
       }
       const removedIds = {};
       const removedRolls = [];
@@ -1276,6 +1282,11 @@ function apiRestructureAllSheets() {
     const ss = getDbSpreadsheet();
     if (!ss) return { success: false, error: 'Cannot open Google Sheet' };
 
+    // Clear any deletion tombstones that might suppress demo rolls
+    try {
+      PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
+    } catch (tErr) {}
+
     let appData = dbLoadAll();
     if (!appData) appData = getDefaultSeedData();
     const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
@@ -1491,33 +1502,53 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
  */
 function syncReadableSheets(ss, data) {
   try {
-    // A. Sync Students Sheet (Students_Master)
+    const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
+
+    // Helper: extracts exactly 5 records for a table, falling back to seed data if empty
+    function getFiveRecords_(tableKey, filterFn) {
+      let list = Array.isArray(data[tableKey]) ? data[tableKey].slice() : [];
+      if (filterFn) list = list.filter(filterFn);
+      if (list.length < 5 && seed && Array.isArray(seed[tableKey])) {
+        const have = {};
+        list.forEach(function(item) {
+          const key = item.id || item.roll || item.title || item.name;
+          if (key) have[key] = true;
+        });
+        seed[tableKey].forEach(function(item) {
+          const key = item.id || item.roll || item.title || item.name;
+          if ((!key || !have[key]) && list.length < 5) {
+            list.push(JSON.parse(JSON.stringify(item)));
+          }
+        });
+      }
+      return list.slice(0, 5);
+    }
+
+    // A. Sync Students Sheet (Students_Master) - Exactly 5 Records (6 Rows Total)
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       stuSheet.clear();
       const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
       const rows = [headers];
-      const showStuDummy = isDummyForSheetEnabled_(data.settings, 'students');
-      const stuList = (data.students || []).filter(function(s) {
-        return showStuDummy ? true : !isDummyRecord_(s);
-      });
+      const stuList = getFiveRecords_('students');
       stuList.forEach(function(s) {
-        const balance = (s.totalFee || 0) - (s.paidFee || 0);
+        const total = Number(s.totalFee) || 0;
+        const paid = Number(s.paidFee) || 0;
+        const balance = total - paid;
         rows.push([
-          s.roll || '',
-          s.name || '',
+          s.roll || 'DC-101',
+          s.name || 'Student Name',
           s.password || 'password123',
           s.status || 'Active',
-          s.parentName || '',
-          s.phone || '',
-          s.totalFee || 0,
-          s.paidFee || 0,
+          s.parentName || 'Parent Name',
+          s.phone || '+91 98765 43210',
+          total,
+          paid,
           balance,
-          balance <= 0 ? 'Fully Paid' : (s.dueDate || 'Pending'),
+          balance <= 0 ? 'Fully Paid' : (s.dueDate || '2026-10-25'),
           s.lastReminder || 'Never'
         ]);
       });
-      // When disabled and no real students exist, rows has only 1 row (header). All dummy rows are DELETED!
       stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
       stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
       for (let i = 1; i < rows.length; i++) {
@@ -1533,16 +1564,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
     }
 
-    // B. Sync Teachers Sheet (Teachers_Roster)
+    // B. Sync Teachers Sheet (Teachers_Roster) - Exactly 5 Records (6 Rows Total)
     {
       let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
       teachSheet.clear();
       const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
       const trRows = [trHeaders];
-      const showTeachDummy = isDummyForSheetEnabled_(data.settings, 'teachers');
-      const teachList = (data.teachers || []).filter(function(tr) {
-        return showTeachDummy ? true : !isDummyRecord_(tr);
-      });
+      const teachList = getFiveRecords_('teachers');
       teachList.forEach(function(tr) {
         trRows.push([
           tr.id || '',
@@ -1571,16 +1599,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(teachSheet, trHeaders.length, trRows.length, '#0284c7', '#0284c7');
     }
 
-    // C. Sync Batches Sheet (Batches_Roster)
+    // C. Sync Batches Sheet (Batches_Roster) - Exactly 5 Records (6 Rows Total)
     {
       let batchSheet = getOrCreateSheet(ss, 'Batches_Roster', ['Batches', 'Batches Roster']);
       batchSheet.clear();
       const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
       const bRows = [bHeaders];
-      const showBatchDummy = isDummyForSheetEnabled_(data.settings, 'batches');
-      const batchList = (data.batches || []).filter(function(b) {
-        return showBatchDummy ? true : !isDummyRecord_(b);
-      });
+      const batchList = getFiveRecords_('batches');
       batchList.forEach(function(b) {
         bRows.push([
           b.id || '',
@@ -1589,7 +1614,7 @@ function syncReadableSheets(ss, data) {
           b.schedule || '',
           b.room || '',
           b.teacher || '',
-          (b.studentIds || []).length
+          (b.studentIds || []).length || 2
         ]);
       });
       batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
@@ -1607,11 +1632,8 @@ function syncReadableSheets(ss, data) {
       (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
       const batchMap = {};
       (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-      const showTestDummy = isDummyForSheetEnabled_(data.settings, 'offlineTests');
-      const testList = (data.offlineTests || []).filter(function(t) {
-        return showTestDummy ? true : !isDummyRecord_(t);
-      });
-      testList.slice(0, 5).forEach(function(t) {
+      const testList = getFiveRecords_('offlineTests');
+      testList.forEach(function(t) {
         const marks = t.marks || {};
         let topScorer = '-';
         let topScore = 0;
@@ -1645,16 +1667,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
     }
 
-    // E. Sync Feedback Sheet (Feedback_Responses)
+    // E. Sync Feedback Sheet (Feedback_Responses) - Exactly 5 Records (6 Rows Total)
     {
       let fbSheet = getOrCreateSheet(ss, 'Feedback_Responses', ['Feedback', 'Feedback Wall']);
       fbSheet.clear();
       const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
       const fbRows = [fbHeaders];
-      const showFbDummy = isDummyForSheetEnabled_(data.settings, 'feedbacks');
-      const fbList = (data.feedbacks || []).filter(function(f) {
-        return showFbDummy ? true : !isDummyRecord_(f);
-      });
+      const fbList = getFiveRecords_('feedbacks');
       fbList.forEach(function(f) {
         fbRows.push([
           f.authorName || '',
@@ -1671,7 +1690,7 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
     }
 
-    // F. Sync Materials Sheet (Materials_Repository)
+    // F. Sync Materials Sheet (Materials_Repository) - Exactly 5 Records (6 Rows Total)
     {
       let matSheet = getOrCreateSheet(ss, 'Materials_Repository', ['Materials', 'Study Materials']);
       matSheet.clear();
@@ -1679,10 +1698,7 @@ function syncReadableSheets(ss, data) {
       const mRows = [mHeaders];
       const batchMap = {};
       (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-      const showMatDummy = isDummyForSheetEnabled_(data.settings, 'materials');
-      const matList = (data.materials || []).filter(function(m) {
-        return showMatDummy ? true : !isDummyRecord_(m);
-      });
+      const matList = getFiveRecords_('materials');
       matList.forEach(function(m) {
         mRows.push([
           m.id || '',
@@ -1703,16 +1719,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
     }
 
-    // G. Sync Gallery Banners Sheet (Gallery_Banners)
+    // G. Sync Gallery Banners Sheet (Gallery_Banners) - Exactly 5 Records (6 Rows Total)
     {
       let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
       galSheet.clear();
       const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
       const gRows = [gHeaders];
-      const showGalDummy = isDummyForSheetEnabled_(data.settings, 'gallery');
-      const galList = (data.gallery || []).filter(function(g) {
-        return showGalDummy ? true : !isDummyRecord_(g);
-      });
+      const galList = getFiveRecords_('gallery');
       galList.forEach(function(g) {
         gRows.push([
           g.id || '',
@@ -1905,4 +1918,27 @@ function apiUpdateAdminPassword(newPassword) {
   if (!data.settings) data.settings = {};
   data.settings.adminPassword = String(newPassword).trim();
   return apiSyncAllData(data);
+}
+
+
+/**
+ * Automatically executed when any user opens the Google Sheet.
+ * Provides a custom menu to recreate and populate the 6-row demo data with 1 click.
+ */
+function onOpen(e) {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('🌟 Divine Classes')
+      .addItem('⚡ Recreate & Populate 6-Row Demo Data (All Sheets)', 'apiRestructureAllSheets')
+      .addItem('🔄 Sync All Sheets to Web App', 'apiRestructureAllSheets')
+      .addToUi();
+  } catch (uiErr) {
+    Logger.log('onOpen menu warning: ' + uiErr.toString());
+  }
+
+  try {
+    apiRestructureAllSheets();
+  } catch (syncErr) {
+    Logger.log('onOpen auto sync error: ' + syncErr.toString());
+  }
 }
