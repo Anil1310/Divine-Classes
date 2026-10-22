@@ -443,7 +443,16 @@ function getDefaultSeedData() {
       showRequirementLabels: true,
       allowAdminFeedbackDelete: true,
       allowAdminLinkDelete: true,
-      showDummyData: true
+      showDummyData: true,
+      dummyDataConfig: {
+        students: true,
+        teachers: true,
+        batches: true,
+        offlineTests: true,
+        materials: true,
+        gallery: true,
+        feedbacks: true
+      }
     };
     return data;
   }
@@ -1106,9 +1115,11 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
  * - enabled: true (populate into sheet) | false (delete completely from sheet)
  * Note: External_Links_Hub is permanent and ALWAYS unchanged!
  */
-function apiSetDummyDataStatus(target, enabled) {
+function apiSetDummyDataStatus(target, enabled, clientState) {
   let appData = dbLoadAll();
   if (!appData) appData = getDefaultSeedData();
+  const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
+
   if (!appData.settings) appData.settings = {};
   if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
     appData.settings.dummyDataConfig = {
@@ -1127,22 +1138,96 @@ function apiSetDummyDataStatus(target, enabled) {
     target = 'all';
   }
 
-  if (target === 'all' || !target) {
-    appData.settings.showDummyData = !!enabled;
-    const cfg = appData.settings.dummyDataConfig;
-    Object.keys(cfg).forEach(function(k) { cfg[k] = !!enabled; });
-  } else if (appData.settings.dummyDataConfig[target] !== undefined) {
-    appData.settings.dummyDataConfig[target] = !!enabled;
-    const anyOn = Object.keys(appData.settings.dummyDataConfig).some(function(k) {
-      return appData.settings.dummyDataConfig[k] === true;
+  const allTables = ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'];
+  const tables = (target === 'all' || !target) ? allTables : [target];
+
+  if (enabled) {
+    // 1. Enable in config
+    if (target === 'all' || !target) {
+      appData.settings.showDummyData = true;
+      allTables.forEach(function(tbl) { appData.settings.dummyDataConfig[tbl] = true; });
+    } else {
+      appData.settings.dummyDataConfig[target] = true;
+      appData.settings.showDummyData = true;
+    }
+
+    // 2. CRITICAL: Inject the seed dummy records for the enabled table(s) into appData
+    // so they are immediately created in the Google Sheet tabs!
+    tables.forEach(function(tbl) {
+      if (!Array.isArray(appData[tbl])) appData[tbl] = [];
+      const have = {};
+      appData[tbl].forEach(function(r) { if (r && r.id) have[r.id] = true; });
+      (seed[tbl] || []).forEach(function(r) {
+        if (r && r.id && !have[r.id]) {
+          appData[tbl].push(JSON.parse(JSON.stringify(r)));
+        }
+      });
     });
-    appData.settings.showDummyData = anyOn;
+
+    // Ensure student IDs are linked into demo batches
+    if (tables.indexOf('students') !== -1 || tables.indexOf('batches') !== -1) {
+      (seed.batches || []).forEach(function(sb) {
+        const mb = (appData.batches || []).find(function(b) { return b.id === sb.id; });
+        if (mb && Array.isArray(sb.studentIds)) {
+          if (!Array.isArray(mb.studentIds)) mb.studentIds = [];
+          sb.studentIds.forEach(function(sid) {
+            if (mb.studentIds.indexOf(sid) === -1) mb.studentIds.push(sid);
+          });
+        }
+      });
+    }
+
+    // If clientState was passed, also preserve any newly created real records from client
+    if (clientState && typeof clientState === 'object') {
+      tables.forEach(function(tbl) {
+        if (Array.isArray(clientState[tbl])) {
+          const existingIds = {};
+          (appData[tbl] || []).forEach(function(r) { if (r && r.id) existingIds[r.id] = true; });
+          clientState[tbl].forEach(function(cr) {
+            if (cr && cr.id && !existingIds[cr.id]) {
+              appData[tbl].push(JSON.parse(JSON.stringify(cr)));
+            }
+          });
+        }
+      });
+    }
+  } else {
+    // 1. Disable in config
+    if (target === 'all' || !target) {
+      appData.settings.showDummyData = false;
+      allTables.forEach(function(tbl) { appData.settings.dummyDataConfig[tbl] = false; });
+    } else {
+      appData.settings.dummyDataConfig[target] = false;
+      const anyOn = allTables.some(function(tbl) { return appData.settings.dummyDataConfig[tbl] === true; });
+      appData.settings.showDummyData = anyOn;
+    }
+
+    // 2. CRITICAL: Delete all dummy records for the disabled table(s) from appData
+    // so they are completely removed from the Google Sheet tabs!
+    tables.forEach(function(tbl) {
+      appData[tbl] = (appData[tbl] || []).filter(function(r) { return !isDummyRecord_(r); });
+    });
+
+    if (tables.indexOf('students') !== -1) {
+      const dummyStudentIds = {};
+      (seed.students || []).forEach(function(s) { dummyStudentIds[s.id] = true; });
+      (appData.batches || []).forEach(function(b) {
+        if (Array.isArray(b.studentIds)) {
+          b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+        }
+      });
+      (appData.offlineTests || []).forEach(function(t) {
+        if (t && t.marks && typeof t.marks === 'object') {
+          Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
+        }
+      });
+    }
   }
 
-  // Persist updated settings in master database
+  // Persist updated state in master database
   dbSaveAll(appData);
 
-  // Sync to Google Sheet: wipes disabled dummy data immediately
+  // Sync to Google Sheet: directly writes or deletes data across the different sheet tabs!
   try {
     const ss = getDbSpreadsheet();
     if (ss) {
@@ -1263,9 +1348,7 @@ function apiSyncAllData(fullData) {
         // DEVELOPER TOGGLE FOR GOOGLE SHEETS:
         // When showDummyData is false: Human-readable sheets reflect ONLY real production records!
         // When showDummyData is true: Human-readable sheets reflect demo records for presentation.
-        const sheetData = (fullData.settings && fullData.settings.showDummyData === false)
-          ? stripDummyData_(JSON.parse(JSON.stringify(fullData)))
-          : fullData;
+        const sheetData = stripDummyData_(JSON.parse(JSON.stringify(fullData)));
         syncReadableSheets(ss, sheetData);
       }
     } catch (sheetErr) {

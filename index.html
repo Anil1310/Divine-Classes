@@ -945,7 +945,7 @@ function stripDummyData(appData, targetTable) {
                             console.warn('apiSetDummyDataStatus error:', err);
                             updateSyncBadge('✓ Saved locally', 'info');
                         })
-                        .apiSetDummyDataStatus(sheetKey, willEnable);
+                        .apiSetDummyDataStatus(sheetKey, willEnable, state);
                 } else {
                     google.script.run
                         .withSuccessHandler(function() {
@@ -1009,7 +1009,7 @@ function stripDummyData(appData, targetTable) {
                             console.warn('apiSetDummyDataStatus error:', err);
                             updateSyncBadge('✓ Saved locally', 'info');
                         })
-                        .apiSetDummyDataStatus('all', willEnable);
+                        .apiSetDummyDataStatus('all', willEnable, state);
                 } else {
                     google.script.run
                         .withSuccessHandler(function() {
