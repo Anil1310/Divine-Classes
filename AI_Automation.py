@@ -182,20 +182,9 @@ def get_vercel_site_url(project_dir):
         try:
             with open(config_path, encoding="utf-8") as f:
                 data = json.load(f)
-                url = data.get("siteUrl") or data.get("url")
+                url = data.get("siteUrl")
                 if url:
                     return f"{url.rstrip('/')}/"
-        except Exception:
-            pass
-
-    vercel_proj_file = os.path.join(project_dir, ".vercel", "project.json")
-    if os.path.isfile(vercel_proj_file):
-        try:
-            with open(vercel_proj_file, encoding="utf-8") as f:
-                data = json.load(f)
-                p_name = data.get("projectName")
-                if p_name:
-                    return f"https://{p_name}.vercel.app/"
         except Exception:
             pass
 
@@ -214,80 +203,9 @@ def get_vercel_project_name(project_dir):
                 return data.get("name")
         except Exception:
             pass
-    vercel_proj_file = os.path.join(project_dir, ".vercel", "project.json")
-    if os.path.isfile(vercel_proj_file):
-        try:
-            with open(vercel_proj_file, encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("projectName")
-        except Exception:
-            pass
     if "expense" in os.path.basename(project_dir).lower():
         return "expense-pro"
     return None
-
-
-def create_vercel_project(project_dir, auto=False):
-    """Automatically create a Vercel project and link it to this directory."""
-    proj_name = os.path.basename(project_dir)
-    default_name = re.sub(r"[^a-z0-9\-]", "-", proj_name.lower()).strip("-")
-    default_name = re.sub(r"-+", "-", default_name) or "my-project"
-
-    print(f"\n{CYAN}--------------------------------------------------------{RESET}")
-    print(f"▲ {BOLD}Create & Link Vercel Project:{RESET} {GREEN}{default_name}{RESET}")
-    print(f"{CYAN}--------------------------------------------------------{RESET}\n")
-
-    if not auto:
-        try:
-            val = input(f"{YELLOW}Enter Vercel project name [{default_name}]: {RESET}").strip()
-            if val:
-                default_name = re.sub(r"[^a-z0-9\-]", "-", val.lower()).strip("-")
-        except (EOFError, KeyboardInterrupt):
-            print("\nCancelled.")
-            return None
-
-    print(f"\n{CYAN}Creating project '{default_name}' in Vercel...{RESET}")
-    res_create = subprocess.run(["npx", "-y", "vercel", "project", "create", default_name], text=True, capture_output=True)
-    if res_create.returncode != 0 and "already exists" not in res_create.stderr and "already exists" not in res_create.stdout:
-        print(f"{YELLOW}{res_create.stdout}\n{res_create.stderr}{RESET}")
-    else:
-        print(f"{GREEN}✓ Project '{default_name}' ready on Vercel.{RESET}")
-
-    print(f"{CYAN}Linking directory to '{default_name}'...{RESET}")
-    subprocess.run(["npx", "-y", "vercel", "link", "--yes", "--project", default_name], cwd=project_dir)
-
-    try:
-        remote = subprocess.check_output(["git", "remote", "get-url", "origin"], cwd=project_dir, text=True).strip()
-        if remote:
-            print(f"{CYAN}Connecting GitHub repository to Vercel...{RESET}")
-            subprocess.run(["npx", "-y", "vercel", "git", "connect", remote, "--yes"], cwd=project_dir)
-    except Exception:
-        pass
-
-    site_url = f"https://{default_name}.vercel.app"
-    config_path = os.path.join(project_dir, ".vercel-site.json")
-    try:
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "name": default_name,
-                "url": site_url,
-                "siteUrl": site_url
-            }, f, indent=2)
-        print(f"{GREEN}✓ Saved project configuration to .vercel-site.json{RESET}")
-    except Exception as e:
-        print(f"{RED}Error saving .vercel-site.json: {e}{RESET}")
-
-    print(f"\n{GREEN}{BOLD}🎉 Project '{default_name}' created & linked successfully!{RESET}")
-    print(f"👉 Live URL: {CYAN}{site_url}{RESET}\n")
-
-    if not auto:
-        try:
-            dep_choice = input(f"{YELLOW}Deploy project to Vercel production now? [Y/n]: {RESET}").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            dep_choice = "y"
-        if dep_choice in ("", "y", "yes"):
-            deploy_vercel(project_dir, auto=True)
-    return default_name
 
 
 def deploy_vercel(project_dir, auto=False):
@@ -309,27 +227,22 @@ def deploy_vercel(project_dir, auto=False):
     print(f"{CYAN}Running: {' '.join(cmd)}...{RESET}")
     proc = subprocess.run(cmd, cwd=project_dir)
 
-    live_url = get_vercel_site_url(project_dir)
+    live_url = get_vercel_site_url(project_dir) or "https://expense-pro-rust.vercel.app/"
     if proc.returncode == 0:
         print(f"\n{GREEN}{BOLD}🎉 SUCCESS! Deployed to Vercel successfully.{RESET}")
-        if live_url:
-            print(f"👉 {BOLD}{CYAN}{live_url}{RESET}\n")
-            try:
-                subprocess.run(["open", live_url])
-            except Exception:
-                pass
+        print(f"👉 {BOLD}{CYAN}{live_url}{RESET}\n")
+        try:
+            subprocess.run(["open", live_url])
+        except Exception:
+            pass
     else:
         print(f"\n{YELLOW}If deployment requires authentication, run: npx vercel login{RESET}")
-        if live_url:
-            print(f"Or view project at: {CYAN}{live_url}{RESET}")
+        print(f"Or view project at: {CYAN}{live_url}{RESET}")
 
 
 def open_vercel_site(project_dir):
     """Open active Vercel site in browser."""
-    url = get_vercel_site_url(project_dir)
-    if not url:
-        print(f"\n{YELLOW}No Vercel site configured for this project. Use 'Create / Connect Project' first.{RESET}")
-        return
+    url = get_vercel_site_url(project_dir) or "https://expense-pro-rust.vercel.app/"
     print(f"\n{CYAN}Opening Vercel site in browser:{RESET} {GREEN}{url}{RESET}")
     try:
         subprocess.run(["open", url])
@@ -869,22 +782,21 @@ def main():
         ]),
         "2": ("VERCEL", [
             (6, "Deploy to Vercel", "Deploy production build to Vercel", "▲"),
-            (7, "Create & Link Project", "Create and link this project on Vercel automatically", "+"),
-            (8, "Open Live Vercel Site", "Open live Vercel URL in web browser", "↗"),
-            (9, "Delete Vercel Project", "Permanently delete a Vercel project", "×"),
+            (7, "Open Live Vercel Site", "Open live Vercel URL in web browser", "↗"),
+            (8, "Delete Vercel Project", "Permanently delete a Vercel project", "×"),
         ]),
         "3": ("NETLIFY", [
-            (10, "Deploy Site", "Deploy a project to Netlify", "▲"),
-            (11, "Connect GitHub Repository", "Set up a Netlify site from a GitHub repository", "↗"),
-            (12, "Delete Netlify Site", "Permanently delete a Netlify project", "×"),
+            (9, "Deploy Site", "Deploy a project to Netlify", "▲"),
+            (10, "Connect GitHub Repository", "Set up a Netlify site from a GitHub repository", "↗"),
+            (11, "Delete Netlify Site", "Permanently delete a Netlify project", "×"),
         ]),
         "4": ("GOOGLE APPS SCRIPT", [
-            (13, "Deploy Apps Script", "Push source and update or create deployment", "↥"),
+            (12, "Deploy Apps Script", "Push source and update or create deployment", "↥"),
         ]),
         "5": ("WORKSPACE", [
-            (14, "Project Status", "View recent commits and live deployment URLs", "≡"),
-            (15, "Switch Project", "Choose another local Git project", "⇄"),
-            (16, "Exit", "Close the automation center", "×"),
+            (13, "Project Status", "View recent commits and live deployment URLs", "≡"),
+            (14, "Switch Project", "Choose another local Git project", "⇄"),
+            (15, "Exit", "Close the automation center", "×"),
         ]),
     }
 
@@ -938,22 +850,20 @@ def main():
         elif choice == "6":
             deploy_vercel(target_project)
         elif choice == "7":
-            create_vercel_project(target_project)
-        elif choice == "8":
             open_vercel_site(target_project)
-        elif choice == "9":
+        elif choice == "8":
             delete_vercel_project(target_project)
-        elif choice == "10":
+        elif choice == "9":
             deploy_netlify(target_project)
-        elif choice == "11":
+        elif choice == "10":
             create_netlify_site(target_project)
-        elif choice == "12":
+        elif choice == "11":
             delete_netlify(target_project)
-        elif choice == "13":
+        elif choice == "12":
             deploy_apps_script(target_project)
-        elif choice == "14":
+        elif choice == "13":
             view_status(target_project)
-        elif choice == "15":
+        elif choice == "14":
             all_projs = list_desktop_projects()
             print(f"\n{BOLD}Available Desktop Projects:{RESET}")
             for i, p in enumerate(all_projs, start=1):
@@ -966,7 +876,7 @@ def main():
                     print(f"{GREEN}Switched to: {os.path.basename(target_project)}{RESET}")
             except (EOFError, KeyboardInterrupt):
                 pass
-        elif choice in ("16", "q", "exit"):
+        elif choice in ("15", "q", "exit"):
             print(f"\n{GREEN}Goodbye! 👋{RESET}\n")
             break
         else:
