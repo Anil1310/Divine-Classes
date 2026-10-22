@@ -1,7 +1,11 @@
 # Divine Classes — Institute Management System
 
 Official portal for **Divine Classes** (JEE / NEET / Board coaching, New Delhi).
-A role-based web app built on **Google Apps Script** with a Cloud Database, Google Drive storage, and a Google Sheet mirror — plus an installable **Android (PWA) app** experience.
+A role-based web app built on **Google Apps Script** with a Cloud Database, Google Drive storage, and a Google Sheet mirror.
+
+### 🌐 Live Web App
+- **Live Portal:** [https://script.google.com/macros/s/AKfycbzeohya5AzIYqWHERYwLE85Uhx6uxRiGVPRnTEuhwD5/dev](https://script.google.com/macros/s/AKfycbzeohya5AzIYqWHERYwLE85Uhx6uxRiGVPRnTEuhwD5/dev)
+- **Production Exec URL:** [https://script.google.com/macros/s/AKfycbzeohya5AzIYqWHERYwLE85Uhx6uxRiGVPRnTEuhwD5/exec](https://script.google.com/macros/s/AKfycbzeohya5AzIYqWHERYwLE85Uhx6uxRiGVPRnTEuhwD5/exec)
 
 ---
 
@@ -44,11 +48,11 @@ A role-based web app built on **Google Apps Script** with a Cloud Database, Goog
 ├── login.html           # Standalone sign-in screen
 ├── logout.html          # Signed-out screen
 ├── appsscript.json      # Apps Script manifest (V8, webapp access: ANYONE)
-├── manifest.json        # PWA manifest (Android install)
 ├── logo.jpeg            # App icon (DC emblem)
+├── divine_toppers_banner.jpg # Result banner
 ├── .clasp.json          # clasp script binding
 ├── .claspignore         # Only pushes the 7 app files above
-└── update_contact_info.py  # (empty utility placeholder)
+└── update_contact_info.py  # (utility placeholder)
 ```
 
 ---
@@ -97,49 +101,7 @@ Every edit auto-syncs (350 ms debounce); the header sync button forces an instan
 
 ---
 
-## 5. Android App (PWA)
-
-There is **no separate native Android project** — the Android app is the same portal installed as a **Progressive Web App**:
-
-- `manifest.json` → name *Divine Classes*, standalone display, indigo theme (`#4f46e5`), dark background, portrait lock, `logo.jpeg` icon (`192/512`, maskable).
-- `index.html` ships the manifest link + apple-touch-icon + base64 favicon.
-- Mobile UI: bottom tab bar (Home / Batches / Fees-or-Materials / Tests / Menu), slide-in sidebar, safe-area padding for notched phones.
-
-### Install on Android
-
-1. Open the deployed web app URL in **Chrome**.
-2. Menu (⋮) → **Add to Home screen** / **Install app**.
-3. Launches full-screen, standalone, with its own home-screen icon.
-
----
-
-## 6. Development & Deployment
-
-```bash
-npm i -g @google/clasp
-clasp login
-clasp push            # upload the 7 app files to the script editor
-clasp deploy          # publish a new web app version (updates live URL)
-clasp open-script     # open the Apps Script editor
-```
-
-- Script ID / Sheet ID are referenced in `Code.js` (top) and `.clasp.json`.
-- `.claspignore` whitelists only: `Code.js`, `appsscript.json`, `index.html`, `css.html`, `javascript.html`, `login.html`, `logout.html` (README, images, manifests stay local).
-
-### Local testing (important!)
-
-Pages load their JS/CSS via Apps Script template scriptlets:
-
-```html
-<?!= include('css'); ?>          <!-- index.html -->
-<?!= include('javascript'); ?>   <!-- index.html -->
-```
-
-These only expand **when served by Google Apps Script**. Opening `index.html` directly (`file://` or a plain server) yields a dead/blank page — always test through the deployed GAS URL (or use `clasp deploy`).
-
----
-
-## 7. Security Notes
+## 5. Security Notes
 
 - All portal passwords (Admin, Developer, Teacher, Student) are stored in script properties and mirrored to the Sheet's `Settings_Config` / roster tabs — treat Sheet access as sensitive.
 - Role gating is enforced client-side (`navigateTo`, `renderMainContent`) and on login; the Sheet/Drive are public-view by design for material sharing.
@@ -148,7 +110,7 @@ These only expand **when served by Google Apps Script**. Opening `index.html` di
 
 ---
 
-## 8. Contact
+## 6. Contact
 
 **Divine Classes** — 235 Paschimpuri Pocket 2, Club Road, New Delhi 110063
 Phone: 9555-6787-53 · contact@divineclasses.in · YouTube: [@chem_crush9](https://www.youtube.com/@chem_crush9)
