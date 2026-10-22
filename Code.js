@@ -369,286 +369,12 @@ function apiGetNotifications() {
 }
 
 /**
- * Seed dataset for Divine Classes
+ * Seed dataset for Divine Classes (modularized via DummyData.js)
  */
 function getDefaultSeedData() {
-  const data = {
-    batches: [
-      {
-        id: 'b1',
-        name: 'JEE Advanced Target 2027 (Alpha Batch)',
-        subject: 'Physics, Chemistry & Mathematics',
-        schedule: 'Mon - Fri • 08:00 AM - 12:30 PM',
-        room: 'Lecture Hall 101 (Smart AC)',
-        teacher: 'Er. Rajesh Chahar (Ex-IITian)',
-        studentIds: ['s1', 's2', 's3', 's4', 's10']
-      },
-      {
-        id: 'b2',
-        name: 'NEET Medical Dropper & Foundation (Bio-Elite)',
-        subject: 'Botany, Zoology, Physics & Chemistry',
-        schedule: 'Mon - Sat • 01:30 PM - 06:00 PM',
-        room: 'Medical Hall 202',
-        teacher: 'Dr. Sunita Sharma (M.D. AIIMS)',
-        studentIds: ['s5', 's6', 's7']
-      },
-      {
-        id: 'b3',
-        name: 'Class 10th CBSE Board Excellence & NTSE',
-        subject: 'Science, Mathematics & Social Science',
-        schedule: 'Tue, Thu, Sat • 04:30 PM - 07:00 PM',
-        room: 'Classroom 104',
-        teacher: 'Mr. Arvind Verma (M.Sc. Gold Medalist)',
-        studentIds: ['s8', 's9']
-      }
-    ],
-    students: [
-      { id: 's1', roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', totalFee: 48000, paidFee: 32000, dueDate: '2026-10-25', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
-      { id: 's2', roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's3', roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', totalFee: 48000, paidFee: 16000, dueDate: '2026-10-18', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's4', roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's5', roll: 'DC-201', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', totalFee: 52000, paidFee: 26000, dueDate: '2026-10-20', lastReminder: '5 days ago', password: 'password123', status: 'Active' },
-      { id: 's6', roll: 'DC-202', name: 'Ananya Singh', phone: '+91 96543 21098', parentName: 'Virendra Singh', totalFee: 52000, paidFee: 52000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's7', roll: 'DC-203', name: 'Devansh Joshi', phone: '+91 95551 12233', parentName: 'Prakash Joshi', totalFee: 52000, paidFee: 36000, dueDate: '2026-10-28', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's8', roll: 'DC-301', name: 'Ishita Das', phone: '+91 94443 32211', parentName: 'Subhash Das', totalFee: 30000, paidFee: 22000, dueDate: '2026-10-22', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's9', roll: 'DC-302', name: 'Yashvardhan Chauhan', phone: '+91 93123 45678', parentName: 'Manoj Chauhan', totalFee: 30000, paidFee: 30000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's10', roll: 'DC-110', name: 'Anil Kumar Chahar', phone: '+91 95556 78753', parentName: 'Rajesh Chahar', totalFee: 50000, paidFee: 25000, dueDate: '2026-10-30', lastReminder: '1 day ago', password: 'password123', status: 'Active' },
-      { id: 's11', roll: 'DC-105', name: 'Radhika Chahar', phone: '+91 95556 78754', parentName: 'Anil Chahar', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' }
-    ],
-    materials: [
-      {
-        id: 'm1',
-        batchId: 'b1',
-        title: 'Rotational Dynamics - Advanced DPP #05 with Step Hints',
-        category: 'Assignment PDF',
-        uploadDate: '12 Oct 2026',
-        uploadedBy: 'Er. Rajesh Chahar',
-        fileSize: '2.4 MB',
-        downloads: 48,
-        fileName: 'Rotational_Dynamics_DPP_05.pdf',
-        fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
-        description: '50 tough multi-concept questions covering Moment of Inertia, Conservation of Angular Momentum, and Pure Rolling on incline.'
-      },
-      {
-        id: 'm2',
-        batchId: 'b1',
-        title: 'Chemical Equilibrium & Ionic Equilibria Formula Booster Sheet',
-        category: 'Worksheet',
-        uploadDate: '14 Oct 2026',
-        uploadedBy: 'Dr. Meera Krishnan',
-        fileSize: '1.1 MB',
-        downloads: 39,
-        fileName: 'Chemical_Equilibrium_Booster_Sheet.pdf',
-        fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
-        description: 'Complete high-yield shortcut formulas, Ostwald dilution law, buffer solutions, and solubility product numerical tables.'
-      },
-      {
-        id: 'm3',
-        batchId: 'b1',
-        title: 'Divine Classes JEE Mock Test #03 (Paper 1 & 2 + Answer Key)',
-        category: 'Test Paper',
-        uploadDate: '10 Oct 2026',
-        uploadedBy: 'Er. Rajesh Chahar',
-        fileSize: '3.6 MB',
-        downloads: 55,
-        fileName: 'JEE_Mock_Test_03_Paper_and_Solutions.pdf',
-        fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
-        description: 'Official full-syllabus simulation offline test paper held on Sunday with detailed marking scheme and video solution links.'
-      },
-      {
-        id: 'm4',
-        batchId: 'b2',
-        title: 'NEET Human Genetics & Molecular Biology NCERT Drill',
-        category: 'Worksheet',
-        uploadDate: '13 Oct 2026',
-        uploadedBy: 'Dr. Sunita Sharma',
-        fileSize: '2.8 MB',
-        downloads: 42,
-        fileName: 'NEET_Human_Genetics_NCERT_Drill.pdf',
-        fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
-        description: 'Line-by-line NCERT diagram drills, pedigree charts, and 120 assertion-reason practice questions.'
-      },
-      {
-        id: 'm5',
-        batchId: 'b3',
-        title: 'CBSE 10th Standard Mathematics Real Numbers & Polynomials Board Paper',
-        category: 'Test Paper',
-        uploadDate: '11 Oct 2026',
-        uploadedBy: 'Mr. Arvind Verma',
-        fileSize: '1.4 MB',
-        downloads: 31,
-        fileName: 'CBSE_10th_Maths_Board_Paper.pdf',
-        fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
-        description: 'CBSE previous 10-year question compilation with step-marking criteria for term exams.'
-      }
-    ],
-    offlineTests: [
-      {
-        id: 't1',
-        batchId: 'b1',
-        title: 'Offline Minor Test #1 - Kinematics, NLM & Vectors',
-        subject: 'Physics',
-        date: '05 Oct 2026',
-        maxMarks: 100,
-        marks: {
-          's1': { score: 92, remarks: 'Outstanding conceptual clarity!' },
-          's2': { score: 96, remarks: 'Batch Topper • Flawless calculations' },
-          's3': { score: 72, remarks: 'Revise constraint motion relations' },
-          's4': { score: 86, remarks: 'Very consistent, good speed' },
-          's10': { score: 76, remarks: 'Account Blocked in Database' }
-        }
-      },
-      {
-        id: 't2',
-        batchId: 'b1',
-        title: 'Offline Grand Test #2 - Physical & Inorganic Chemistry',
-        subject: 'Chemistry',
-        date: '12 Oct 2026',
-        maxMarks: 100,
-        marks: {
-          's1': { score: 89, remarks: 'Great improvement in thermodynamics' },
-          's2': { score: 94, remarks: 'Excellent stoichiometry work' },
-          's3': { score: 78, remarks: 'Good attempt, practice redox titration' },
-          's4': { score: 88, remarks: 'Strong accuracy throughout' }
-        }
-      },
-      {
-        id: 't3',
-        batchId: 'b2',
-        title: 'NEET Offline Minor Test - Cell Division & Plant Kingdom',
-        subject: 'Biology',
-        date: '08 Oct 2026',
-        maxMarks: 720,
-        marks: {
-          's5': { score: 628, remarks: 'Strong Botany score, revise meiosis stages' },
-          's6': { score: 680, remarks: 'Top Ranker in Divine Classes! AIIMS caliber' },
-          's7': { score: 595, remarks: 'Improve speed in assertion-reason' }
-        }
-      },
-      {
-        id: 't4',
-        batchId: 'b3',
-        title: 'Class 10 CBSE Offline Term Assessment #1',
-        subject: 'Mathematics & Science',
-        date: '09 Oct 2026',
-        maxMarks: 80,
-        marks: {
-          's8': { score: 73, remarks: 'Neat geometry diagrams and proofs' },
-          's9': { score: 78, remarks: 'Excellent, 100% accuracy in Algebra' }
-        }
-      }
-    ],
-    teachers: [
-      {
-        id: 'tr1',
-        name: 'Er. Rajesh Chahar',
-        subject: 'Senior Physics Faculty & Academic Director',
-        qualification: 'B.Tech (IIT Roorkee), M.Tech',
-        experience: '15+ Years Experience',
-        email: 'rajesh.chahar@divineclasses.in',
-        phone: '+91 95556 78753',
-        specialization: 'Rotational Dynamics, Electromagnetism & JEE Advanced Strategy',
-        bio: 'Founder of Divine Classes. Mentored 800+ IITians and NITians. Known for breaking down complex physics into crystal-clear intuitive models.',
-        avatarColor: 'from-indigo-600 to-blue-600',
-        initials: 'RC',
-        password: 'teacher123',
-        status: 'Active'
-      },
-      {
-        id: 'tr2',
-        name: 'Dr. Sunita Sharma',
-        subject: 'Head of Biology & Medical Entrance Wing',
-        qualification: 'M.B.B.S, M.D. (AIIMS New Delhi)',
-        experience: '12+ Years Experience',
-        email: 'dr.sunita@divineclasses.in',
-        phone: '+91 98234 56789',
-        specialization: 'Human Physiology, Genetics & High-Yield NEET Revision',
-        bio: 'Former clinical fellow turned passionate NEET coach. Produced multiple top-100 All India Ranks in NEET-UG with 350+/360 biology scores.',
-        avatarColor: 'from-emerald-600 to-teal-600',
-        initials: 'SS',
-        password: 'teacher123',
-        status: 'Active'
-      },
-      {
-        id: 'tr3',
-        name: 'Mr. Arvind Verma',
-        subject: 'Mathematics Mentor & Olympiad Specialist',
-        qualification: 'M.Sc. Mathematics (Gold Medalist)',
-        experience: '11+ Years Experience',
-        email: 'arvind.verma@divineclasses.in',
-        phone: '+91 98345 67890',
-        specialization: 'Calculus, Vectors-3D & Rapid Problem Solving Shortcuts',
-        bio: 'Celebrated for transforming mathematics from a feared subject into a scoring powerhouse. Author of shortcut trick compilations for competitive tests.',
-        avatarColor: 'from-amber-500 to-orange-600',
-        initials: 'AV',
-        password: 'teacher123',
-        status: 'Active'
-      },
-      {
-        id: 'tr4',
-        name: 'Dr. Meera Krishnan',
-        subject: 'Senior Chemistry Faculty (Organic & Physical)',
-        qualification: 'Ph.D. Chemistry (IISc Bangalore)',
-        experience: '10+ Years Experience',
-        email: 'meera.krishnan@divineclasses.in',
-        phone: '+91 98456 78901',
-        specialization: 'Named Reaction Mechanisms, Thermodynamics & GOC',
-        bio: 'Believes in zero rote-memorization. Uses molecular 3D models to make organic synthesis reaction pathways stick effortlessly.',
-        avatarColor: 'from-purple-600 to-pink-600',
-        initials: 'MK',
-        password: 'teacher123',
-        status: 'Active'
-      }
-    ],
-    gallery: [
-      {
-        id: 'g1',
-        title: 'JEE Advanced 2026 - All India Top 100 Toppers Felicitation',
-        category: 'Result Banner',
-        date: 'June 2026',
-        caption: 'Divine Classes champions shine bright! AIR 14, AIR 28, and 18 students securing 99.5+ percentile in JEE Advanced.',
-        badge: 'AIR 14, 28, 64',
-        imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80'
-      },
-      {
-        id: 'g2',
-        title: 'NEET Medical Selections Felicitation Ceremony',
-        category: 'Result Banner',
-        date: 'June 2026',
-        caption: '46 selections in Govt. Medical Colleges including AIIMS, MAMC, and LHMC. Highest score: 685/720.',
-        badge: '685/720 Highest',
-        imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80'
-      },
-      {
-        id: 'g3',
-        title: 'Interactive Smart AC Classroom & Doubt Clearing Sessions',
-        category: 'Classroom Photo',
-        date: 'September 2026',
-        caption: 'Lecture Hall 101 equipped with interactive smart panels, live problem projections, and ergonomic seating.',
-        badge: 'Smart Hall 101',
-        imageUrl: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80'
-      },
-      {
-        id: 'g4',
-        title: 'Annual Merit Scholarship & Trophy Distribution Day',
-        category: 'Event',
-        date: 'August 2026',
-        caption: 'Over ₹5 Lakhs worth of merit-cum-means scholarships awarded to meritorious students by Divine Classes management.',
-        badge: 'Annual Day',
-        imageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
-      }
-    ],
-    externalLinks: [
+  if (typeof getDummySeedData === 'function') {
+    const data = getDummySeedData();
+    data.externalLinks = [
       {
         id: 'l1',
         title: 'NCERT Official Portal - Free e-Textbooks (Class 6-12)',
@@ -699,40 +425,8 @@ function getDefaultSeedData() {
         icon: 'fa-file-lines',
         color: 'bg-purple-600'
       }
-    ],
-    feedbacks: [
-      {
-        id: 'f1',
-        authorName: 'Rajesh Sharma (Parent of Aarav Sharma)',
-        role: 'Parent',
-        batchName: 'JEE Advanced Target 2027 (Alpha Batch)',
-        category: 'Teaching Quality',
-        rating: 5,
-        date: '13 Oct 2026',
-        comment: 'Divine Classes has transformed Aarav’s problem-solving approach. Er. Rajesh Chahar sir’s physics lectures and individual doubt attention are exceptional!'
-      },
-      {
-        id: 'f2',
-        authorName: 'Ananya Singh',
-        role: 'Student',
-        batchName: 'NEET Medical Dropper & Foundation',
-        category: 'Study Material',
-        rating: 5,
-        date: '10 Oct 2026',
-        comment: 'The offline test analysis and Dr. Sunita ma’am’s NCERT biology booster worksheets are the main reason my mock test scores jumped from 520 to 660+!'
-      },
-      {
-        id: 'f3',
-        authorName: 'Sanjay Gupta (Parent of Rohan Gupta)',
-        role: 'Parent',
-        batchName: 'JEE Advanced Target 2027 (Alpha Batch)',
-        category: 'Offline Test Series',
-        rating: 5,
-        date: '06 Oct 2026',
-        comment: 'Very disciplined institute. Receiving regular offline test marks and updates gives us complete peace of mind about our ward’s exam prep.'
-      }
-    ],
-    settings: {
+    ];
+    data.settings = {
       instituteName: 'Divine Classes',
       tagline: 'Empowering Aspirants for JEE, NEET & Board Excellence',
       phone: '+91 95556 78753',
@@ -750,14 +444,10 @@ function getDefaultSeedData() {
       allowAdminFeedbackDelete: true,
       allowAdminLinkDelete: true,
       showDummyData: true
-    }
-  };
-  ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function(col) {
-    (data[col] || []).forEach(function(rec) { rec.isDummy = true; });
-  });
-  // Note: externalLinks (study links l1-l5) are NEVER marked dummy — they stay
-  // visible for clients even when demo data is hidden.
-  return data;
+    };
+    return data;
+  }
+  return { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: [], externalLinks: [], feedbacks: [], settings: {} };
 }
 
 /**
@@ -1334,7 +1024,10 @@ function apiGetInitialData() {
     try {
       const ss = getDbSpreadsheet();
       if (ss) {
-        syncReadableSheets(ss, appData);
+        const sheetData = (appData.settings && appData.settings.showDummyData === false)
+          ? stripDummyData_(JSON.parse(JSON.stringify(appData)))
+          : appData;
+        syncReadableSheets(ss, sheetData);
       }
     } catch (sheetSyncErr) {
       Logger.log('Sheet sync in apiGetInitialData: ' + sheetSyncErr.toString());
@@ -1385,19 +1078,53 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
 }
 
 /**
+ * Developer API: Toggle Dummy/Demo Data visibility in Web App and Google Sheets
+ * - enabled = true:  Demo records are restored to Web App and written to Google Sheets
+ * - enabled = false: Demo records are hidden from all client roles and wiped from Google Sheets
+ */
+function apiSetDummyDataStatus(enabled) {
+  let appData = dbLoadAll();
+  if (!appData) appData = getDefaultSeedData();
+  if (!appData.settings) appData.settings = {};
+  appData.settings.showDummyData = !!enabled;
+  dbSaveAll(appData);
+
+  try {
+    const ss = getDbSpreadsheet();
+    if (ss) {
+      let jsonSheet = ss.getSheetByName('DB_JSON');
+      if (!jsonSheet) {
+        jsonSheet = ss.insertSheet('DB_JSON');
+        jsonSheet.hideSheet();
+      }
+      jsonSheet.getRange(1, 1).setValue(JSON.stringify(appData));
+      const sheetData = enabled ? appData : stripDummyData_(JSON.parse(JSON.stringify(appData)));
+      syncReadableSheets(ss, sheetData);
+    }
+  } catch (err) {
+    Logger.log('apiSetDummyDataStatus sheet sync notice: ' + err.toString());
+  }
+
+  return {
+    success: true,
+    showDummyData: appData.settings.showDummyData,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
  * Syncs full application state to the Primary Cloud Database
  * and optional background mirror to Google Sheets
  */
 function apiSyncAllData(fullData) {
   try {
     // 0. Dummy-data safety: if client state was stripped (showDummyData off),
-    //    re-inject seed/demo records so a sync never permanently deletes them.
+    //    re-inject seed/demo records into cloud database backup so demo data is never lost.
     try { restoreDummyData_(fullData); } catch (dummyErr) {
       Logger.log('restoreDummyData_ notice: ' + dummyErr.toString());
     }
 
-    // 0b. Deletion safety: strip tombstoned (manually sheet-deleted) records so
-    //     a stale browser tab can NEVER resurrect a deleted student/link.
+    // 0b. Deletion safety: strip tombstoned (manually sheet-deleted) records
     try { applyTombstones_(fullData); } catch (tombErr) {
       Logger.log('applyTombstones_ notice: ' + tombErr.toString());
     }
@@ -1415,7 +1142,14 @@ function apiSyncAllData(fullData) {
           jsonSheet.hideSheet();
         }
         jsonSheet.getRange(1, 1).setValue(JSON.stringify(fullData));
-        syncReadableSheets(ss, fullData);
+
+        // DEVELOPER TOGGLE FOR GOOGLE SHEETS:
+        // When showDummyData is false: Human-readable sheets reflect ONLY real production records!
+        // When showDummyData is true: Human-readable sheets reflect demo records for presentation.
+        const sheetData = (fullData.settings && fullData.settings.showDummyData === false)
+          ? stripDummyData_(JSON.parse(JSON.stringify(fullData)))
+          : fullData;
+        syncReadableSheets(ss, sheetData);
       }
     } catch (sheetErr) {
       Logger.log('Secondary sheet mirror notice (database is primary): ' + sheetErr.toString());
@@ -1464,10 +1198,7 @@ function getOrCreateSheet(ss, targetName, legacyNames) {
  */
 function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
   try {
-    // 1. Freeze header row
     sheet.setFrozenRows(1);
-
-    // 2. Adjust columns: ensure exactly numColumns exist, delete trailing blank columns
     const maxCols = sheet.getMaxColumns();
     if (maxCols > numColumns) {
       sheet.deleteColumns(numColumns + 1, maxCols - numColumns);
@@ -1475,20 +1206,17 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
       sheet.insertColumnsAfter(maxCols, numColumns - maxCols);
     }
 
-    // 3. Trim extra blank rows (leave 1 row padding for clean boundary)
     const maxRows = sheet.getMaxRows();
     const neededRows = Math.max(numRows, 2);
     if (maxRows > neededRows + 1) {
       sheet.deleteRows(neededRows + 2, maxRows - (neededRows + 1));
     }
 
-    // 4. Set entire active range to Calibri, Font Size 10
     const fullRange = sheet.getRange(1, 1, Math.min(sheet.getMaxRows(), neededRows + 1), numColumns);
     fullRange.setFontFamily('Calibri');
     fullRange.setFontSize(10);
     fullRange.setVerticalAlignment('middle');
 
-    // 5. Header row styling (Calibri, Size 10, Bold, Header Background, White Text)
     const headerRange = sheet.getRange(1, 1, 1, numColumns);
     headerRange.setFontFamily('Calibri');
     headerRange.setFontSize(10);
@@ -1499,12 +1227,10 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
     }
     sheet.setRowHeight(1, 28);
 
-    // 6. Set tab color if supported
     if (tabColor && sheet.setTabColor) {
       sheet.setTabColor(tabColor);
     }
 
-    // 7. Auto-fit column widths
     sheet.autoResizeColumns(1, numColumns);
   } catch (err) {
     Logger.log('Formatting error on ' + sheet.getName() + ': ' + err.toString());
@@ -1512,22 +1238,21 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
 }
 
 /**
- * Generates human-friendly Google Sheets tab views for the client
- * Includes Login Passwords and Access Status (Active vs Blocked) columns,
- * freezes the first header row on each tab, and deletes blank columns automatically.
+ * Generates human-friendly Google Sheets tab views for the client.
+ * Respects showDummyData: when false, removes demo data and displays clean production records.
  */
 function syncReadableSheets(ss, data) {
   try {
     // A. Sync Students Sheet with Passwords and Authorization Status
-    if (data.students && data.students.length > 0) {
-      let stuSheet = ss.getSheetByName('Students_Master');
-      if (!stuSheet) {
-        stuSheet = ss.insertSheet('Students_Master');
-      }
-      stuSheet.clear();
-      const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
-      const rows = [headers];
-      data.students.forEach(function(s) {
+    let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
+    stuSheet.clear();
+    const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
+    const rows = [headers];
+    const stuList = (data.students || []).filter(function(s) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(s) : true;
+    });
+    if (stuList.length > 0) {
+      stuList.forEach(function(s) {
         const balance = (s.totalFee || 0) - (s.paidFee || 0);
         rows.push([
           s.roll || '',
@@ -1543,35 +1268,33 @@ function syncReadableSheets(ss, data) {
           s.lastReminder || 'Never'
         ]);
       });
-      stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
-      stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
-      
-      // Highlight Access Status column (Active in green, Blocked in rose, Inactive in grey)
-      for (let i = 1; i < rows.length; i++) {
-        const statusCell = stuSheet.getRange(i + 1, 4);
-        if (rows[i][3] === 'Blocked') {
-          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
-        } else if (rows[i][3] === 'Inactive') {
-          statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
-        } else {
-          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
-        }
-      }
-      
-      // Freeze header row and delete all blank columns
-      formatAndTrimSheet(stuSheet, headers.length, rows.length);
+    } else {
+      rows.push(['-', 'No production students enrolled yet (Demo Data Disabled)', '-', '-', '-', '-', 0, 0, 0, '-', '-']);
     }
+    stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
+    stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
+    for (let i = 1; i < rows.length; i++) {
+      const statusCell = stuSheet.getRange(i + 1, 4);
+      if (rows[i][3] === 'Blocked') {
+        statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+      } else if (rows[i][3] === 'Inactive') {
+        statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
+      } else {
+        statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+      }
+    }
+    formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
 
     // B. Sync Teachers Sheet with Login Email, Passwords and Access Status
-    if (data.teachers && data.teachers.length > 0) {
-      let teachSheet = ss.getSheetByName('Teachers_Roster');
-      if (!teachSheet) {
-        teachSheet = ss.insertSheet('Teachers_Roster');
-      }
-      teachSheet.clear();
-      const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
-      const trRows = [trHeaders];
-      data.teachers.forEach(function(tr) {
+    let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
+    teachSheet.clear();
+    const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
+    const trRows = [trHeaders];
+    const teachList = (data.teachers || []).filter(function(tr) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(tr) : true;
+    });
+    if (teachList.length > 0) {
+      teachList.forEach(function(tr) {
         trRows.push([
           tr.id || '',
           tr.name || '',
@@ -1584,31 +1307,33 @@ function syncReadableSheets(ss, data) {
           tr.experience || ''
         ]);
       });
-      teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
-      teachSheet.getRange(1, 1, 1, trHeaders.length).setFontWeight('bold').setBackground('#0284c7').setFontColor('#ffffff');
-      for (let i = 1; i < trRows.length; i++) {
-        const statusCell = teachSheet.getRange(i + 1, 6);
-        if (trRows[i][5] === 'Blocked') {
-          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
-        } else if (trRows[i][5] === 'Inactive') {
-          statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
-        } else {
-          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
-        }
-      }
-      formatAndTrimSheet(teachSheet, trHeaders.length, trRows.length);
+    } else {
+      trRows.push(['-', 'No production teachers added yet (Demo Data Disabled)', '-', '-', '-', '-', '-', '-', '-']);
     }
+    teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
+    teachSheet.getRange(1, 1, 1, trHeaders.length).setFontWeight('bold').setBackground('#0284c7').setFontColor('#ffffff');
+    for (let i = 1; i < trRows.length; i++) {
+      const statusCell = teachSheet.getRange(i + 1, 6);
+      if (trRows[i][5] === 'Blocked') {
+        statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+      } else if (trRows[i][5] === 'Inactive') {
+        statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
+      } else {
+        statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+      }
+    }
+    formatAndTrimSheet(teachSheet, trHeaders.length, trRows.length, '#0284c7', '#0284c7');
 
     // C. Sync Batches Sheet
-    if (data.batches && data.batches.length > 0) {
-      let batchSheet = ss.getSheetByName('Batches_Roster');
-      if (!batchSheet) {
-        batchSheet = ss.insertSheet('Batches_Roster');
-      }
-      batchSheet.clear();
-      const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
-      const bRows = [bHeaders];
-      data.batches.forEach(function(b) {
+    let batchSheet = getOrCreateSheet(ss, 'Batches_Roster', ['Batches', 'Batches Roster']);
+    batchSheet.clear();
+    const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
+    const bRows = [bHeaders];
+    const batchList = (data.batches || []).filter(function(b) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(b) : true;
+    });
+    if (batchList.length > 0) {
+      batchList.forEach(function(b) {
         bRows.push([
           b.id || '',
           b.name || '',
@@ -1619,25 +1344,25 @@ function syncReadableSheets(ss, data) {
           (b.studentIds || []).length
         ]);
       });
-      batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
-      batchSheet.getRange(1, 1, 1, bHeaders.length).setFontWeight('bold').setBackground('#059669').setFontColor('#ffffff');
-      formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length);
+    } else {
+      bRows.push(['-', 'No production batches created yet (Demo Data Disabled)', '-', '-', '-', '-', 0]);
     }
+    batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
+    batchSheet.getRange(1, 1, 1, bHeaders.length).setFontWeight('bold').setBackground('#059669').setFontColor('#ffffff');
+    formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
 
     // D. Sync Offline Tests
-    if (data.offlineTests && data.offlineTests.length > 0) {
-      let testSheet = ss.getSheetByName('Offline_Test_Marks');
-      if (!testSheet) {
-        testSheet = ss.insertSheet('Offline_Test_Marks');
-      }
-      testSheet.clear();
-      const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Date', 'Max Marks', 'Student Name', 'Marks Obtained', 'Percentage', 'Teacher Remarks'];
-      const tRows = [tHeaders];
-      
-      const studentMap = {};
-      (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
-
-      data.offlineTests.forEach(function(t) {
+    let testSheet = getOrCreateSheet(ss, 'Offline_Test_Marks', ['Test_Marks', 'Offline Tests']);
+    testSheet.clear();
+    const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Date', 'Max Marks', 'Student Name', 'Marks Obtained', 'Percentage', 'Teacher Remarks'];
+    const tRows = [tHeaders];
+    const studentMap = {};
+    (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
+    const testList = (data.offlineTests || []).filter(function(t) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(t) : true;
+    });
+    if (testList.length > 0) {
+      testList.forEach(function(t) {
         const marks = t.marks || {};
         Object.keys(marks).forEach(function(sid) {
           const entry = marks[sid] || {};
@@ -1655,24 +1380,24 @@ function syncReadableSheets(ss, data) {
           ]);
         });
       });
-
-      if (tRows.length > 1) {
-        testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
-        testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
-        formatAndTrimSheet(testSheet, tHeaders.length, tRows.length);
-      }
     }
+    if (tRows.length === 1) {
+      tRows.push(['-', 'No production offline tests scheduled yet (Demo Data Disabled)', '-', '-', '-', '-', '-', '-', '-']);
+    }
+    testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
+    testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
+    formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
 
     // E. Sync Feedback Sheet
-    if (data.feedbacks && data.feedbacks.length > 0) {
-      let fbSheet = ss.getSheetByName('Feedback_Responses');
-      if (!fbSheet) {
-        fbSheet = ss.insertSheet('Feedback_Responses');
-      }
-      fbSheet.clear();
-      const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
-      const fbRows = [fbHeaders];
-      data.feedbacks.forEach(function(f) {
+    let fbSheet = getOrCreateSheet(ss, 'Feedback_Responses', ['Feedback', 'Feedback Wall']);
+    fbSheet.clear();
+    const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
+    const fbRows = [fbHeaders];
+    const fbList = (data.feedbacks || []).filter(function(f) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(f) : true;
+    });
+    if (fbList.length > 0) {
+      fbList.forEach(function(f) {
         fbRows.push([
           f.authorName || '',
           f.role || '',
@@ -1683,24 +1408,25 @@ function syncReadableSheets(ss, data) {
           f.comment || ''
         ]);
       });
-      fbSheet.getRange(1, 1, fbRows.length, fbHeaders.length).setValues(fbRows);
-      fbSheet.getRange(1, 1, 1, fbHeaders.length).setFontWeight('bold').setBackground('#7c3aed').setFontColor('#ffffff');
-      formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length);
+    } else {
+      fbRows.push(['-', 'No production feedback responses yet (Demo Data Disabled)', '-', '-', 5, '-', '-']);
     }
+    fbSheet.getRange(1, 1, fbRows.length, fbHeaders.length).setValues(fbRows);
+    fbSheet.getRange(1, 1, 1, fbHeaders.length).setFontWeight('bold').setBackground('#7c3aed').setFontColor('#ffffff');
+    formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
 
     // F. Sync Materials Sheet (Assignments, DPPs, Test Papers)
-    if (data.materials && data.materials.length > 0) {
-      let matSheet = ss.getSheetByName('Materials_Repository');
-      if (!matSheet) {
-        matSheet = ss.insertSheet('Materials_Repository');
-      }
-      matSheet.clear();
-      const mHeaders = ['Material ID', 'Title', 'Batch Name', 'Category', 'Upload Date', 'Uploaded By', 'File Size', 'Downloads', 'Description', 'Download URL', 'Google Drive Link'];
-      const mRows = [mHeaders];
-      const batchMap = {};
-      (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-
-      data.materials.forEach(function(m) {
+    let matSheet = getOrCreateSheet(ss, 'Materials_Repository', ['Materials', 'Study Materials']);
+    matSheet.clear();
+    const mHeaders = ['Material ID', 'Title', 'Batch Name', 'Category', 'Upload Date', 'Uploaded By', 'File Size', 'Downloads', 'Description', 'Download URL', 'Google Drive Link'];
+    const mRows = [mHeaders];
+    const batchMap = {};
+    (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
+    const matList = (data.materials || []).filter(function(m) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(m) : true;
+    });
+    if (matList.length > 0) {
+      matList.forEach(function(m) {
         mRows.push([
           m.id || '',
           m.title || '',
@@ -1715,21 +1441,23 @@ function syncReadableSheets(ss, data) {
           m.driveUrl || ''
         ]);
       });
-      matSheet.getRange(1, 1, mRows.length, mHeaders.length).setValues(mRows);
-      matSheet.getRange(1, 1, 1, mHeaders.length).setFontWeight('bold').setBackground('#2563eb').setFontColor('#ffffff');
-      formatAndTrimSheet(matSheet, mHeaders.length, mRows.length);
+    } else {
+      mRows.push(['-', 'No production study materials uploaded yet (Demo Data Disabled)', '-', '-', '-', '-', '-', 0, '-', '-', '-']);
     }
+    matSheet.getRange(1, 1, mRows.length, mHeaders.length).setValues(mRows);
+    matSheet.getRange(1, 1, 1, mHeaders.length).setFontWeight('bold').setBackground('#2563eb').setFontColor('#ffffff');
+    formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
 
     // G. Sync Gallery Banners Sheet (Results & Achievements)
-    if (data.gallery && data.gallery.length > 0) {
-      let galSheet = ss.getSheetByName('Gallery_Banners');
-      if (!galSheet) {
-        galSheet = ss.insertSheet('Gallery_Banners');
-      }
-      galSheet.clear();
-      const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
-      const gRows = [gHeaders];
-      data.gallery.forEach(function(g) {
+    let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
+    galSheet.clear();
+    const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
+    const gRows = [gHeaders];
+    const galList = (data.gallery || []).filter(function(g) {
+      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(g) : true;
+    });
+    if (galList.length > 0) {
+      galList.forEach(function(g) {
         gRows.push([
           g.id || '',
           g.title || '',
@@ -1740,10 +1468,12 @@ function syncReadableSheets(ss, data) {
           g.imageUrl || ''
         ]);
       });
-      galSheet.getRange(1, 1, gRows.length, gHeaders.length).setValues(gRows);
-      galSheet.getRange(1, 1, 1, gHeaders.length).setFontWeight('bold').setBackground('#db2777').setFontColor('#ffffff');
-      formatAndTrimSheet(galSheet, gHeaders.length, gRows.length);
+    } else {
+      gRows.push(['-', 'No production gallery banners added yet (Demo Data Disabled)', '-', '-', '-', '-', '-']);
     }
+    galSheet.getRange(1, 1, gRows.length, gHeaders.length).setValues(gRows);
+    galSheet.getRange(1, 1, 1, gHeaders.length).setFontWeight('bold').setBackground('#db2777').setFontColor('#ffffff');
+    formatAndTrimSheet(galSheet, gHeaders.length, gRows.length, '#db2777', '#db2777');
 
     // G2. Sync External Study Links Hub Sheet (always visible to all roles)
     {
