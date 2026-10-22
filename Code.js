@@ -482,25 +482,43 @@ function isDummyRecord_(rec) {
 
 // Removes seed/demo records from the data RETURNED to clients (DB untouched).
 // externalLinks (study links) are ALWAYS kept — never stripped.
-function stripDummyData_(appData) {
-  if (!appData || !appData.settings || appData.settings.showDummyData !== false) return appData;
+function isDummyForSheetEnabled_(settings, sheetKey) {
+  if (!settings) return true;
+  if (settings.showDummyData === false) return false;
+  if (settings.dummyDataConfig && typeof settings.dummyDataConfig === 'object') {
+    if (settings.dummyDataConfig[sheetKey] === false) return false;
+  }
+  return true;
+}
+
+// Removes seed/demo records per sheet or globally (DB untouched).
+// externalLinks (External_Links_Hub) are ALWAYS kept — never stripped or deleted!
+function stripDummyData_(appData, targetTable) {
+  if (!appData || !appData.settings) return appData;
   const dummyStudentIds = {};
   (appData.students || []).forEach(function(s) {
     if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
   });
-  ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function(tbl) {
-    appData[tbl] = (appData[tbl] || []).filter(function(r) { return !isDummyRecord_(r); });
-  });
-  (appData.batches || []).forEach(function(b) {
-    if (Array.isArray(b.studentIds)) {
-      b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+
+  const tbls = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'];
+  tbls.forEach(function(tbl) {
+    if (!isDummyForSheetEnabled_(appData.settings, tbl) || targetTable) {
+      appData[tbl] = (appData[tbl] || []).filter(function(r) { return !isDummyRecord_(r); });
     }
   });
-  (appData.offlineTests || []).forEach(function(t) {
-    if (t && t.marks && typeof t.marks === 'object') {
-      Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
-    }
-  });
+
+  if (!isDummyForSheetEnabled_(appData.settings, 'students') || targetTable === 'students') {
+    (appData.batches || []).forEach(function(b) {
+      if (Array.isArray(b.studentIds)) {
+        b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+      }
+    });
+    (appData.offlineTests || []).forEach(function(t) {
+      if (t && t.marks && typeof t.marks === 'object') {
+        Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
+      }
+    });
+  }
   return appData;
 }
 
@@ -1082,13 +1100,49 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
  * - enabled = true:  Demo records are restored to Web App and written to Google Sheets
  * - enabled = false: Demo records are hidden from all client roles and wiped from Google Sheets
  */
-function apiSetDummyDataStatus(enabled) {
+/**
+ * Developer API: Toggle Dummy/Demo Data for EACH SHEET individually or for all sheets
+ * - target: 'students' | 'teachers' | 'batches' | 'offlineTests' | 'materials' | 'gallery' | 'feedbacks' | 'all'
+ * - enabled: true (populate into sheet) | false (delete completely from sheet)
+ * Note: External_Links_Hub is permanent and ALWAYS unchanged!
+ */
+function apiSetDummyDataStatus(target, enabled) {
   let appData = dbLoadAll();
   if (!appData) appData = getDefaultSeedData();
   if (!appData.settings) appData.settings = {};
-  appData.settings.showDummyData = !!enabled;
+  if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
+    appData.settings.dummyDataConfig = {
+      students: true,
+      teachers: true,
+      batches: true,
+      offlineTests: true,
+      materials: true,
+      gallery: true,
+      feedbacks: true
+    };
+  }
+
+  if (typeof target === 'boolean') {
+    enabled = target;
+    target = 'all';
+  }
+
+  if (target === 'all' || !target) {
+    appData.settings.showDummyData = !!enabled;
+    const cfg = appData.settings.dummyDataConfig;
+    Object.keys(cfg).forEach(function(k) { cfg[k] = !!enabled; });
+  } else if (appData.settings.dummyDataConfig[target] !== undefined) {
+    appData.settings.dummyDataConfig[target] = !!enabled;
+    const anyOn = Object.keys(appData.settings.dummyDataConfig).some(function(k) {
+      return appData.settings.dummyDataConfig[k] === true;
+    });
+    appData.settings.showDummyData = anyOn;
+  }
+
+  // Persist updated settings in master database
   dbSaveAll(appData);
 
+  // Sync to Google Sheet: wipes disabled dummy data immediately
   try {
     const ss = getDbSpreadsheet();
     if (ss) {
@@ -1098,18 +1152,81 @@ function apiSetDummyDataStatus(enabled) {
         jsonSheet.hideSheet();
       }
       jsonSheet.getRange(1, 1).setValue(JSON.stringify(appData));
-      const sheetData = enabled ? appData : stripDummyData_(JSON.parse(JSON.stringify(appData)));
-      syncReadableSheets(ss, sheetData);
+      syncReadableSheets(ss, appData);
     }
   } catch (err) {
-    Logger.log('apiSetDummyDataStatus sheet sync notice: ' + err.toString());
+    Logger.log('apiSetDummyDataStatus sheet sync error: ' + err.toString());
   }
 
   return {
     success: true,
+    target: target,
+    enabled: enabled,
     showDummyData: appData.settings.showDummyData,
+    dummyDataConfig: appData.settings.dummyDataConfig,
     timestamp: new Date().toISOString()
   };
+}
+
+/**
+ * Developer API: Completely audits, restructures, formats, and orders all Google Sheet tabs
+ * Applies Calibri 10, freezes header row, custom tab colors, auto-resizes columns,
+ * and deletes all unnecessary trailing empty rows/columns.
+ * External_Links_Hub is preserved and unchanged!
+ */
+function apiRestructureAllSheets() {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return { success: false, error: 'Cannot open Google Sheet' };
+
+    let appData = dbLoadAll();
+    if (!appData) appData = getDefaultSeedData();
+
+    // 1. Sync & format all readable sheets
+    syncReadableSheets(ss, appData);
+
+    // 2. Order tabs in standard intuitive sequence
+    const tabOrder = [
+      'Students_Master',
+      'Teachers_Roster',
+      'Batches_Roster',
+      'Offline_Test_Marks',
+      'Materials_Repository',
+      'Gallery_Banners',
+      'Feedback_Responses',
+      'External_Links_Hub',
+      'Settings_Config'
+    ];
+
+    for (let i = 0; i < tabOrder.length; i++) {
+      const sh = ss.getSheetByName(tabOrder[i]);
+      if (sh) {
+        try {
+          ss.setActiveSheet(sh);
+          ss.moveActiveSheet(i + 1);
+        } catch (e) {}
+      }
+    }
+
+    // Hide DB_JSON sheet
+    const dbJson = ss.getSheetByName('DB_JSON');
+    if (dbJson) dbJson.hideSheet();
+
+    // Default front tab to Students_Master
+    const firstTab = ss.getSheetByName('Students_Master');
+    if (firstTab) ss.setActiveSheet(firstTab);
+
+    return {
+      success: true,
+      spreadsheetId: ss.getId(),
+      spreadsheetUrl: ss.getUrl(),
+      restructuredTabs: tabOrder,
+      timestamp: new Date().toISOString()
+    };
+  } catch (err) {
+    Logger.log('apiRestructureAllSheets error: ' + err.toString());
+    return { success: false, error: err.toString() };
+  }
 }
 
 /**
@@ -1208,11 +1325,13 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
 
     const maxRows = sheet.getMaxRows();
     const neededRows = Math.max(numRows, 2);
-    if (maxRows > neededRows + 1) {
-      sheet.deleteRows(neededRows + 2, maxRows - (neededRows + 1));
+    if (maxRows > neededRows) {
+      sheet.deleteRows(neededRows + 1, maxRows - neededRows);
+    } else if (maxRows < neededRows) {
+      sheet.insertRowsAfter(maxRows, neededRows - maxRows);
     }
 
-    const fullRange = sheet.getRange(1, 1, Math.min(sheet.getMaxRows(), neededRows + 1), numColumns);
+    const fullRange = sheet.getRange(1, 1, Math.min(sheet.getMaxRows(), neededRows), numColumns);
     fullRange.setFontFamily('Calibri');
     fullRange.setFontSize(10);
     fullRange.setVerticalAlignment('middle');
@@ -1243,15 +1362,16 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
  */
 function syncReadableSheets(ss, data) {
   try {
-    // A. Sync Students Sheet with Passwords and Authorization Status
-    let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
-    stuSheet.clear();
-    const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
-    const rows = [headers];
-    const stuList = (data.students || []).filter(function(s) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(s) : true;
-    });
-    if (stuList.length > 0) {
+    // A. Sync Students Sheet (Students_Master)
+    {
+      let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
+      stuSheet.clear();
+      const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
+      const rows = [headers];
+      const showStuDummy = isDummyForSheetEnabled_(data.settings, 'students');
+      const stuList = (data.students || []).filter(function(s) {
+        return showStuDummy ? true : !isDummyRecord_(s);
+      });
       stuList.forEach(function(s) {
         const balance = (s.totalFee || 0) - (s.paidFee || 0);
         rows.push([
@@ -1268,32 +1388,32 @@ function syncReadableSheets(ss, data) {
           s.lastReminder || 'Never'
         ]);
       });
-    } else {
-      rows.push(['-', 'No production students enrolled yet (Demo Data Disabled)', '-', '-', '-', '-', 0, 0, 0, '-', '-']);
-    }
-    stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
-    stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
-    for (let i = 1; i < rows.length; i++) {
-      const statusCell = stuSheet.getRange(i + 1, 4);
-      if (rows[i][3] === 'Blocked') {
-        statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
-      } else if (rows[i][3] === 'Inactive') {
-        statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
-      } else {
-        statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+      // When disabled and no real students exist, rows has only 1 row (header). All dummy rows are DELETED!
+      stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
+      stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
+      for (let i = 1; i < rows.length; i++) {
+        const statusCell = stuSheet.getRange(i + 1, 4);
+        if (rows[i][3] === 'Blocked') {
+          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+        } else if (rows[i][3] === 'Inactive') {
+          statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
+        } else {
+          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+        }
       }
+      formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
     }
-    formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
 
-    // B. Sync Teachers Sheet with Login Email, Passwords and Access Status
-    let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
-    teachSheet.clear();
-    const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
-    const trRows = [trHeaders];
-    const teachList = (data.teachers || []).filter(function(tr) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(tr) : true;
-    });
-    if (teachList.length > 0) {
+    // B. Sync Teachers Sheet (Teachers_Roster)
+    {
+      let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
+      teachSheet.clear();
+      const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
+      const trRows = [trHeaders];
+      const showTeachDummy = isDummyForSheetEnabled_(data.settings, 'teachers');
+      const teachList = (data.teachers || []).filter(function(tr) {
+        return showTeachDummy ? true : !isDummyRecord_(tr);
+      });
       teachList.forEach(function(tr) {
         trRows.push([
           tr.id || '',
@@ -1307,32 +1427,31 @@ function syncReadableSheets(ss, data) {
           tr.experience || ''
         ]);
       });
-    } else {
-      trRows.push(['-', 'No production teachers added yet (Demo Data Disabled)', '-', '-', '-', '-', '-', '-', '-']);
-    }
-    teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
-    teachSheet.getRange(1, 1, 1, trHeaders.length).setFontWeight('bold').setBackground('#0284c7').setFontColor('#ffffff');
-    for (let i = 1; i < trRows.length; i++) {
-      const statusCell = teachSheet.getRange(i + 1, 6);
-      if (trRows[i][5] === 'Blocked') {
-        statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
-      } else if (trRows[i][5] === 'Inactive') {
-        statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
-      } else {
-        statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+      teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
+      teachSheet.getRange(1, 1, 1, trHeaders.length).setFontWeight('bold').setBackground('#0284c7').setFontColor('#ffffff');
+      for (let i = 1; i < trRows.length; i++) {
+        const statusCell = teachSheet.getRange(i + 1, 6);
+        if (trRows[i][5] === 'Blocked') {
+          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+        } else if (trRows[i][5] === 'Inactive') {
+          statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
+        } else {
+          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+        }
       }
+      formatAndTrimSheet(teachSheet, trHeaders.length, trRows.length, '#0284c7', '#0284c7');
     }
-    formatAndTrimSheet(teachSheet, trHeaders.length, trRows.length, '#0284c7', '#0284c7');
 
-    // C. Sync Batches Sheet
-    let batchSheet = getOrCreateSheet(ss, 'Batches_Roster', ['Batches', 'Batches Roster']);
-    batchSheet.clear();
-    const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
-    const bRows = [bHeaders];
-    const batchList = (data.batches || []).filter(function(b) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(b) : true;
-    });
-    if (batchList.length > 0) {
+    // C. Sync Batches Sheet (Batches_Roster)
+    {
+      let batchSheet = getOrCreateSheet(ss, 'Batches_Roster', ['Batches', 'Batches Roster']);
+      batchSheet.clear();
+      const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
+      const bRows = [bHeaders];
+      const showBatchDummy = isDummyForSheetEnabled_(data.settings, 'batches');
+      const batchList = (data.batches || []).filter(function(b) {
+        return showBatchDummy ? true : !isDummyRecord_(b);
+      });
       batchList.forEach(function(b) {
         bRows.push([
           b.id || '',
@@ -1344,24 +1463,23 @@ function syncReadableSheets(ss, data) {
           (b.studentIds || []).length
         ]);
       });
-    } else {
-      bRows.push(['-', 'No production batches created yet (Demo Data Disabled)', '-', '-', '-', '-', 0]);
+      batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
+      batchSheet.getRange(1, 1, 1, bHeaders.length).setFontWeight('bold').setBackground('#059669').setFontColor('#ffffff');
+      formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
     }
-    batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
-    batchSheet.getRange(1, 1, 1, bHeaders.length).setFontWeight('bold').setBackground('#059669').setFontColor('#ffffff');
-    formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
 
-    // D. Sync Offline Tests
-    let testSheet = getOrCreateSheet(ss, 'Offline_Test_Marks', ['Test_Marks', 'Offline Tests']);
-    testSheet.clear();
-    const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Date', 'Max Marks', 'Student Name', 'Marks Obtained', 'Percentage', 'Teacher Remarks'];
-    const tRows = [tHeaders];
-    const studentMap = {};
-    (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
-    const testList = (data.offlineTests || []).filter(function(t) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(t) : true;
-    });
-    if (testList.length > 0) {
+    // D. Sync Offline Tests Sheet (Offline_Test_Marks)
+    {
+      let testSheet = getOrCreateSheet(ss, 'Offline_Test_Marks', ['Test_Marks', 'Offline Tests']);
+      testSheet.clear();
+      const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Date', 'Max Marks', 'Student Name', 'Marks Obtained', 'Percentage', 'Teacher Remarks'];
+      const tRows = [tHeaders];
+      const studentMap = {};
+      (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
+      const showTestDummy = isDummyForSheetEnabled_(data.settings, 'offlineTests');
+      const testList = (data.offlineTests || []).filter(function(t) {
+        return showTestDummy ? true : !isDummyRecord_(t);
+      });
       testList.forEach(function(t) {
         const marks = t.marks || {};
         Object.keys(marks).forEach(function(sid) {
@@ -1380,23 +1498,21 @@ function syncReadableSheets(ss, data) {
           ]);
         });
       });
+      testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
+      testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
+      formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
     }
-    if (tRows.length === 1) {
-      tRows.push(['-', 'No production offline tests scheduled yet (Demo Data Disabled)', '-', '-', '-', '-', '-', '-', '-']);
-    }
-    testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
-    testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
-    formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
 
-    // E. Sync Feedback Sheet
-    let fbSheet = getOrCreateSheet(ss, 'Feedback_Responses', ['Feedback', 'Feedback Wall']);
-    fbSheet.clear();
-    const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
-    const fbRows = [fbHeaders];
-    const fbList = (data.feedbacks || []).filter(function(f) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(f) : true;
-    });
-    if (fbList.length > 0) {
+    // E. Sync Feedback Sheet (Feedback_Responses)
+    {
+      let fbSheet = getOrCreateSheet(ss, 'Feedback_Responses', ['Feedback', 'Feedback Wall']);
+      fbSheet.clear();
+      const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
+      const fbRows = [fbHeaders];
+      const showFbDummy = isDummyForSheetEnabled_(data.settings, 'feedbacks');
+      const fbList = (data.feedbacks || []).filter(function(f) {
+        return showFbDummy ? true : !isDummyRecord_(f);
+      });
       fbList.forEach(function(f) {
         fbRows.push([
           f.authorName || '',
@@ -1408,24 +1524,23 @@ function syncReadableSheets(ss, data) {
           f.comment || ''
         ]);
       });
-    } else {
-      fbRows.push(['-', 'No production feedback responses yet (Demo Data Disabled)', '-', '-', 5, '-', '-']);
+      fbSheet.getRange(1, 1, fbRows.length, fbHeaders.length).setValues(fbRows);
+      fbSheet.getRange(1, 1, 1, fbHeaders.length).setFontWeight('bold').setBackground('#7c3aed').setFontColor('#ffffff');
+      formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
     }
-    fbSheet.getRange(1, 1, fbRows.length, fbHeaders.length).setValues(fbRows);
-    fbSheet.getRange(1, 1, 1, fbHeaders.length).setFontWeight('bold').setBackground('#7c3aed').setFontColor('#ffffff');
-    formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
 
-    // F. Sync Materials Sheet (Assignments, DPPs, Test Papers)
-    let matSheet = getOrCreateSheet(ss, 'Materials_Repository', ['Materials', 'Study Materials']);
-    matSheet.clear();
-    const mHeaders = ['Material ID', 'Title', 'Batch Name', 'Category', 'Upload Date', 'Uploaded By', 'File Size', 'Downloads', 'Description', 'Download URL', 'Google Drive Link'];
-    const mRows = [mHeaders];
-    const batchMap = {};
-    (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-    const matList = (data.materials || []).filter(function(m) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(m) : true;
-    });
-    if (matList.length > 0) {
+    // F. Sync Materials Sheet (Materials_Repository)
+    {
+      let matSheet = getOrCreateSheet(ss, 'Materials_Repository', ['Materials', 'Study Materials']);
+      matSheet.clear();
+      const mHeaders = ['Material ID', 'Title', 'Batch Name', 'Category', 'Upload Date', 'Uploaded By', 'File Size', 'Downloads', 'Description', 'Download URL', 'Google Drive Link'];
+      const mRows = [mHeaders];
+      const batchMap = {};
+      (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
+      const showMatDummy = isDummyForSheetEnabled_(data.settings, 'materials');
+      const matList = (data.materials || []).filter(function(m) {
+        return showMatDummy ? true : !isDummyRecord_(m);
+      });
       matList.forEach(function(m) {
         mRows.push([
           m.id || '',
@@ -1441,22 +1556,21 @@ function syncReadableSheets(ss, data) {
           m.driveUrl || ''
         ]);
       });
-    } else {
-      mRows.push(['-', 'No production study materials uploaded yet (Demo Data Disabled)', '-', '-', '-', '-', '-', 0, '-', '-', '-']);
+      matSheet.getRange(1, 1, mRows.length, mHeaders.length).setValues(mRows);
+      matSheet.getRange(1, 1, 1, mHeaders.length).setFontWeight('bold').setBackground('#2563eb').setFontColor('#ffffff');
+      formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
     }
-    matSheet.getRange(1, 1, mRows.length, mHeaders.length).setValues(mRows);
-    matSheet.getRange(1, 1, 1, mHeaders.length).setFontWeight('bold').setBackground('#2563eb').setFontColor('#ffffff');
-    formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
 
-    // G. Sync Gallery Banners Sheet (Results & Achievements)
-    let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
-    galSheet.clear();
-    const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
-    const gRows = [gHeaders];
-    const galList = (data.gallery || []).filter(function(g) {
-      return (data.settings && data.settings.showDummyData === false) ? !isDummyRecord_(g) : true;
-    });
-    if (galList.length > 0) {
+    // G. Sync Gallery Banners Sheet (Gallery_Banners)
+    {
+      let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
+      galSheet.clear();
+      const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
+      const gRows = [gHeaders];
+      const showGalDummy = isDummyForSheetEnabled_(data.settings, 'gallery');
+      const galList = (data.gallery || []).filter(function(g) {
+        return showGalDummy ? true : !isDummyRecord_(g);
+      });
       galList.forEach(function(g) {
         gRows.push([
           g.id || '',
@@ -1468,14 +1582,12 @@ function syncReadableSheets(ss, data) {
           g.imageUrl || ''
         ]);
       });
-    } else {
-      gRows.push(['-', 'No production gallery banners added yet (Demo Data Disabled)', '-', '-', '-', '-', '-']);
+      galSheet.getRange(1, 1, gRows.length, gHeaders.length).setValues(gRows);
+      galSheet.getRange(1, 1, 1, gHeaders.length).setFontWeight('bold').setBackground('#db2777').setFontColor('#ffffff');
+      formatAndTrimSheet(galSheet, gHeaders.length, gRows.length, '#db2777', '#db2777');
     }
-    galSheet.getRange(1, 1, gRows.length, gHeaders.length).setValues(gRows);
-    galSheet.getRange(1, 1, 1, gHeaders.length).setFontWeight('bold').setBackground('#db2777').setFontColor('#ffffff');
-    formatAndTrimSheet(galSheet, gHeaders.length, gRows.length, '#db2777', '#db2777');
 
-    // G2. Sync External Study Links Hub Sheet (always visible to all roles)
+    // G2. External_Links_Hub (ALWAYS PERMANENT - NEVER DELETED ON DISABLE)
     {
       let linkSheet = ss.getSheetByName('External_Links_Hub');
       if (!linkSheet) {
@@ -1498,15 +1610,12 @@ function syncReadableSheets(ss, data) {
       });
       linkSheet.getRange(1, 1, lRows.length, lHeaders.length).setValues(lRows);
       linkSheet.getRange(1, 1, 1, lHeaders.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
-      formatAndTrimSheet(linkSheet, lHeaders.length, lRows.length);
+      formatAndTrimSheet(linkSheet, lHeaders.length, lRows.length, '#4f46e5', '#4f46e5');
     }
 
     // H. Sync Institute Settings Config
     if (data.settings) {
-      let setSheet = ss.getSheetByName('Settings_Config');
-      if (!setSheet) {
-        setSheet = ss.insertSheet('Settings_Config');
-      }
+      let setSheet = getOrCreateSheet(ss, 'Settings_Config', ['Institute_Settings']);
       setSheet.clear();
       const sHeaders = ['Setting Parameter', 'Configured Value', 'Description'];
       const sRows = [sHeaders];
@@ -1527,21 +1636,29 @@ function syncReadableSheets(ss, data) {
       sRows.push(['Show Requirement Labels', (s.showRequirementLabels === false) ? 'Off' : 'On', 'Page header "Requirement #N" tags (toggle in Settings)']);
       sRows.push(['Admin Feedback Delete', (s.allowAdminFeedbackDelete === false) ? 'Off' : 'On', 'Admin delete button on Feedback Wall (toggle in Settings)']);
       sRows.push(['Study Link Delete', (s.allowAdminLinkDelete === false) ? 'Off' : 'On', 'Admin delete button on Study Links cards (toggle in Settings)']);
-      sRows.push(['Show Dummy / Demo Data', (s.showDummyData === false) ? 'Off (hidden, not deleted)' : 'On', 'Seed demo students/batches/tests visibility (study links always kept)']);
+
+      // Dummy Data Status per sheet
+      const cfg = s.dummyDataConfig || {};
+      sRows.push(['Overall Dummy Data Master', (s.showDummyData === false) ? 'OFF (All Demo Data Deleted)' : 'ON', 'Master toggle']);
+      sRows.push(['Students Master Dummy Data', (cfg.students === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (11 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Teachers Roster Dummy Data', (cfg.teachers === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (4 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Batches Roster Dummy Data', (cfg.batches === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (3 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Offline Tests Dummy Data', (cfg.offlineTests === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (4 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Materials Dummy Data', (cfg.materials === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (5 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Gallery Dummy Data', (cfg.gallery === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (4 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Feedback Dummy Data', (cfg.feedbacks === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (3 demo rows)', 'Controlled by Developer']);
+      sRows.push(['External_Links_Hub Status', 'PERMANENT (All 5 portals active)', 'Curated official study links never deleted']);
       sRows.push(['Last Auto-Sync Timestamp', new Date().toLocaleString(), 'Time of last auto-sync from Web App']);
 
       setSheet.getRange(1, 1, sRows.length, sHeaders.length).setValues(sRows);
       setSheet.getRange(1, 1, 1, sHeaders.length).setFontWeight('bold').setBackground('#334155').setFontColor('#ffffff');
-      formatAndTrimSheet(setSheet, sHeaders.length, sRows.length);
+      formatAndTrimSheet(setSheet, sHeaders.length, sRows.length, '#334155', '#334155');
     }
   } catch (err) {
     Logger.log('Error creating readable sheets: ' + err.toString());
   }
 }
 
-/**
- * Dedicated API to update a student's password and status
- */
 function apiUpdateStudentAuth(studentId, newPassword, newStatus) {
   const data = apiGetInitialData();
   const student = (data.students || []).find(function(s) { return s.id === studentId; });

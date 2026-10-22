@@ -366,26 +366,42 @@ function getDummySeedData() {
   return JSON.parse(JSON.stringify(data));
 }
 
-function stripDummyData(appData) {
+function isDummyForSheetEnabled(settings, sheetKey) {
+  if (!settings) return true;
+  if (settings.showDummyData === false) return false;
+  if (settings.dummyDataConfig && typeof settings.dummyDataConfig === 'object') {
+    if (settings.dummyDataConfig[sheetKey] === false) return false;
+  }
+  return true;
+}
+
+function stripDummyData(appData, targetTable) {
   if (!appData) return appData;
   var clone = JSON.parse(JSON.stringify(appData));
   var dummyStudentIds = {};
   (clone.students || []).forEach(function(s) {
     if (s && isDummyRecord(s)) dummyStudentIds[s.id] = true;
   });
-  ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function(tbl) {
-    clone[tbl] = (clone[tbl] || []).filter(function(r) { return !isDummyRecord(r); });
-  });
-  (clone.batches || []).forEach(function(b) {
-    if (Array.isArray(b.studentIds)) {
-      b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+
+  var tablesToStrip = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'];
+  tablesToStrip.forEach(function(tbl) {
+    if (!isDummyForSheetEnabled(clone.settings, tbl) || targetTable) {
+      clone[tbl] = (clone[tbl] || []).filter(function(r) { return !isDummyRecord(r); });
     }
   });
-  (clone.offlineTests || []).forEach(function(t) {
-    if (t && t.marks && typeof t.marks === 'object') {
-      Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
-    }
-  });
+
+  if (!isDummyForSheetEnabled(clone.settings, 'students') || targetTable === 'students') {
+    (clone.batches || []).forEach(function(b) {
+      if (Array.isArray(b.studentIds)) {
+        b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+      }
+    });
+    (clone.offlineTests || []).forEach(function(t) {
+      if (t && t.marks && typeof t.marks === 'object') {
+        Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
+      }
+    });
+  }
   return clone;
 }
 
@@ -393,6 +409,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     DUMMY_SEED_ID_SET: DUMMY_SEED_ID_SET,
     isDummyRecord: isDummyRecord,
+    isDummyForSheetEnabled: isDummyForSheetEnabled,
     getDummySeedData: getDummySeedData,
     stripDummyData: stripDummyData
   };
