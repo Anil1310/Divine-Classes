@@ -6,9 +6,9 @@
         const GOOGLE_SHEET_ID = '1v7RZX0R8AmVDv02BCr3D_t28B8i3I8PO_qpjqMzFeKM';
 
         let state = {
-            isAuthenticated: false,
-            currentUser: null, // { role: 'admin'|'teacher'|'student'|'developer', id, name, identifier }
-            currentRole: 'student', // 'admin' | 'teacher' | 'student' | 'developer'
+            isAuthenticated: true,
+            currentUser: { role: 'admin', name: 'Shankar', identifier: 'Admin Master' },
+            currentRole: 'admin',
             isDeveloper: false, // Unlocks full Institute Settings console + Google Drive & Google Sheet links
             activeTab: 'dashboard',
             selectedBatchFilter: 'all',
