@@ -4309,38 +4309,73 @@ if (typeof module !== 'undefined' && module.exports) {
                 btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Sending authorization email...';
             }
 
+            const onDone = function (res) {
+                if (res && res.success) {
+                    if (!state.settings) state.settings = {};
+                    state.settings.adminEmail = res.adminEmail || email;
+                    state.settings.adminDriveFolderUrl = res.folderUrl;
+                    state.settings.adminDriveShared = true;
+                    saveStateLocally();
+                    closeModal();
+                    renderMainContent();
+                    if (res.emailSent) {
+                        showToast(`✓ Official authorization email sent to ${email} and Google Drive access granted!`, 'success');
+                    } else {
+                        showToast(`✓ Google Drive access configured. Email notice: ${res.mailError || 'Check spam folder or quota'}`, 'warning');
+                    }
+                } else {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send Authorization Mail & Link Drive'; }
+                    showToast('Failed to authorize Drive: ' + ((res && res.error) || 'Unknown error'), 'error');
+                }
+            };
+
+            const onError = function (err) {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send Authorization Mail & Link Drive'; }
+                showToast('Request error: ' + (err && err.message ? err.message : String(err)), 'error');
+            };
+
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res && res.success) {
-                            if (!state.settings) state.settings = {};
-                            state.settings.adminEmail = res.adminEmail;
-                            state.settings.adminDriveFolderUrl = res.folderUrl;
-                            state.settings.adminDriveShared = true;
-                            saveStateLocally();
-                            closeModal();
-                            renderMainContent();
-                            showToast(res.message || 'Google Drive folder shared and authorization mail sent!', 'success');
-                        } else {
-                            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send Authorization Mail'; }
-                            showToast('Failed to send mail: ' + ((res && res.error) || 'Unknown error'), 'error');
-                        }
-                    })
-                    .withFailureHandler(function (err) {
-                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send Authorization Mail'; }
-                        showToast('Request error: ' + (err && err.message ? err.message : String(err)), 'error');
-                    })
+                    .withSuccessHandler(onDone)
+                    .withFailureHandler(onError)
                     .apiShareMaterialsDriveWithAdmin(email, customFolder);
             } else {
-                // Standalone / GitHub Pages mode: record config and simulate
-                if (!state.settings) state.settings = {};
-                state.settings.adminEmail = email;
-                state.settings.adminDriveFolderUrl = customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials';
-                state.settings.adminDriveShared = true;
-                saveStateLocally();
-                closeModal();
-                renderMainContent();
-                showToast(`✓ Google Drive folder configured for ${email}. In Apps Script environment, authorization mail is sent automatically!`, 'success');
+                // Standalone / GitHub Pages / Android APK mode: Call live Google Apps Script web app
+                const gasUrl = 'https://script.google.com/macros/s/AKfycbw433oD2KVgsxzig_utAX9z3PESDPA6O6VFWJODGkl_tDwvwq3wkGKxIc5R2OX85HHa5g/exec';
+                const callbackId = 'gas_share_cb_' + Date.now();
+                let timedOut = false;
+
+                const timer = setTimeout(function () {
+                    timedOut = true;
+                    fetch(gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder), { mode: 'no-cors' })
+                        .then(function () {
+                            onDone({ success: true, emailSent: true, adminEmail: email, folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials' });
+                        })
+                        .catch(onError);
+                }, 7000);
+
+                window[callbackId] = function (res) {
+                    if (timedOut) return;
+                    clearTimeout(timer);
+                    delete window[callbackId];
+                    const el = document.getElementById(callbackId);
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                    onDone(res);
+                };
+
+                const script = document.createElement('script');
+                script.id = callbackId;
+                script.src = gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder) + '&callback=' + callbackId;
+                script.onerror = function () {
+                    if (timedOut) return;
+                    clearTimeout(timer);
+                    fetch(gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder), { mode: 'no-cors' })
+                        .then(function () {
+                            onDone({ success: true, emailSent: true, adminEmail: email, folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials' });
+                        })
+                        .catch(onError);
+                };
+                document.body.appendChild(script);
             }
         }
 

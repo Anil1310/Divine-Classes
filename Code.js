@@ -25,6 +25,20 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // External API invocation for Admin Google Drive authorization and email dispatch
+    if (e && e.parameter && (e.parameter.action === 'shareAdminDrive' || e.parameter.action === 'authorizeAdmin')) {
+      const email = (e.parameter.email || '').trim();
+      const folderLink = (e.parameter.folderUrl || e.parameter.folderLink || '').trim();
+      const res = apiShareMaterialsDriveWithAdmin(email, folderLink);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
     let title = 'Divine Classes - Institute Management System';
@@ -485,24 +499,27 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
     let emailSent = false;
     let mailError = '';
     try {
-      GmailApp.sendEmail(emailToUse, subject, textBody, {
-        name: instituteName + ' Portal',
-        htmlBody: htmlBody
+      MailApp.sendEmail({
+        to: emailToUse,
+        subject: subject,
+        body: textBody,
+        htmlBody: htmlBody,
+        name: instituteName + ' Portal'
       });
       emailSent = true;
+      Logger.log('Authorization email sent via MailApp to ' + emailToUse);
     } catch (e1) {
+      Logger.log('MailApp.sendEmail failed: ' + e1.toString() + ' — trying GmailApp...');
       try {
-        MailApp.sendEmail({
-          to: emailToUse,
-          subject: subject,
-          body: textBody,
-          htmlBody: htmlBody,
-          name: instituteName + ' Portal'
+        GmailApp.sendEmail(emailToUse, subject, textBody, {
+          name: instituteName + ' Portal',
+          htmlBody: htmlBody
         });
         emailSent = true;
+        Logger.log('Authorization email sent via GmailApp to ' + emailToUse);
       } catch (e2) {
-        mailError = e2.toString();
-        Logger.log('Email delivery failed: ' + mailError);
+        mailError = 'MailApp: ' + e1.toString() + ' | GmailApp: ' + e2.toString();
+        Logger.log('All email delivery attempts failed: ' + mailError);
       }
     }
 
@@ -2143,5 +2160,18 @@ function onOpen(e) {
     apiRestructureAllSheets();
   } catch (syncErr) {
     Logger.log('onOpen auto sync error: ' + syncErr.toString());
+  }
+}
+
+function debugShareAdminDrive() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    Logger.log('All script properties keys: ' + JSON.stringify(props.getKeys()));
+    const res = apiShareMaterialsDriveWithAdmin('mis@doctorsoap.com', '');
+    Logger.log('apiShareMaterialsDriveWithAdmin result: ' + JSON.stringify(res));
+    return res;
+  } catch (e) {
+    Logger.log('debugShareAdminDrive error: ' + e.toString() + ' Stack: ' + e.stack);
+    return { success: false, error: e.toString(), stack: e.stack };
   }
 }
