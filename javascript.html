@@ -1051,11 +1051,12 @@ if (typeof module !== 'undefined' && module.exports) {
             }
         }
 
-        // Local Storage Cache Key
-        const CACHE_KEY = 'DIVINE_CLASSES_APP_DATA_V1';
+        // Local Storage Cache Key (Bumped to V2 to ensure Android APK immediately updates)
+        const CACHE_KEY = 'DIVINE_CLASSES_APP_DATA_V2';
 
         function loadCachedData() {
             try {
+                localStorage.removeItem('DIVINE_CLASSES_APP_DATA_V1');
                 const raw = localStorage.getItem(CACHE_KEY);
                 if (raw) {
                     const parsed = JSON.parse(raw);
