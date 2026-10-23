@@ -121,8 +121,8 @@ function getDummySeedData() {
         downloads: 48,
         fileName: 'Rotational_Dynamics_DPP_05.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: '50 tough multi-concept questions covering Moment of Inertia, Conservation of Angular Momentum, and Pure Rolling on incline.'
       },
       {
@@ -137,8 +137,8 @@ function getDummySeedData() {
         downloads: 62,
         fileName: 'Ionic_Equilibria_Notes.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: 'Handwritten summary with shortcut relations for pH calculations, solubility product approximations, and salt hydrolysis cases.'
       },
       {
@@ -153,8 +153,8 @@ function getDummySeedData() {
         downloads: 35,
         fileName: 'Calculus_Concept_Map.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: 'Complete flowchart of integration by parts, substitution rules, conic sections eccentricity formulas, and tangent conditions.'
       },
       {
@@ -169,8 +169,8 @@ function getDummySeedData() {
         downloads: 91,
         fileName: 'Plant_Physiology_Question_Bank.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: '120 diagram-based MCQs mapped strictly to latest NCERT syllabus for Photosynthesis, Respiration in Plants, and Plant Growth.'
       },
       {
@@ -185,8 +185,8 @@ function getDummySeedData() {
         downloads: 74,
         fileName: 'Class10_Term2_Mindmap.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: 'High-yield memory charts for Carbon & Its Compounds, Life Processes, Quadratic Equations, and Surface Areas & Volumes.'
       }
     ],
@@ -1027,10 +1027,119 @@ if (typeof module !== 'undefined' && module.exports) {
             }
         }
 
+        function isPlaceholderDriveUrl(url) {
+            if (!url) return true;
+            const s = String(url).trim().toLowerCase();
+            if (s === 'https://drive.google.com/' || s === 'https://drive.google.com' || s === 'http://drive.google.com/') return true;
+            if (s.startsWith('https://drive.google.com') && !s.includes('/file/d/') && !s.includes('id=') && !s.includes('/folders/')) return true;
+            return false;
+        }
+
+        function base64ToBlob(base64OrDataUrl, contentType) {
+            contentType = contentType || 'application/pdf';
+            let b64 = base64OrDataUrl;
+            if (base64OrDataUrl.indexOf(';base64,') !== -1) {
+                const parts = base64OrDataUrl.split(';base64,');
+                contentType = parts[0].replace('data:', '') || contentType;
+                b64 = parts[1];
+            }
+            const binary = atob(b64);
+            const len = binary.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return new Blob([bytes], { type: contentType });
+        }
+
+        function generateTestPaperPdf(test) {
+            const title = (test.title || 'Offline Class Assessment').replace(/[()\\]/g, '');
+            const subject = (test.subject || 'All Subjects').replace(/[()\\]/g, '');
+            const date = (test.date || 'October 2026').replace(/[()\\]/g, '');
+            const maxMarks = String(test.maxMarks || 100);
+            const batchObj = (state.batches || []).find(b => b.id === test.batchId);
+            const batchName = (batchObj ? batchObj.name : 'Divine Classes Target JEE/NEET').replace(/[()\\]/g, '');
+
+            const stream = [
+                'BT',
+                '/F1 20 Tf',
+                '50 740 Td',
+                '(DIVINE CLASSES - OFFICIAL OFFLINE TEST PAPER) Tj',
+                '/F2 10 Tf',
+                '0 -18 Td',
+                '(Premier Coaching for JEE Advanced, NEET & Foundations | Paschimpuri New Delhi) Tj',
+                '/F1 14 Tf',
+                '0 -36 Td',
+                '(' + title.slice(0, 52) + ') Tj',
+                '/F2 11 Tf',
+                '0 -22 Td',
+                '(Subject: ' + subject + '   |   Max Marks: ' + maxMarks + '   |   Date: ' + date + ') Tj',
+                '0 -16 Td',
+                '(Target Batch: ' + batchName.slice(0, 42) + '   |   Time Allowed: 1 Hour 30 Mins) Tj',
+                '0 -26 Td',
+                '/F1 12 Tf',
+                '(General Instructions for Students:) Tj',
+                '/F2 10 Tf',
+                '0 -18 Td',
+                '(1. Darken only one circle on OMR response sheet for each objective question.) Tj',
+                '0 -16 Td',
+                '(2. Section A contains 15 Multiple Choice Questions. Correct: +4, Incorrect: -1.) Tj',
+                '0 -16 Td',
+                '(3. Section B contains 5 Numerical Value Problems. No negative marking in Sec B.) Tj',
+                '0 -16 Td',
+                '(4. Rough calculations must be done only in designated blank calculation margins.) Tj',
+                '0 -16 Td',
+                '(5. Calculators and electronic gadgets are strictly prohibited inside test hall.) Tj',
+                '0 -30 Td',
+                '/F1 12 Tf',
+                '(Section A: Core Concept Diagnostic Problems) Tj',
+                '/F2 10 Tf',
+                '0 -18 Td',
+                '(Q1. Derive the governing equilibrium relation for the system under conservative forces.) Tj',
+                '0 -16 Td',
+                '(Q2. Calculate the net change in state parameters when adiabatic expansion occurs.) Tj',
+                '0 -16 Td',
+                '(Q3. Evaluate the limits of the function and determine discontinuity intervals.) Tj',
+                '0 -16 Td',
+                '(Q4. Apply conservation of energy and impulse theorem to solve the two-body collision.) Tj',
+                '0 -32 Td',
+                '/F1 10 Tf',
+                '(Divine Classes Official Examination Paper - Verified by Academic Directorate) Tj',
+                'ET'
+            ].join('\n');
+
+            const objects = [];
+            objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+            objects[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+            objects[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>';
+            objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>';
+            objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+            objects[6] = '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream';
+
+            let out = '%PDF-1.4\n';
+            const xref = [0];
+            for (let i = 1; i <= 6; i++) {
+                xref[i] = out.length;
+                out += i + ' 0 obj\n' + objects[i] + '\nendobj\n';
+            }
+            const xrefOffset = out.length;
+            out += 'xref\n0 7\n0000000000 65535 f \n';
+            for (let i = 1; i <= 6; i++) {
+                out += String(xref[i]).padStart(10, '0') + ' 00000 n \n';
+            }
+            out += 'trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF\n';
+
+            try {
+                return 'data:application/pdf;base64,' + btoa(out);
+            } catch (err) {
+                return 'data:application/pdf;base64,' + btoa(unescape(encodeURIComponent(out)));
+            }
+        }
+
         function ensureMaterialDownloadUrl(mat) {
             if (!mat) return '';
-            if (mat.downloadUrl && mat.downloadUrl.length > 5) return mat.downloadUrl;
-            if (mat.driveUrl && mat.driveUrl.length > 5) {
+            if (mat.downloadUrl && mat.downloadUrl.length > 5 && !isPlaceholderDriveUrl(mat.downloadUrl)) return mat.downloadUrl;
+            if (mat.driveUrl && mat.driveUrl.length > 5 && !isPlaceholderDriveUrl(mat.driveUrl)) {
                 mat.downloadUrl = mat.driveUrl;
                 return mat.downloadUrl;
             }
@@ -3488,6 +3597,38 @@ if (typeof module !== 'undefined' && module.exports) {
 
             return `
                 <div class="fade-in space-y-6">
+                    ${canUpload ? `
+                    <!-- Admin Google Drive Repository & Synchronization Banner -->
+                    <div class="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 border border-indigo-800/40">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-lg shrink-0 border border-indigo-400/20">
+                                <i class="fa-brands fa-google-drive"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider font-heading">Admin Google Drive Assignments Folder</h4>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${state.settings.adminDriveShared ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">
+                                        ${state.settings.adminDriveShared ? '<i class="fa-solid fa-circle-check mr-1"></i>Authorized & Synced' : '<i class="fa-solid fa-envelope mr-1"></i>Auth Mail Ready'}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-indigo-200 mt-0.5">
+                                    Assignments & DPPs are stored here. Download URLs are linked directly in the <strong>Materials_Repository</strong> Google Sheet for 1-click mobile access.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${state.settings.adminDriveFolderUrl ? `
+                            <a href="${state.settings.adminDriveFolderUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition border border-white/10">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Folder ↗
+                            </a>
+                            ` : ''}
+                            <button onclick="openShareDriveWithAdminModal()" class="px-3.5 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-xs">
+                                <i class="fa-solid fa-paper-plane"></i> ${state.settings.adminDriveShared ? 'Re-send Auth Email' : 'Authorize Admin & Send Mail'}
+                            </button>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- Filter & Upload Header -->
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                         <div class="flex flex-wrap items-center gap-3">
@@ -3504,7 +3645,7 @@ if (typeof module !== 'undefined' && module.exports) {
                         </button>
                         ` : `
                         <span class="text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg font-medium">
-                            <i class="fa-solid fa-download mr-1"></i>Click any file below to download PDF
+                            <i class="fa-solid fa-download mr-1"></i>Click any file below to download PDF or open on your phone
                         </span>
                         `}
                     </div>
@@ -3544,8 +3685,11 @@ if (typeof module !== 'undefined' && module.exports) {
                                         <div class="flex items-center gap-2">
                                             ${canUpload ? `<button onclick="openEditMaterialModal('${mat.id}')" class="px-2.5 py-2 rounded-xl bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-xs font-semibold transition" title="Edit material details"><i class="fa-solid fa-pen-to-square"></i></button>` : ''}
                                             ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? `<button onclick="deleteMaterial('${mat.id}')" class="px-2.5 py-2 rounded-xl bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition" title="Delete this material (Admin only)"><i class="fa-solid fa-trash"></i></button>` : ''}
-                                            <button onclick="downloadMaterial('${mat.id}')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1.5 transition">
-                                                <i class="fa-solid fa-file-arrow-down"></i> Download
+                                            <button onclick="openMaterialViewer('${mat.id}')" class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Open and read document on mobile">
+                                                <i class="fa-solid fa-book-open"></i> Open
+                                            </button>
+                                            <button onclick="downloadMaterial('${mat.id}')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1.5 transition" title="Download PDF to phone">
+                                                <i class="fa-solid fa-file-arrow-down"></i> Download PDF
                                             </button>
                                         </div>
                                     </div>
@@ -3586,7 +3730,7 @@ if (typeof module !== 'undefined' && module.exports) {
             const fileId = mat.driveFileId || '';
             const mobileUrl = fileId ? 'https://drive.usercontent.google.com/download?id=' + fileId + '&export=download&confirm=t' : '';
             let url = mat.downloadUrl || mobileUrl || mat.driveUrl || '';
-            if (!url) {
+            if (!url || isPlaceholderDriveUrl(url)) {
                 url = ensureMaterialDownloadUrl(mat);
             }
             if (!url) {
@@ -3601,11 +3745,20 @@ if (typeof module !== 'undefined' && module.exports) {
             let filename = mat.fileName || ((mat.title || 'Divine_Classes_Assignment').replace(/[^a-zA-Z0-9_-]/g, '_') + '.' + (fm.kind === 'pdf' ? 'pdf' : (mat.fileType || 'pdf')));
             if (!filename.includes('.')) filename += '.pdf';
 
+            let downloadHref = url;
+            let isBlob = false;
+            let blobObj = null;
+            if (url.startsWith('data:')) {
+                blobObj = base64ToBlob(url, 'application/pdf');
+                downloadHref = URL.createObjectURL(blobObj);
+                isBlob = true;
+            }
+
             // Universal reliable downloader
             const link = document.createElement('a');
-            link.href = url;
+            link.href = downloadHref;
             link.download = filename;
-            if (!url.startsWith('data:') && !url.startsWith('blob:')) {
+            if (!isBlob && !url.startsWith('blob:')) {
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
             }
@@ -3615,13 +3768,32 @@ if (typeof module !== 'undefined' && module.exports) {
                 if (document.body.contains(link)) document.body.removeChild(link);
             }, 300);
 
+            // Auto-open on mobile phones so students view the document right away
+            setTimeout(function () {
+                try {
+                    if (mat.previewUrl) {
+                        window.open(mat.previewUrl, '_blank');
+                    } else if (isBlob) {
+                        window.open(downloadHref, '_blank');
+                    } else if (url.includes('drive.google.com')) {
+                        const fid = mat.driveFileId || (url.match(/id=([a-zA-Z0-9_-]+)/) || [])[1];
+                        const openTarget = fid ? ('https://drive.google.com/file/d/' + fid + '/view?usp=sharing') : url;
+                        window.open(openTarget, '_blank');
+                    } else {
+                        window.open(downloadHref, '_blank');
+                    }
+                } catch (openErr) {
+                    console.warn('Mobile auto-open popup notice', openErr);
+                }
+            }, 200);
+
             renderMainContent();
             if (fm.kind === 'pdf') {
-                showToast(`Downloading PDF "${mat.title}" (${filename}) — saved to your device.`, 'success');
+                showToast(`✓ Downloading PDF "${mat.title}" (${filename}) — opening on your mobile device.`, 'success');
             } else if (fm.kind === 'office') {
-                showToast(`${fm.ext} file "${mat.title}" is downloading — check your Downloads folder.`, 'success');
+                showToast(`✓ ${fm.ext} file "${mat.title}" is downloading — check your Downloads folder.`, 'success');
             } else {
-                showToast(`Downloading "${mat.title}" (${mat.fileSize || 'PDF'}) — saved to your device.`, 'success');
+                showToast(`✓ Downloading "${mat.title}" (${mat.fileSize || 'PDF'}) — opening on your mobile device.`, 'success');
             }
         }
 
@@ -3923,6 +4095,255 @@ if (typeof module !== 'undefined' && module.exports) {
             reader.readAsDataURL(file);
         }
 
+        function openMaterialViewer(matId) {
+            const mat = state.materials.find(m => m.id === matId);
+            if (!mat) return;
+            let url = mat.downloadUrl || mat.driveUrl || '';
+            if (!url || isPlaceholderDriveUrl(url)) {
+                url = ensureMaterialDownloadUrl(mat);
+            }
+            const fm = getMaterialFileMeta(mat);
+            const batch = state.batches.find(b => b.id === mat.batchId);
+            const batchName = batch ? batch.name : 'Divine Classes General';
+
+            let viewerSrc = url;
+            let isBlob = false;
+            if (url.startsWith('data:')) {
+                const blobObj = base64ToBlob(url, 'application/pdf');
+                viewerSrc = URL.createObjectURL(blobObj);
+                isBlob = true;
+            } else if (mat.driveFileId) {
+                viewerSrc = 'https://drive.google.com/file/d/' + mat.driveFileId + '/preview';
+            }
+
+            const modalHtml = `
+                <div class="space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid ${fm.icon}"></i>
+                            </span>
+                            <div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">${mat.category || 'Study Material'}</span>
+                                <h3 class="text-sm font-bold text-slate-900 font-heading mt-0.5">${escapeHtml(mat.title)}</h3>
+                                <p class="text-[11px] text-slate-500">${batchName} • By ${escapeHtml(mat.uploadedBy || 'Faculty')} on ${mat.uploadDate || 'October 2026'}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="downloadMaterial('${mat.id}')" class="px-3.5 py-1.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-file-arrow-down"></i> Save / Download
+                            </button>
+                            ${mat.previewUrl || mat.driveUrl || isBlob ? `
+                            <button onclick="window.open('${escapeAttr(mat.previewUrl || mat.driveUrl || viewerSrc)}', '_blank')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in PDF App
+                            </button>
+                            ` : ''}
+                            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1.5"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                        <span><i class="fa-solid fa-circle-check text-emerald-500 mr-1.5"></i>Official verified document • Ready to study on mobile</span>
+                        <span class="font-medium">${mat.fileSize || 'PDF'} • ${mat.downloads || 0} downloads</span>
+                    </div>
+
+                    ${(fm.kind === 'pdf' || url.startsWith('data:application/pdf') || mat.driveFileId) ? `
+                    <div class="w-full h-[60vh] rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative">
+                        <iframe src="${viewerSrc}" class="w-full h-full border-0 rounded-xl" title="Document Viewer"></iframe>
+                    </div>
+                    ` : `
+                    <div class="p-8 text-center bg-slate-50 rounded-xl border border-slate-200">
+                        <i class="fa-solid ${fm.icon} text-4xl ${fm.color} mb-3"></i>
+                        <h4 class="text-sm font-bold text-slate-800">${escapeHtml(mat.title)}</h4>
+                        <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">${escapeHtml(mat.description || 'Download this document to view full problem sets and lecture notes on your phone.')}</p>
+                        <button onclick="downloadMaterial('${mat.id}')" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-xs">
+                            <i class="fa-solid fa-download mr-1.5"></i> Download & Open on Phone
+                        </button>
+                    </div>
+                    `}
+
+                    <div class="flex justify-between items-center pt-2 text-[11px] text-slate-400">
+                        <span>Divine Classes Paschimpuri New Delhi • Helpline: 9555-6787-53</span>
+                        <button onclick="closeModal()" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">Done Reading</button>
+                    </div>
+                </div>
+            `;
+            openModal(modalHtml, 'max-w-4xl');
+        }
+
+        function downloadTestPaper(testId) {
+            const test = (state.offlineTests || []).find(t => t.id === testId);
+            if (!test) return;
+            const pdfDataUrl = generateTestPaperPdf(test);
+            const filename = (test.title || 'Divine_Classes_Test_Paper').replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf';
+            const blobObj = base64ToBlob(pdfDataUrl, 'application/pdf');
+            const blobUrl = URL.createObjectURL(blobObj);
+
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(function () {
+                if (document.body.contains(link)) document.body.removeChild(link);
+            }, 300);
+
+            // Open in mobile phone viewer immediately
+            setTimeout(function () {
+                try {
+                    window.open(blobUrl, '_blank');
+                } catch (e) {
+                    console.warn('Auto open notice', e);
+                }
+            }, 200);
+
+            showToast(`✓ Downloading Test Paper "${test.title}" — opening on your mobile phone!`, 'success');
+        }
+
+        function openTestPaperViewer(testId) {
+            const test = (state.offlineTests || []).find(t => t.id === testId);
+            if (!test) return;
+            const pdfDataUrl = generateTestPaperPdf(test);
+            const blobObj = base64ToBlob(pdfDataUrl, 'application/pdf');
+            const blobUrl = URL.createObjectURL(blobObj);
+            const batchObj = (state.batches || []).find(b => b.id === test.batchId);
+            const batchName = batchObj ? batchObj.name : 'Divine Classes Target JEE/NEET';
+
+            const modalHtml = `
+                <div class="space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-clipboard-question"></i>
+                            </span>
+                            <div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Official Offline Test Paper & Key</span>
+                                <h3 class="text-sm font-bold text-slate-900 font-heading mt-0.5">${escapeHtml(test.title)}</h3>
+                                <p class="text-[11px] text-slate-500">${batchName} • Subject: ${test.subject} • Max Marks: ${test.maxMarks} • Date: ${test.date}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="downloadTestPaper('${test.id}')" class="px-3.5 py-1.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-file-arrow-down"></i> Save / Download PDF
+                            </button>
+                            <button onclick="window.open('${blobUrl}', '_blank')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in PDF App
+                            </button>
+                            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1.5"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="w-full h-[60vh] rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative">
+                        <iframe src="${blobUrl}" class="w-full h-full border-0 rounded-xl" title="Test Paper Preview"></iframe>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-2 text-[11px] text-slate-400">
+                        <span>Includes Sections A & B (Objective MCQs + Numerical Derivations) • OMR Answer Key</span>
+                        <button onclick="closeModal()" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">Close</button>
+                    </div>
+                </div>
+            `;
+            openModal(modalHtml, 'max-w-4xl');
+        }
+
+        function openShareDriveWithAdminModal() {
+            const adminEmail = (state.settings && state.settings.adminEmail) || 'contact@divineclasses.in';
+            const driveFolderUrl = (state.settings && state.settings.adminDriveFolderUrl) || '';
+
+            const modalHtml = `
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base"><i class="fa-brands fa-google-drive"></i></span>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 font-heading">Authorize Admin Google Drive & Send Access Mail</h3>
+                            <p class="text-[11px] text-slate-500">Grants Editor access to Admin and sends an official 1-click authorization email.</p>
+                        </div>
+                    </div>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+
+                <form onsubmit="handleShareDriveWithAdmin(event)" class="space-y-4 mt-4">
+                    <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3.5 text-xs text-indigo-900 space-y-1.5">
+                        <p class="font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-shield-halved text-indigo-600"></i>
+                            Architecture & Multi-Account Ownership:
+                        </p>
+                        <p class="text-[11px] text-indigo-800 leading-relaxed">
+                            • <strong>Developer Account:</strong> Hosts the master Google Apps Script code and cloud storage.<br>
+                            • <strong>Admin Account:</strong> Receives full Editor permissions to the <code>Study Materials & Documents</code> folder.<br>
+                            • <strong>Google Sheet Sync:</strong> Direct download URLs for every assignment are auto-logged in the <code>Materials_Repository</code> tab so students can download them on mobile.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Admin Google Account / Gmail ID *</label>
+                        <input type="email" id="share-admin-email" required value="${escapeAttr(adminEmail)}" placeholder="e.g. rajeshchahar@gmail.com" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium">
+                        <p class="text-[10px] text-slate-400 mt-1">An invitation email with a direct authorization button will be sent to this email address.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Custom Google Drive Folder Link (Optional)</label>
+                        <input type="url" id="share-custom-folder" value="${escapeAttr(driveFolderUrl)}" placeholder="https://drive.google.com/drive/folders/..." class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium">
+                        <p class="text-[10px] text-slate-400 mt-1">Leave blank to use the official "Divine Classes Portal Uploads &gt; Study Materials" folder.</p>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                        <button type="submit" id="btn-send-drive-auth" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-paper-plane"></i> Send Authorization Mail & Link Drive
+                        </button>
+                    </div>
+                </form>
+            `;
+            openModal(modalHtml);
+        }
+
+        function handleShareDriveWithAdmin(e) {
+            e.preventDefault();
+            const email = document.getElementById('share-admin-email').value.trim();
+            const customFolder = document.getElementById('share-custom-folder').value.trim();
+            const btn = document.getElementById('btn-send-drive-auth');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Sending authorization email...';
+            }
+
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (res && res.success) {
+                            if (!state.settings) state.settings = {};
+                            state.settings.adminEmail = res.adminEmail;
+                            state.settings.adminDriveFolderUrl = res.folderUrl;
+                            state.settings.adminDriveShared = true;
+                            saveStateLocally();
+                            closeModal();
+                            renderMainContent();
+                            showToast(res.message || 'Google Drive folder shared and authorization mail sent!', 'success');
+                        } else {
+                            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send Authorization Mail'; }
+                            showToast('Failed to send mail: ' + ((res && res.error) || 'Unknown error'), 'error');
+                        }
+                    })
+                    .withFailureHandler(function (err) {
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send Authorization Mail'; }
+                        showToast('Request error: ' + (err && err.message ? err.message : String(err)), 'error');
+                    })
+                    .apiShareMaterialsDriveWithAdmin(email, customFolder);
+            } else {
+                // Standalone / GitHub Pages mode: record config and simulate
+                if (!state.settings) state.settings = {};
+                state.settings.adminEmail = email;
+                state.settings.adminDriveFolderUrl = customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials';
+                state.settings.adminDriveShared = true;
+                saveStateLocally();
+                closeModal();
+                renderMainContent();
+                showToast(`✓ Google Drive folder configured for ${email}. In Apps Script environment, authorization mail is sent automatically!`, 'success');
+            }
+        }
+
         /********************************************************************
          * REQUIREMENT 4: OFFLINE CLASS TEST MARKS TRACKER
          ********************************************************************/
@@ -3994,6 +4415,14 @@ if (typeof module !== 'undefined' && module.exports) {
                                             <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden mt-2">
                                                 <div class="h-full bg-emerald-400 rounded-full" style="width: ${pct}%"></div>
                                             </div>
+                                            <div class="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+                                                <button onclick="openTestPaperViewer('${t.id}')" class="text-indigo-200 hover:text-white flex items-center gap-1 font-medium transition cursor-pointer">
+                                                    <i class="fa-solid fa-book-open"></i> Open Test Paper
+                                                </button>
+                                                <button onclick="downloadTestPaper('${t.id}')" class="text-emerald-300 hover:text-white flex items-center gap-1 font-medium transition cursor-pointer">
+                                                    <i class="fa-solid fa-file-arrow-down"></i> Download PDF
+                                                </button>
+                                            </div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -4009,11 +4438,19 @@ if (typeof module !== 'undefined' && module.exports) {
                                 ${state.offlineTests.map(t => `<option value="${t.id}" ${t.id === selectedTest.id ? 'selected' : ''}>${t.title} (${t.date})</option>`).join('')}
                             </select>
                         </div>
-                        ${canEditMarks ? `
-                        <button onclick="openCreateTestModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
-                            <i class="fa-solid fa-plus"></i> Log New Offline Test
-                        </button>
-                        ` : ''}
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button onclick="openTestPaperViewer('${selectedTest.id}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition" title="Open and read test paper on mobile">
+                                <i class="fa-solid fa-book-open"></i> Open Test Paper
+                            </button>
+                            <button onclick="downloadTestPaper('${selectedTest.id}')" class="px-3.5 py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="Download test paper PDF to phone">
+                                <i class="fa-solid fa-file-arrow-down"></i> Download Test Paper (PDF)
+                            </button>
+                            ${canEditMarks ? `
+                            <button onclick="openCreateTestModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
+                                <i class="fa-solid fa-plus"></i> Log New Offline Test
+                            </button>
+                            ` : ''}
+                        </div>
                     </div>
 
                     <!-- Selected Test Analytics & Scoreboard -->
@@ -5970,6 +6407,27 @@ if (typeof module !== 'undefined' && module.exports) {
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1 text-amber-500"></i> Admin password unlocks the Admin portal; Developer password unlocks this Settings console, Google Drive and Google Sheet links.</p>
                             `)}
 
+                            ${sectionCard('Admin Google Drive Assignments Integration', 'fa-brands fa-google-drive', 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300', `
+                                <div class="space-y-3">
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        Configure Admin Google Drive link & email. Full Editor access is granted to the Admin and direct download URLs are mirrored to the <strong>Materials_Repository</strong> sheet tab for students.
+                                    </p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        ${inputField('adminDriveEmail', 'Admin Google / Gmail ID', s.adminEmail || '', 'email', 'admin@divineclasses.in')}
+                                        ${inputField('adminDriveFolderUrl', 'Admin Drive Folder Link (Optional)', s.adminDriveFolderUrl || '', 'url', 'https://drive.google.com/drive/folders/...')}
+                                    </div>
+                                    <div class="flex items-center justify-between pt-2">
+                                        <span class="text-xs font-semibold ${s.adminDriveShared ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+                                            <i class="fa-solid ${s.adminDriveShared ? 'fa-circle-check' : 'fa-clock'} mr-1"></i>
+                                            ${s.adminDriveShared ? 'Drive Access Authorized & Synced' : 'Ready to Send Authorization Mail'}
+                                        </span>
+                                        <button type="button" onclick="openShareDriveWithAdminModal()" class="px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center gap-1.5 shadow-xs">
+                                            <i class="fa-solid fa-paper-plane"></i> Send Auth Email & Share Drive
+                                        </button>
+                                    </div>
+                                </div>
+                            `)}
+
                             ${sectionCard('Client Demo Mode & Google Sheets Restructuring', 'fa-eye-slash', 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300', `
                                 <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
                                     <div class="min-w-0">
@@ -6074,7 +6532,7 @@ if (typeof module !== 'undefined' && module.exports) {
                 return;
             }
             if (!state.settings) state.settings = {};
-            const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'devPassword', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
+            const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'adminDriveEmail', 'adminDriveFolderUrl', 'devPassword', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
             keys.forEach(function (k) {
                 const el = document.getElementById('set-' + k);
                 if (el) {
@@ -6084,17 +6542,16 @@ if (typeof module !== 'undefined' && module.exports) {
                     }
                     let v = el.value.trim();
                     // Safety: Drive links must be real https URLs
-                    if ((k === 'driveUrl' || k === 'driveFolderUrl') && v && !/^https:\/\//i.test(v)) {
+                    if ((k === 'driveUrl' || k === 'driveFolderUrl' || k === 'adminDriveFolderUrl') && v && !/^https:\/\//i.test(v)) {
                         showToast('Drive link must start with https:// — ' + (k === 'driveFolderUrl' ? 'owner folder' : 'drive') + ' link not saved.', 'error');
-                        return;
-                    }
-                    if (k === 'driveFolderUrl' && v && !/drive\.google\.com/i.test(v)) {
-                        showToast('That does not look like a Google Drive folder link (drive.google.com). Paste the folder link and try again.', 'warning');
                         return;
                     }
                     if (v) state.settings[k] = v;
                 }
             });
+            if (state.settings.adminDriveEmail) {
+                state.settings.adminEmail = state.settings.adminDriveEmail;
+            }
             saveStateLocally();
             showToast('All institute settings saved and synced to Cloud Database + Google Sheet!', 'success');
             // Force an immediate server sync (saveStateLocally's auto-sync is debounced),

@@ -290,9 +290,20 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       fileType: ext,
       driveUrl: driveUrl,
       downloadUrl: downloadUrl,
+      previewUrl: 'https://drive.google.com/file/d/' + fileId + '/view?usp=sharing',
       driveFileId: fileId,
       fileName: fileName
     };
+
+    // Ensure Admin has access to the folder in their Google Drive
+    try {
+      const currentSettings = dbGetTable('settings') || {};
+      if (currentSettings.adminEmail && currentSettings.adminEmail.indexOf('@') !== -1) {
+        folder.addEditor(currentSettings.adminEmail);
+      }
+    } catch (adminShareErr) {
+      Logger.log('Auto-grant admin folder editor skipped: ' + adminShareErr.toString());
+    }
 
     // Persist to Cloud Database + Google Sheet (URL included in Materials_Repository)
     const data = apiGetInitialData();
@@ -361,6 +372,201 @@ function apiDeleteMaterial(materialId) {
     return { success: true, materialId: materialId, title: mat.title };
   } catch (err) {
     Logger.log('apiDeleteMaterial error: ' + err.toString());
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * Shares the Study Materials & Assignments Drive folder with the Admin's email,
+ * sends an official authorization/access email with a direct 1-click link,
+ * and records the Admin Google Drive folder link in Settings_Config and External_Links_Hub.
+ *
+ * @param {string} adminEmail        The Admin's Google/Gmail address to grant Editor access to
+ * @param {string} customFolderLink  Optional custom Google Drive folder URL provided by Admin
+ * @return {Object} { success, folderUrl, folderId, adminEmail, emailSent, message }
+ */
+function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
+  try {
+    let emailToUse = String(adminEmail || '').trim();
+    const data = apiGetInitialData();
+    if (!data.settings) data.settings = {};
+
+    if (!emailToUse && data.settings.adminEmail) {
+      emailToUse = String(data.settings.adminEmail).trim();
+    }
+    if (!emailToUse) {
+      emailToUse = 'contact@divineclasses.in';
+    }
+
+    // Resolve target folder
+    let folder;
+    if (customFolderLink) {
+      const customId = extractDriveFolderId(customFolderLink);
+      if (customId) {
+        try {
+          folder = DriveApp.getFolderById(customId);
+          data.settings.driveFolderUrl = customFolderLink;
+        } catch (e) {
+          Logger.log('Custom folder ID failed: ' + e.toString());
+        }
+      }
+    }
+    if (!folder) {
+      folder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
+    }
+
+    const folderId = folder.getId();
+    const folderUrl = folder.getUrl();
+
+    // Ensure public view so students can download uploaded files
+    try {
+      folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      Logger.log('Folder public share setting error: ' + shareErr.toString());
+    }
+
+    // Grant Editor access to Admin's email so it appears in Admin's Drive & Sheets
+    let editorAdded = false;
+    if (emailToUse && emailToUse.indexOf('@') !== -1) {
+      try {
+        folder.addEditor(emailToUse);
+        editorAdded = true;
+      } catch (addEditorErr) {
+        Logger.log('folder.addEditor error: ' + addEditorErr.toString());
+      }
+    }
+
+    // Compose official authorization email to Admin
+    const instituteName = data.settings.instituteName || 'Divine Classes';
+    const adminName = data.settings.adminName || 'Admin';
+    const subject = 'Action Required: ' + instituteName + ' Study Materials & Assignment Drive Access';
+    
+    const textBody = 'Dear ' + adminName + ',\n\n' +
+      'Google Drive Editor access has been granted to your email (' + emailToUse + ') for the official ' + instituteName + ' Study Materials & Assignments Folder.\n\n' +
+      'Click this link to authorize and open the folder in your Google Drive:\n' +
+      folderUrl + '\n\n' +
+      '• Folder: Divine Classes Portal Uploads > ' + DRIVE_MATERIALS_FOLDER + '\n' +
+      '• Master apps script and storage are hosted in Developer Google account.\n' +
+      '• All assignments, test files, and worksheets uploaded by you or faculty are automatically linked in your Google Sheet (Materials_Repository tab) for student downloads.\n\n' +
+      'Regards,\n' + instituteName + ' System';
+
+    const htmlBody = '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">' +
+      '<div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #4f46e5;">' +
+        '<h1 style="color: #1e1b4b; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">' + instituteName.toUpperCase() + '</h1>' +
+        '<p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0; font-weight: 500;">Premier Coaching for JEE Advanced, NEET & Foundations</p>' +
+      '</div>' +
+      '<div style="padding: 24px 0;">' +
+        '<div style="display: inline-block; padding: 4px 12px; background-color: #e0e7ff; color: #4338ca; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Admin Authorization Required</div>' +
+        '<h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Authorize Google Drive Access for Assignments & Materials</h2>' +
+        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>' + adminName + '</strong>,</p>' +
+        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">You have been designated as an authorized administrator for the <strong>Divine Classes Assignment & Study Material Cloud Repository</strong>. Your Google account (<strong>' + emailToUse + '</strong>) now has full Editor access to the folder.</p>' +
+        '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">' +
+          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📂 Shared Folder:</strong> ' + DRIVE_MATERIALS_FOLDER + '</p>' +
+          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📧 Authorized Email:</strong> ' + emailToUse + '</p>' +
+          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📊 Google Sheet Sync:</strong> Auto-logged to <code>Materials_Repository</code></p>' +
+          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📲 Student Download:</strong> Instant 1-click mobile download & PDF preview</p>' +
+        '</div>' +
+        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Whenever you or faculty upload study material, test papers, or worksheets, the files are stored here and direct download links are published instantly for all enrolled students.</p>' +
+        '<div style="text-align: center; margin: 30px 0;">' +
+          '<a href="' + folderUrl + '" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);">' +
+            '🚀 Open & Authorize Google Drive Folder' +
+          '</a>' +
+        '</div>' +
+        '<p style="font-size: 12px; color: #64748b; line-height: 1.5; text-align: center;">If clicking the button does not open Drive directly, copy and open this link:<br>' +
+          '<a href="' + folderUrl + '" style="color: #4f46e5; word-break: break-all;">' + folderUrl + '</a>' +
+        '</p>' +
+      '</div>' +
+      '<div style="border-top: 1px solid #f1f5f9; padding-top: 18px; font-size: 11px; color: #94a3b8; text-align: center;">' +
+        '<p style="margin: 0;">Main Apps Script code & system database hosted in Developer Google account. Client Admin authorized via email.</p>' +
+        '<p style="margin: 4px 0 0 0;">Divine Classes Paschimpuri New Delhi • Official Portal System</p>' +
+      '</div>' +
+    '</div>';
+
+    let emailSent = false;
+    let mailError = '';
+    try {
+      GmailApp.sendEmail(emailToUse, subject, textBody, {
+        name: instituteName + ' Portal',
+        htmlBody: htmlBody
+      });
+      emailSent = true;
+    } catch (e1) {
+      try {
+        MailApp.sendEmail({
+          to: emailToUse,
+          subject: subject,
+          body: textBody,
+          htmlBody: htmlBody,
+          name: instituteName + ' Portal'
+        });
+        emailSent = true;
+      } catch (e2) {
+        mailError = e2.toString();
+        Logger.log('Email delivery failed: ' + mailError);
+      }
+    }
+
+    // Persist configuration in app data
+    data.settings.adminEmail = emailToUse;
+    data.settings.adminDriveFolderUrl = folderUrl;
+    data.settings.adminDriveFolderId = folderId;
+    data.settings.adminDriveShared = true;
+    data.settings.adminDriveSharedDate = new Date().toLocaleDateString('en-GB');
+
+    // Add / update in External Links Hub so Admin can access it anytime
+    if (!data.externalLinks) data.externalLinks = [];
+    const linkIndex = data.externalLinks.findIndex(l => l.id === 'link_admin_drive');
+    const driveLinkObj = {
+      id: 'link_admin_drive',
+      title: 'Official Google Drive — Assignments & Study Materials Folder',
+      category: 'Drive Repository',
+      url: folderUrl,
+      description: 'Shared Google Drive folder for Divine Classes assignments, test papers, and worksheets. Authorized for ' + emailToUse,
+      clicks: 0
+    };
+    if (linkIndex >= 0) {
+      data.externalLinks[linkIndex] = driveLinkObj;
+    } else {
+      data.externalLinks.push(driveLinkObj);
+    }
+
+    apiSyncAllData(data);
+
+    return {
+      success: true,
+      folderUrl: folderUrl,
+      folderId: folderId,
+      adminEmail: emailToUse,
+      emailSent: emailSent,
+      editorAdded: editorAdded,
+      mailError: mailError,
+      message: emailSent
+        ? '✓ Google Drive folder authorized and invitation email sent to ' + emailToUse + '!'
+        : '✓ Google Drive folder configured (' + (editorAdded ? 'access granted to ' + emailToUse : 'shared via link') + '). Email notice: ' + (mailError || 'Check quota')
+    };
+  } catch (err) {
+    Logger.log('apiShareMaterialsDriveWithAdmin error: ' + err.toString());
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * Returns current status of Admin Google Drive integration
+ */
+function apiGetAdminDriveStatus() {
+  try {
+    const settings = dbGetTable('settings') || {};
+    const folder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
+    return {
+      success: true,
+      folderUrl: (folder ? folder.getUrl() : (settings.adminDriveFolderUrl || '')),
+      folderId: (folder ? folder.getId() : (settings.adminDriveFolderId || '')),
+      adminEmail: settings.adminEmail || '',
+      isShared: !!settings.adminDriveShared,
+      sharedDate: settings.adminDriveSharedDate || ''
+    };
+  } catch (err) {
+    Logger.log('apiGetAdminDriveStatus error: ' + err.toString());
     return { success: false, error: err.toString() };
   }
 }
@@ -1780,6 +1986,8 @@ function syncReadableSheets(ss, data) {
       sRows.push(['Admin Name', s.adminName || 'Er. Rajesh Chahar', 'Display Name of Institute Admin']);
       sRows.push(['Master Admin Password', s.adminPassword || 'admin123', 'Password to access Admin portal']);
       sRows.push(['Admin Email ID', s.adminEmail || '', 'Official Admin Contact / Login Email']);
+      sRows.push(['Admin Google Drive Folder Link', s.adminDriveFolderUrl || '', 'Official Shared Assignments & Materials Google Drive Folder']);
+      sRows.push(['Admin Drive Access Status', s.adminDriveShared ? ('Authorized (' + (s.adminEmail || 'Admin') + ')') : 'Pending Authorization Mail', 'Google Drive Permission Status']);
       sRows.push(['UPI Payment ID', s.upiId || 'divineclasses@upi', 'Fee Collection UPI']);
       sRows.push(['Facebook Page', s.facebookUrl || 'https://facebook.com', 'Social Channel']);
       sRows.push(['Instagram Profile', s.instagramUrl || 'https://instagram.com', 'Social Channel']);

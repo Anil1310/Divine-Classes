@@ -110,8 +110,8 @@ function getDummySeedData() {
         downloads: 48,
         fileName: 'Rotational_Dynamics_DPP_05.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: '50 tough multi-concept questions covering Moment of Inertia, Conservation of Angular Momentum, and Pure Rolling on incline.'
       },
       {
@@ -126,8 +126,8 @@ function getDummySeedData() {
         downloads: 62,
         fileName: 'Ionic_Equilibria_Notes.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: 'Handwritten summary with shortcut relations for pH calculations, solubility product approximations, and salt hydrolysis cases.'
       },
       {
@@ -142,8 +142,8 @@ function getDummySeedData() {
         downloads: 35,
         fileName: 'Calculus_Concept_Map.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: 'Complete flowchart of integration by parts, substitution rules, conic sections eccentricity formulas, and tangent conditions.'
       },
       {
@@ -158,8 +158,8 @@ function getDummySeedData() {
         downloads: 91,
         fileName: 'Plant_Physiology_Question_Bank.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: '120 diagram-based MCQs mapped strictly to latest NCERT syllabus for Photosynthesis, Respiration in Plants, and Plant Growth.'
       },
       {
@@ -174,8 +174,8 @@ function getDummySeedData() {
         downloads: 74,
         fileName: 'Class10_Term2_Mindmap.pdf',
         fileType: 'pdf',
-        downloadUrl: 'https://drive.google.com/',
-        driveUrl: 'https://drive.google.com/',
+        downloadUrl: '',
+        driveUrl: '',
         description: 'High-yield memory charts for Carbon & Its Compounds, Life Processes, Quadratic Equations, and Surface Areas & Volumes.'
       }
     ],
