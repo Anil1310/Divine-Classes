@@ -4063,8 +4063,8 @@
                                             <button onclick="openMaterialViewer('${mat.id}')" class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Open and read document on mobile">
                                                 <i class="fa-solid fa-book-open"></i> Open
                                             </button>
-                                            <button onclick="downloadMaterial('${mat.id}')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1.5 transition" title="Download PDF to phone">
-                                                <i class="fa-solid fa-file-pdf text-red-500"></i> Download PDF
+                                            <button onclick="downloadMaterial('${mat.id}')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap" title="Download to phone">
+                                                <i class="fa-solid fa-file-pdf text-red-500"></i> Download
                                             </button>
                                         </div>
                                     </div>
@@ -4628,8 +4628,8 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <button onclick="downloadTestPaper('${test.id}')" class="px-3.5 py-1.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
-                                <i class="fa-solid fa-file-pdf text-red-500"></i> Save / Download PDF
+                            <button onclick="downloadTestPaper('${test.id}')" class="px-3.5 py-1.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap">
+                                <i class="fa-solid fa-file-pdf text-red-500"></i> Save / Download
                             </button>
                             <button onclick="window.open('${blobUrl}', '_blank')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
                                 <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in PDF App
@@ -4982,8 +4982,8 @@
                                                 <button onclick="openTestPaperViewer('${t.id}')" class="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 transition cursor-pointer">
                                                     <i class="fa-solid fa-book-open"></i> Read Test Paper
                                                 </button>
-                                                <button onclick="downloadTestPaper('${t.id}')" class="px-3 py-1.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-lg font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs">
-                                                    <i class="fa-solid fa-file-pdf text-red-500"></i> Download PDF
+                                                <button onclick="downloadTestPaper('${t.id}')" class="px-3 py-1.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-lg font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs whitespace-nowrap">
+                                                    <i class="fa-solid fa-file-pdf text-red-500"></i> Download
                                                 </button>
                                             </div>
                                         </div>
