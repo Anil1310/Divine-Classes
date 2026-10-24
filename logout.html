@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logged Out - Divine Classes</title>
+    <title>Logged Out - MIA</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -67,20 +67,20 @@
     </div>
 
     <footer class="text-center py-4 text-xs text-slate-400">
-        <p>&copy; 2026 Divine Classes • 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063 • Contact: 9555-6787-53</p>
+        <p>&copy; 2026 MIA • 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063 • Contact: 9555-6787-53</p>
     </footer>
 
     <?!= include('javascript'); ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                localStorage.removeItem('DIVINE_AUTH_SESSION');
-                sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+                localStorage.removeItem('MIA_AUTH_SESSION');
+                sessionStorage.removeItem('MIA_AUTH_SESSION');
             } catch(e) {}
             if (typeof COACHING_LOGO_BASE64 !== 'undefined') {
                 const logoContainer = document.getElementById('logout-logo-container');
                 if (logoContainer) {
-                    logoContainer.innerHTML = `<img src="${COACHING_LOGO_BASE64}" alt="Divine Classes Logo" class="w-full h-full object-contain">`;
+                    logoContainer.innerHTML = `<img src="${COACHING_LOGO_BASE64}" alt="MIA Logo" class="w-full h-full object-contain">`;
                 }
             }
         });

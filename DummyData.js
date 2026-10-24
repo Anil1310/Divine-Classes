@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * DIVINE CLASSES - DUMMY / DEMO DATA REPOSITORY (5 RECORDS PER SHEET)
+ * MIA - DUMMY / DEMO DATA REPOSITORY (5 RECORDS PER SHEET)
  * ============================================================================
  * Contains exactly 5 seed / demo records for each sheet tab:
  * - Batches: 5 records
@@ -222,7 +222,7 @@ function getDummySeedData() {
         maxMarks: 720,
         marks: {
           's1': { score: 610, remarks: 'Good botany fundamentals' },
-          's2': { score: 670, remarks: 'Top Ranker in Divine Classes! AIIMS caliber' },
+          's2': { score: 670, remarks: 'Top Ranker in MIA! AIIMS caliber' },
           's3': { score: 580, remarks: 'Strong attempt, revise plant taxonomy' },
           's4': { score: 645, remarks: 'High accuracy in genetics' },
           's5': { score: 628, remarks: 'Strong Botany score, revise meiosis stages' }
@@ -269,10 +269,10 @@ function getDummySeedData() {
         subject: 'Senior Physics Faculty & Academic Director',
         qualification: 'B.Tech (IIT Roorkee), M.Tech',
         experience: '15+ Years Experience',
-        email: 'rajesh.chahar@divineclasses.in',
+        email: 'rajesh.chahar@mia.in',
         phone: '+91 95556 78753',
         specialization: 'Rotational Dynamics, Electromagnetism & JEE Advanced Strategy',
-        bio: 'Founder of Divine Classes. Mentored 800+ IITians and NITians. Known for breaking down complex physics into crystal-clear intuitive models.',
+        bio: 'Founder of MIA. Mentored 800+ IITians and NITians. Known for breaking down complex physics into crystal-clear intuitive models.',
         avatarColor: 'from-indigo-600 to-blue-600',
         initials: 'RC',
         password: 'teacher123',
@@ -285,7 +285,7 @@ function getDummySeedData() {
         subject: 'Head of Biology & Medical Entrance Wing',
         qualification: 'M.B.B.S, M.D. (AIIMS New Delhi)',
         experience: '12+ Years Experience',
-        email: 'dr.sunita@divineclasses.in',
+        email: 'dr.sunita@mia.in',
         phone: '+91 98234 56789',
         specialization: 'Human Physiology, Genetics & High-Yield NEET Revision',
         bio: 'Former clinical fellow turned passionate NEET coach. Produced multiple top-100 All India Ranks in NEET-UG with 350+/360 biology scores.',
@@ -301,7 +301,7 @@ function getDummySeedData() {
         subject: 'Head of Mathematics (IIT-JEE & Olympiads)',
         qualification: 'M.Sc. Mathematics (Gold Medalist, DU)',
         experience: '10+ Years Experience',
-        email: 'arvind.verma@divineclasses.in',
+        email: 'arvind.verma@mia.in',
         phone: '+91 97112 23344',
         specialization: 'Integral Calculus, Vectors-3D & Permutations & Combinations',
         bio: 'Specialist in speed-math techniques and Olympiad geometry. Believes in building rigorous mathematical proofs from foundational principles.',
@@ -317,7 +317,7 @@ function getDummySeedData() {
         subject: 'Senior Chemistry Faculty (Organic & Inorganic)',
         qualification: 'M.Sc. Chemistry (IIT Delhi), CSIR-NET JRF',
         experience: '8+ Years Experience',
-        email: 'kavita.mehra@divineclasses.in',
+        email: 'kavita.mehra@mia.in',
         phone: '+91 98989 12345',
         specialization: 'Reaction Mechanisms, Stereochemistry & Coordination Chemistry',
         bio: 'Expert in simplifying complex arrow-pushing mechanisms and periodic trends. Her visual charts are student favorites across coaching batches.',
@@ -333,7 +333,7 @@ function getDummySeedData() {
         subject: 'Senior Physical Chemistry & Research Mentor',
         qualification: 'Ph.D. Chemistry (IISc Bangalore)',
         experience: '9+ Years Experience',
-        email: 'pradeep.rawat@divineclasses.in',
+        email: 'pradeep.rawat@mia.in',
         phone: '+91 95551 12233',
         specialization: 'Chemical Thermodynamics, Electrochemistry & Quantum Chemistry',
         bio: 'Renowned researcher and educator. Focuses on numerical accuracy and shortcut derivations for competitive exams.',
@@ -347,7 +347,7 @@ function getDummySeedData() {
       {
         id: 'g1',
         isDummy: true,
-        title: 'Divine Classes JEE Advanced All India Top Rankers 2026',
+        title: 'MIA JEE Advanced All India Top Rankers 2026',
         category: 'Result Banner',
         date: 'July 2026',
         caption: 'Heartiest congratulations to our classroom achievers: AIR 42, AIR 118, and AIR 256 in JEE Advanced 2026.',
@@ -380,7 +380,7 @@ function getDummySeedData() {
         title: 'Annual Merit Scholarship & Trophy Distribution Day',
         category: 'Event',
         date: 'August 2026',
-        caption: 'Over ₹5 Lakhs worth of merit-cum-means scholarships awarded to meritorious students by Divine Classes management.',
+        caption: 'Over ₹5 Lakhs worth of merit-cum-means scholarships awarded to meritorious students by MIA management.',
         badge: 'Annual Day',
         imageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
       },
@@ -390,7 +390,7 @@ function getDummySeedData() {
         title: 'Intensive Sunday Full-Length Mock Test & Rank Analysis',
         category: 'Event',
         date: 'October 2026',
-        caption: 'Bi-weekly simulated entrance exam condition tests conducted across all Divine Classes examination halls.',
+        caption: 'Bi-weekly simulated entrance exam condition tests conducted across all MIA examination halls.',
         badge: 'Sunday Test Series',
         imageUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80'
       }
@@ -405,7 +405,7 @@ function getDummySeedData() {
         category: 'Teaching Quality',
         rating: 5,
         date: '13 Oct 2026',
-        comment: 'Divine Classes has transformed Aarav’s problem-solving approach. Er. Rajesh Chahar sir’s physics lectures and individual doubt attention are exceptional!'
+        comment: 'MIA has transformed Aarav’s problem-solving approach. Er. Rajesh Chahar sir’s physics lectures and individual doubt attention are exceptional!'
       },
       {
         id: 'f2',
