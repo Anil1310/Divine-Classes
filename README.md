@@ -489,9 +489,20 @@ For mobile devices and phone viewports (`< 1024px`), the portal features a nativ
 ### 11.6 Dual-Viewport Layout Lock (Fixed Sidebar & Independent Workspace Scroll)
 
 Prevents outer body window scrolling across all pages, ensuring complex modules like the multi-form Institute Settings console remain fluid:
-- **`html, body` Constraint:** `height: 100%; overflow: hidden; margin: 0; padding: 0;` locks viewport boundaries.
+- **`html, body` Fixed Constraint:** `height: 100%; width: 100%; overflow: hidden; position: fixed; inset: 0; margin: 0; padding: 0;` permanently locks viewport boundaries.
+- **Root Layout Pinning:** `<div id="app-root" class="flex h-screen w-full overflow-hidden fixed inset-0">` anchors the entire app container to the viewport edges so the window can never jump or shift.
 - **Desktop Sidebar:** `<aside id="sidebar">` styled with `lg:static lg:h-full lg:shrink-0` to guarantee the left sidebar remains 100% fixed on the left while only the central workspace (`#main-content`) scrolls.
 - **Flexbox Min-Height Resolution:** `#main-content` and its wrapper container enforce `min-h-0 min-w-0`, resolving CSS Flexbox expansion bugs where tall forms would otherwise stretch the root window.
+- **Programmatic Scroll Guard:** Automated event listeners monitor `window` and `#app-root` to immediately reset any focus-induced scroll offsets back to `(0, 0)`.
+
+### 11.7 Self-Contained Toggle Switch Architecture (Zero Focus-Scroll Jump)
+
+Standard Tailwind `sr-only` switches (`position: absolute; width: 1px; height: 1px; margin: -1px; clip: rect(0,0,0,0)`) inside unpositioned `<label>` elements trigger browser `scrollIntoView()` when clicked, shifting the viewport by hundreds of pixels and pushing navigation elements off-screen.
+
+To eliminate this focus-scroll jump completely:
+- **Dedicated Relative Wrapper:** Every toggle switch is wrapped in a `<div class="relative w-11 h-6 shrink-0">`.
+- **Full-Dimension Transparent Input:** The `<input type="checkbox">` uses `peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0` to physically cover the exact 44×24px switch geometry.
+- **In-Place Browser Focus:** Because the input is physically located directly beneath the user's cursor within the visible viewport, browser focus requires **zero scroll movement**, ensuring instant, smooth toggle transitions without layout shifts.
 
 ---
 
