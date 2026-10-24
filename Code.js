@@ -509,13 +509,24 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       Logger.log('Folder public share setting error: ' + shareErr.toString());
     }
 
-    // Grant Editor access to Admin's email so it appears in Admin's Drive & Sheets
+    // Grant Editor access and attempt Ownership transfer to Admin's email
     let editorAdded = false;
+    let ownerTransferred = false;
+    let ownerError = '';
     try {
       folder.addEditor(emailToUse);
       editorAdded = true;
     } catch (addEditorErr) {
       Logger.log('folder.addEditor error: ' + addEditorErr.toString());
+    }
+
+    try {
+      folder.setOwner(emailToUse);
+      ownerTransferred = true;
+      Logger.log('folder.setOwner succeeded for: ' + emailToUse);
+    } catch (setOwnerErr) {
+      ownerError = setOwnerErr.toString();
+      Logger.log('folder.setOwner note: ' + ownerError);
     }
 
     // Compose official authorization email to Admin
@@ -624,7 +635,8 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       adminEmail: emailToUse,
       emailSent: emailSent,
       editorAdded: editorAdded,
-      mailError: mailError,
+      ownerTransferred: ownerTransferred,
+      ownerError: ownerError,
       message: emailSent
         ? '✓ Google Drive folder authorized and invitation email sent to ' + emailToUse + '!'
         : '✓ Google Drive folder configured (' + (editorAdded ? 'access granted to ' + emailToUse : 'shared via link') + '). Email notice: ' + (mailError || 'Check quota')

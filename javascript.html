@@ -188,6 +188,22 @@
                     downloadUrl: '',
                     driveUrl: '',
                     description: 'High-yield memory charts for Carbon & Its Compounds, Life Processes, Quadratic Equations, and Surface Areas & Volumes.'
+                },
+                {
+                    id: 'm6',
+                    isDummy: true,
+                    batchId: 'b1',
+                    title: 'Electromagnetism & AC Circuits Advanced Practice DPP #06',
+                    category: 'Assignment PDF',
+                    uploadDate: '15 Oct 2026',
+                    uploadedBy: 'Er. Rajesh Chahar',
+                    fileSize: '3.2 MB',
+                    downloads: 54,
+                    fileName: 'Electromagnetism_AC_DPP_06.pdf',
+                    fileType: 'pdf',
+                    downloadUrl: '',
+                    driveUrl: '',
+                    description: 'Comprehensive high-yield problems on Electromagnetic Induction, Faraday Law, Mutual Inductance, and LC oscillations.'
                 }
             ],
             offlineTests: [
@@ -531,6 +547,7 @@
         activeStudentId: 's1',
         selectedBatchFilter: 'all',
         selectedTestId: 't1',
+        showAllMaterials: false,
 
         // Seed Demo Records from DummyData.js
         batches: seedDemo.batches,
@@ -3640,6 +3657,9 @@
                                 <option value="all" ${state.selectedBatchFilter === 'all' ? 'selected' : ''}>All Batches (${state.materials.length})</option>
                                 ${state.batches.map(b => `<option value="${b.id}" ${state.selectedBatchFilter === b.id ? 'selected' : ''}>${b.name}</option>`).join('')}
                             </select>
+                            <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                                <i class="fa-solid fa-mobile-screen mr-1 text-slate-400"></i>5 uploads on mobile • <i class="fa-solid fa-laptop mr-1 text-slate-400"></i>6 on laptop
+                            </span>
                         </div>
 
                         ${canUpload ? `
@@ -3653,9 +3673,9 @@
                         `}
                     </div>
 
-                    <!-- Materials Grid -->
+                    <!-- Materials Grid (Responsive: 5 on mobile, 6 on laptop) -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        ${filteredMaterials.map(mat => {
+                        ${filteredMaterials.map((mat, index) => {
             const batch = state.batches.find(b => b.id === mat.batchId);
             const badgeStyle = mat.category === 'Assignment PDF'
                 ? 'bg-indigo-100 text-indigo-700'
@@ -3663,8 +3683,18 @@
                     ? 'bg-emerald-100 text-emerald-700'
                     : 'bg-amber-100 text-amber-800';
 
+            // 5 uploads shown on mobile (indices 0..4), 6 uploads shown on laptop (indices 0..5)
+            let visibilityClass = 'flex';
+            if (!state.showAllMaterials) {
+                if (index === 5) {
+                    visibilityClass = 'hidden md:flex';
+                } else if (index >= 6) {
+                    visibilityClass = 'hidden';
+                }
+            }
+
             return `
-                                <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between">
+                                <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition ${visibilityClass} flex-col justify-between">
                                     <div>
                                         <div class="flex items-center justify-between gap-2">
                                             <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${badgeStyle}">${mat.category}</span>
@@ -3700,8 +3730,34 @@
                             `;
         }).join('')}
                     </div>
+
+                    ${filteredMaterials.length === 0 ? `
+                    <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+                        <div class="w-16 h-16 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mb-4">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <h3 class="text-sm font-bold text-slate-800">No Assignments Uploaded Yet</h3>
+                        <p class="text-xs text-slate-500 mt-1">Assignments and DPPs uploaded for this batch will appear here.</p>
+                    </div>
+                    ` : ''}
+
+                    ${filteredMaterials.length > 5 ? `
+                    <div class="flex justify-center pt-2 ${filteredMaterials.length === 6 ? 'md:hidden' : ''}">
+                        <button onclick="toggleShowAllMaterials()" class="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-2 shadow-xs transition hover:border-indigo-300">
+                            ${state.showAllMaterials
+                                ? '<i class="fa-solid fa-compress text-indigo-600"></i> Show Standard (5 on Mobile / 6 on Laptop)'
+                                : `<i class="fa-solid fa-layer-group text-indigo-600"></i> View All ${filteredMaterials.length} Uploads`
+                            }
+                        </button>
+                    </div>
+                    ` : ''}
                 </div>
             `;
+    }
+
+    function toggleShowAllMaterials() {
+        state.showAllMaterials = !state.showAllMaterials;
+        renderMainContent();
     }
 
     function filterMaterialsByBatch(batchId) {
@@ -6584,7 +6640,7 @@
 
                         <div class="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4">
                             <p class="text-[11px] text-slate-500 dark:text-slate-400"><i class="fa-solid fa-rotate mr-1"></i>Saving instantly syncs to the Cloud Database and mirrors to the Google Sheet.</p>
-                            <button type="submit" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-purple-600/25 flex items-center gap-2 cursor-pointer">
+                            <button type="submit" id="btn-save-settings" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all duration-200 shadow-lg shadow-purple-600/25 flex items-center gap-2 cursor-pointer">
                                 <i class="fa-solid fa-floppy-disk"></i> Save All Settings
                             </button>
                         </div>
@@ -6623,11 +6679,36 @@
         if (!state.settings.instituteName || /^mia$/i.test(String(state.settings.instituteName).trim())) {
             state.settings.instituteName = 'Divine Classes';
         }
+
+        // Smooth in-button feedback without re-rendering or screen shaking
+        const saveBtn = document.getElementById('btn-save-settings');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving Settings...';
+        }
+
+        // Persist locally and trigger debounced cloud sync
         saveStateLocally();
-        showToast('All institute settings saved and synced to Cloud Database + Google Sheet!', 'success');
-        // Force an immediate server sync (saveStateLocally's auto-sync is debounced),
-        // then re-fetch so the dummy-data strip/restore applies instantly.
-        const applyRemoteAndRender = function (remoteData) {
+        renderSidebar();
+
+        showToast('All institute settings saved smoothly & synced to Cloud Database + Google Sheet!', 'success');
+
+        if (saveBtn) {
+            saveBtn.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-300"></i> Saved Successfully!';
+            saveBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700', 'shadow-purple-600/25');
+            saveBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
+            setTimeout(function () {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save All Settings';
+                    saveBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
+                    saveBtn.classList.add('bg-purple-600', 'hover:bg-purple-700', 'shadow-purple-600/25');
+                }
+            }, 2500);
+        }
+
+        // Apply remote data quietly in background without wiping or shaking the active settings page
+        const applyRemoteSilently = function (remoteData) {
             if (remoteData && remoteData.students) {
                 state.batches = remoteData.batches || [];
                 state.students = remoteData.students || [];
@@ -6640,25 +6721,19 @@
                 if (remoteData.settings) state.settings = Object.assign({}, state.settings, remoteData.settings);
                 saveStateLocally();
             }
-            if (state.activeTab === 'settings') renderMainContent();
             renderSidebar();
         };
+
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function () {
                     google.script.run
-                        .withSuccessHandler(applyRemoteAndRender)
-                        .withFailureHandler(function () {
-                            if (state.activeTab === 'settings') renderMainContent();
-                        })
+                        .withSuccessHandler(applyRemoteSilently)
+                        .withFailureHandler(function () { renderSidebar(); })
                         .apiGetInitialData();
                 })
-                .withFailureHandler(function () {
-                    if (state.activeTab === 'settings') renderMainContent();
-                })
+                .withFailureHandler(function () { renderSidebar(); })
                 .apiSyncAllData(state);
-        } else if (state.activeTab === 'settings') {
-            renderMainContent();
         }
     }
 

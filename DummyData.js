@@ -176,7 +176,22 @@ function getDummySeedData() {
         fileType: 'pdf',
         downloadUrl: '',
         driveUrl: '',
-        description: 'High-yield memory charts for Carbon & Its Compounds, Life Processes, Quadratic Equations, and Surface Areas & Volumes.'
+      },
+      {
+        id: 'm6',
+        isDummy: true,
+        batchId: 'b1',
+        title: 'Electromagnetism & AC Circuits Advanced Practice DPP #06',
+        category: 'Assignment PDF',
+        uploadDate: '15 Oct 2026',
+        uploadedBy: 'Er. Rajesh Chahar',
+        fileSize: '3.2 MB',
+        downloads: 54,
+        fileName: 'Electromagnetism_AC_DPP_06.pdf',
+        fileType: 'pdf',
+        downloadUrl: '',
+        driveUrl: '',
+        description: 'Comprehensive high-yield problems on Electromagnetic Induction, Faraday Law, Mutual Inductance, and LC oscillations.'
       }
     ],
     offlineTests: [
