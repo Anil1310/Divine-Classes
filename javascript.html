@@ -1254,16 +1254,40 @@
         }
     }
 
+    const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
+
+    function mergeRemoteData(remoteData) {
+        if (!remoteData || !remoteData.students) return;
+        const notifMap = new Map();
+        (state.notifications || []).forEach(function (n) { if (n && n.id) notifMap.set(n.id, n); });
+        if (remoteData.notifications && Array.isArray(remoteData.notifications)) {
+            remoteData.notifications.forEach(function (n) {
+                if (n && n.id) {
+                    const local = notifMap.get(n.id);
+                    notifMap.set(n.id, local ? Object.assign({}, n, local) : n);
+                }
+            });
+        }
+        state = Object.assign(state, remoteData);
+        state.notifications = Array.from(notifMap.values()).filter(function (n) {
+            return n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_'));
+        });
+        saveStateLocally(true); // pass skipSync to avoid loop
+        loadAuthSession();
+        updateRoleUI();
+        updateNotificationBadge();
+    }
+
     function autoSyncToDatabase() {
         if (autoSyncTimer) clearTimeout(autoSyncTimer);
-        updateSyncBadge('Saving to Database...', 'syncing');
+        updateSyncBadge('Syncing to Google Sheet...', 'syncing');
 
         autoSyncTimer = setTimeout(function () {
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function (res) {
                         state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+                        updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
                     })
                     .withFailureHandler(function (err) {
                         console.warn('Auto-sync notice:', err);
@@ -1271,14 +1295,28 @@
                     })
                     .apiSyncAllData(state);
             } else {
-                state.lastSyncTime = new Date().toLocaleTimeString();
-                updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
+                // Standalone / Vercel: POST 2-way sync to Google Apps Script endpoint
+                fetch(GAS_WEBAPP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'syncData', data: state })
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (res) {
+                    state.lastSyncTime = new Date().toLocaleTimeString();
+                    updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                })
+                .catch(function (err) {
+                    console.warn('Remote sync notice:', err);
+                    state.lastSyncTime = new Date().toLocaleTimeString();
+                    updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
+                });
             }
-        }, 350);
+        }, 400);
     }
     const autoSyncToGoogleSheet = autoSyncToDatabase;
 
-    function saveStateLocally() {
+    function saveStateLocally(skipRemoteSync) {
         try {
             const safeMaterials = (state.materials || []).map(function (m) {
                 if (m && m.downloadUrl && m.downloadUrl.length > 400000) {
@@ -1305,31 +1343,45 @@
             console.warn('Could not save local cache', e);
         }
 
-        // Real-time automatic Cloud Database persistence
-        autoSyncToDatabase();
+        if (!skipRemoteSync) {
+            // Real-time automatic Cloud Database & Google Sheet persistence
+            autoSyncToDatabase();
+        }
     }
 
     /********************************************************************
-     * CLOUD DATABASE SYNC BRIDGE (Manual Instant Force-Sync)
+     * CLOUD DATABASE SYNC BRIDGE (Manual Instant Force 2-Way Sync)
      ********************************************************************/
     function syncWithDatabase() {
         const btn = document.getElementById('btn-sync');
         const icon = document.getElementById('sync-icon');
         if (icon) icon.classList.add('fa-spin');
         if (btn) btn.disabled = true;
-        updateSyncBadge('Saving to Database...', 'syncing');
+        updateSyncBadge('Syncing with Google Sheet...', 'syncing');
 
-        showToast('Syncing state to Cloud Database (PropertiesService NoSQL)...', 'info');
+        showToast('Initiating 2-way Google Sheet sync across all tabs...', 'info');
 
-        // If running inside Google Apps Script Web App:
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (res) {
-                    if (icon) icon.classList.remove('fa-spin');
-                    if (btn) btn.disabled = false;
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
-                    showToast('Cloud Database successfully updated! All tables (Students, Batches, Teachers, Tests, Materials, Gallery, Settings) saved.', 'success');
+                    google.script.run
+                        .withSuccessHandler(function (remoteData) {
+                            if (remoteData && remoteData.students) {
+                                mergeRemoteData(remoteData);
+                            }
+                            if (icon) icon.classList.remove('fa-spin');
+                            if (btn) btn.disabled = false;
+                            state.lastSyncTime = new Date().toLocaleTimeString();
+                            updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                            showToast('2-Way Google Sheet sync complete! All tabs (Students, Batches, Teachers, Tests, Materials, Gallery, Settings) updated.', 'success');
+                            renderMainContent();
+                        })
+                        .withFailureHandler(function (err) {
+                            if (icon) icon.classList.remove('fa-spin');
+                            if (btn) btn.disabled = false;
+                            updateSyncBadge('✓ Sheet Synced', 'success');
+                        })
+                        .apiGetInitialData();
                 })
                 .withFailureHandler(function (err) {
                     if (icon) icon.classList.remove('fa-spin');
@@ -1339,14 +1391,35 @@
                 })
                 .apiSyncAllData(state);
         } else {
-            // In standalone local browser mode:
-            setTimeout(() => {
+            // Standalone Vercel / External web app: POST state, then GET latest merged sheet data
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'syncData', data: state })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function () {
+                return fetch(GAS_WEBAPP_URL + '?action=getData');
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (remoteData) {
+                if (remoteData && remoteData.students) {
+                    mergeRemoteData(remoteData);
+                }
+                if (icon) icon.classList.remove('fa-spin');
+                if (btn) btn.disabled = false;
+                state.lastSyncTime = new Date().toLocaleTimeString();
+                updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                showToast('2-Way Google Sheet sync complete! All tabs updated.', 'success');
+                renderMainContent();
+            })
+            .catch(function (err) {
                 if (icon) icon.classList.remove('fa-spin');
                 if (btn) btn.disabled = false;
                 state.lastSyncTime = new Date().toLocaleTimeString();
                 updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                showToast('State saved in local database storage!', 'success');
-            }, 400);
+                showToast('State saved locally. Remote sync queued.', 'info');
+            });
         }
     }
     const syncWithGoogleSheet = syncWithDatabase;
@@ -1819,6 +1892,25 @@
         if (titleEl) titleEl.textContent = title;
         if (subtitleEl) subtitleEl.textContent = subtitle;
 
+        function renderAccessDeniedView(sectionName, allowedRoles) {
+            return `
+                <div class="fade-in max-w-xl mx-auto my-10 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 text-center shadow-lg">
+                    <div class="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center text-2xl mb-4 border border-amber-200 dark:border-amber-800">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Access Restricted</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        The <strong>${escapeHtml(sectionName)}</strong> console requires <strong>${escapeHtml(allowedRoles)}</strong> privileges.
+                    </p>
+                    <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+                        <button onclick="navigateTo('dashboard')" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm flex items-center gap-2 cursor-pointer">
+                            <i class="fa-solid fa-house"></i> Return to Overview Dashboard
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
         switch (state.activeTab) {
             case 'dashboard':
                 container.innerHTML = renderDashboardView();
@@ -1827,13 +1919,19 @@
                 container.innerHTML = renderBatchesView();
                 break;
             case 'fees':
-                container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer') ? renderFeesView() : '';
+                container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer')
+                    ? renderFeesView()
+                    : renderAccessDeniedView('Student Fees & Reminder Center', 'Admin or Developer');
                 break;
             case 'access':
-                container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer') ? renderAccessView() : '';
+                container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer')
+                    ? renderAccessView()
+                    : renderAccessDeniedView('Access Control & User Permissions', 'Admin or Developer');
                 break;
             case 'settings':
-                container.innerHTML = (state.currentRole === 'developer') ? renderSettingsView() : '';
+                container.innerHTML = (state.currentRole === 'developer')
+                    ? renderSettingsView()
+                    : renderAccessDeniedView('Institute Settings Console', 'Developer');
                 break;
             case 'materials':
                 container.innerHTML = renderMaterialsView();
@@ -1852,6 +1950,9 @@
                 break;
             case 'feedback':
                 container.innerHTML = renderFeedbackView();
+                break;
+            default:
+                container.innerHTML = renderDashboardView();
                 break;
         }
     }
@@ -2089,12 +2190,12 @@
                                 </div>
                             </button>
 
-                            <button onclick="${state.currentRole === 'admin' ? "navigateTo('access')" : "showToast('Switch to ADMIN role to manage User Access & Passwords!', 'warning')"}" class="text-left p-3.5 rounded-xl border ${state.currentRole === 'admin' ? 'border-amber-200 bg-amber-50/40 hover:border-amber-500' : 'border-slate-200 bg-slate-50 opacity-75'} transition flex items-start gap-3">
+                            <button onclick="${(state.currentRole === 'admin' || state.currentRole === 'developer') ? "navigateTo('access')" : "showToast('Switch to Admin or Developer role to manage User Access & Passwords!', 'warning')"}" class="text-left p-3.5 rounded-xl border ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? 'border-amber-200 bg-amber-50/40 hover:border-amber-500 cursor-pointer' : 'border-slate-200 bg-slate-50 opacity-75'} transition flex items-start gap-3">
                                 <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center shrink-0">11</span>
                                 <div>
                                     <div class="flex items-center gap-1.5">
                                         <p class="text-sm font-semibold text-slate-900">Access Control & Passwords</p>
-                                        ${state.currentRole === 'admin' ? '<span class="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-medium">Sheet Synced</span>' : ''}
+                                        ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? '<span class="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-medium">Sheet Synced</span>' : ''}
                                     </div>
                                     <p class="text-xs text-slate-500 mt-0.5">Authorize/block students & teachers from Google Sheet</p>
                                 </div>
@@ -6412,237 +6513,329 @@
     /********************************************************************
      * VIEW: INSTITUTE SETTINGS CONSOLE (DEVELOPER ONLY)
      ********************************************************************/
+    window.settingsTab = window.settingsTab || 'all';
+
+    function switchSettingsTab(tabName) {
+        window.settingsTab = tabName;
+        const container = document.getElementById('main-content');
+        if (container && state.activeTab === 'settings') {
+            container.innerHTML = renderSettingsView();
+        }
+    }
+
+    function toggleInputVisibility(inputId, btn) {
+        const el = document.getElementById(inputId);
+        if (!el) return;
+        const isPwd = el.type === 'password';
+        el.type = isPwd ? 'text' : 'password';
+        if (btn) {
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.className = isPwd ? 'fa-solid fa-eye-slash text-xs text-indigo-500' : 'fa-solid fa-eye text-xs text-slate-400';
+            }
+        }
+    }
+
     function renderSettingsView() {
         const s = state.settings || {};
         const sheetUrl = 'https://docs.google.com/spreadsheets/d/1v7RZX0R8AmVDv02BCr3D_t28B8i3I8PO_qpjqMzFeKM/edit';
+        const activeTab = window.settingsTab || 'all';
 
         const inputField = (id, label, value, type, placeholder) => `
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">${label}</label>
                     <div class="relative">
                         <input type="${type}" id="set-${id}" value="${escapeAttr(value || '')}" placeholder="${escapeAttr(placeholder || '')}" class="w-full px-3.5 py-2.5 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20">
-                        ${type === 'password' ? `<button type="button" onclick="togglePasswordVisibility('set-${id}')" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"><i class="fa-solid fa-eye text-xs"></i></button>` : ''}
+                        ${type === 'password' ? `<button type="button" onclick="toggleInputVisibility('set-${id}', this)" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"><i class="fa-solid fa-eye text-xs"></i></button>` : ''}
                     </div>
                 </div>
             `;
 
-        const sectionCard = (title, icon, iconBg, bodyHtml) => `
-                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden">
-                    <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60 flex items-center gap-2.5">
-                        <span class="w-8 h-8 rounded-xl ${iconBg} flex items-center justify-center text-sm"><i class="fa-solid ${icon}"></i></span>
-                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">${title}</h3>
+        const sectionCard = (id, title, icon, iconBg, bodyHtml) => {
+            const isVisible = activeTab === 'all' || activeTab === id;
+            if (!isVisible) return '';
+            return `
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden transition-all duration-200 fade-in">
+                    <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center text-sm shadow-xs"><i class="fa-solid ${icon}"></i></span>
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">${title}</h3>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Settings</span>
                     </div>
-                    <div class="p-5 space-y-4">${bodyHtml}</div>
+                    <div class="p-5 sm:p-6 space-y-4">${bodyHtml}</div>
                 </div>
             `;
+        };
+
+        const tabs = [
+            { id: 'all', label: 'All Settings', icon: 'fa-layer-group' },
+            { id: 'admin_permissions', label: 'Admin Permissions & Security', icon: 'fa-user-shield' },
+            { id: 'profile', label: 'Institute Profile & Branding', icon: 'fa-school' },
+            { id: 'cloud_sync', label: 'Google Sheet 2-Way Sync', icon: 'fa-table-cells' },
+            { id: 'drive', label: 'Google Drive Storage', icon: 'fa-brands fa-google-drive' },
+            { id: 'demo', label: 'Client Handover & Demo Controls', icon: 'fa-eye-slash' }
+        ];
 
         return `
                 <div class="fade-in space-y-6">
-                    <!-- Developer Settings Banner -->
-                    <div class="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white border border-purple-900/40 shadow-sm relative overflow-hidden">
-                        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <!-- Developer Settings Command Banner -->
+                    <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white border border-purple-800/40 shadow-sm relative overflow-hidden">
+                        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
                             <div>
-                                <div class="flex flex-wrap items-center gap-2 mb-1.5">
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/25 text-purple-300 border border-purple-500/40">
-                                        <i class="fa-solid fa-code mr-1"></i>Developer Only • Full Settings Console
+                                <div class="flex flex-wrap items-center gap-2 mb-2">
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/25 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-code"></i> Developer Mode • Command Console
                                     </span>
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                        <i class="fa-solid fa-database mr-1"></i>Cloud Database Connected
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-database"></i> 10 Google Sheet Tabs Synced
+                                    </span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                        Last Sync: ${state.lastSyncTime || 'Active'}
                                     </span>
                                 </div>
-                                <h2 class="text-xl font-bold font-heading">Institute Configuration & Integration Settings</h2>
-                                <p class="text-xs text-slate-300 max-w-2xl mt-1 leading-relaxed">
-                                    Every institute setting in one place — profile, contact, payments, social channels, portal passwords, and direct Google Drive / Google Sheets access. Changes auto-sync to the Cloud Database and the Google Sheet mirror.
+                                <h2 class="text-xl sm:text-2xl font-bold font-heading">Institute Configuration & Integration Console</h2>
+                                <p class="text-xs text-slate-300 max-w-2xl mt-1.5 leading-relaxed">
+                                    Central control for institute branding, contact, payments, Admin permissions, and full 2-way dynamic sync with Google Sheets & Google Drive.
                                 </p>
                             </div>
-                            <div class="hidden lg:flex flex-col items-center shrink-0">
-                                <div class="w-16 h-16 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-2xl text-purple-300">
-                                    <i class="fa-solid fa-sliders"></i>
-                                </div>
+                            <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                                <a href="${sheetUrl}" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white border border-indigo-400/30 transition flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-solid fa-table-cells text-emerald-300"></i> Open Sheet Mirror
+                                </a>
+                                <button type="button" onclick="openDriveFolder()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600/80 hover:bg-emerald-600 text-white border border-emerald-400/30 transition flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-brands fa-google-drive text-amber-300"></i> Open Drive
+                                </button>
+                                <button type="button" onclick="syncWithDatabase()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-rotate"></i> Sync 2-Way Now
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Google Drive & Google Sheet Access (Developer Only) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 p-5 flex items-center justify-between gap-4">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-xl shadow-md shadow-emerald-600/25">
-                                    <i class="fa-brands fa-google-drive"></i>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">Google Drive Storage</p>
-                                    <p class="text-[11px] text-slate-500 dark:text-slate-400">${s.driveEmail ? 'Opening as: ' + escapeHtml(s.driveEmail) : 'Photos, banners, materials & link shortcuts'}</p>
-                                </div>
-                            </div>
-                            <button onclick="openDriveFolder()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer shrink-0">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open
-                            </button>
-                        </div>
-                        <div class="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-slate-800 rounded-2xl border border-indigo-200 dark:border-indigo-900/50 p-5 flex items-center justify-between gap-4">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl shadow-md shadow-indigo-600/25">
-                                    <i class="fa-solid fa-table-cells"></i>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">Google Sheet Database</p>
-                                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Mirrored tabs: Students, Fees, Tests, Settings</p>
-                                </div>
-                            </div>
-                            <a href="${sheetUrl}" target="_blank" rel="noopener noreferrer" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-600/25 flex items-center gap-1.5 cursor-pointer shrink-0">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open
-                            </a>
-                        </div>
+                    <!-- Category Tab Switcher (Responsive, horizontal scroll on mobile) -->
+                    <div class="flex items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
+                        ${tabs.map(t => {
+                            const isSel = activeTab === t.id;
+                            return `
+                                <button type="button" onclick="switchSettingsTab('${t.id}')" class="px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap flex items-center gap-2 cursor-pointer shrink-0 ${isSel
+                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'}">
+                                    <i class="fa-solid ${t.icon}"></i>
+                                    <span>${t.label}</span>
+                                </button>
+                            `;
+                        }).join('')}
                     </div>
 
                     <!-- Settings Form -->
-                    <form onsubmit="handleSaveSettings(event)" class="space-y-5">
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${sectionCard('Institute Profile', 'fa-school', 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300', `
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    ${inputField('instituteName', 'Institute Name', s.instituteName, 'text', 'Divine Classes')}
-                                    ${inputField('tagline', 'Tagline / Mission', s.tagline, 'text', 'Empowering Aspirants...')}
-                                </div>
-                                ${inputField('address', 'Center Address', s.address, 'text', 'Full postal address')}
-                            `)}
-
-                            ${sectionCard('Contact & Payments', 'fa-phone-volume', 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300', `
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    ${inputField('phone', 'Helpline Phone', s.phone, 'text', '+91 95556 78753')}
-                                    ${inputField('contactDisplay', 'Display Contact', s.contactDisplay, 'text', '9555-6787-53')}
-                                    ${inputField('email', 'Official Email', s.email, 'text', 'contact@divineclasses.in')}
-                                    ${inputField('upiId', 'UPI Payment ID', s.upiId, 'text', 'divineclasses@upi')}
-                                </div>
-                            `)}
-
-                            ${sectionCard('Social Media Channels', 'fa-share-nodes', 'bg-pink-100 text-pink-600 dark:bg-pink-950/50 dark:text-pink-300', `
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    ${inputField('facebookUrl', 'Facebook Page URL', s.facebookUrl, 'text', 'https://facebook.com')}
-                                    ${inputField('instagramUrl', 'Instagram Profile URL', s.instagramUrl, 'text', 'https://instagram.com')}
-                                </div>
-                                ${inputField('youtubeUrl', 'YouTube Channel URL', s.youtubeUrl, 'text', 'https://www.youtube.com/@chem_crush9')}
-                            `)}
-
-                            ${sectionCard('Portal Security & Passwords', 'fa-key', 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300', `
-                                ${inputField('adminName', 'Admin Name', s.adminName, 'text', 'e.g. Er. Rajesh Chahar')}
-                                ${inputField('adminPassword', 'Master Admin Password', s.adminPassword, 'password', 'admin123')}
-                                ${inputField('adminEmail', 'Admin Email ID', s.adminEmail, 'text', 'admin@divineclasses.in')}
-                                ${inputField('devPassword', 'Developer Login Password', s.devPassword, 'password', 'dev123')}
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1 text-amber-500"></i> Admin password unlocks the Admin portal; Developer password unlocks this Settings console, Google Drive and Google Sheet links.</p>
-                            `)}
-
-                            ${sectionCard('Admin Google Drive Assignments Integration', 'fa-brands fa-google-drive', 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300', `
-                                <div class="space-y-3">
-                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                                        Configure Admin Google Drive link & email. Full Editor access is granted to the Admin and direct download URLs are mirrored to the <strong>Materials_Repository</strong> sheet tab for students.
-                                    </p>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        ${inputField('adminDriveEmail', 'Admin Google / Gmail ID', s.adminEmail || '', 'email', 'admin@divineclasses.in')}
-                                        ${inputField('adminDriveFolderUrl', 'Admin Drive Folder Link (Optional)', s.adminDriveFolderUrl || '', 'url', 'https://drive.google.com/drive/folders/...')}
+                    <form onsubmit="handleSaveSettings(event)" class="space-y-6">
+                        <div class="grid grid-cols-1 ${activeTab === 'all' ? 'lg:grid-cols-2' : ''} gap-5">
+                            <!-- 1. ADMIN PERMISSIONS & SECURITY -->
+                            ${sectionCard('admin_permissions', 'Admin Permissions & Portal Security', 'fa-user-shield', 'bg-violet-100 text-violet-600 dark:bg-violet-950/60 dark:text-violet-300', `
+                                <div class="space-y-4">
+                                    <div class="p-3.5 bg-violet-50/70 dark:bg-violet-950/40 rounded-xl border border-violet-200 dark:border-violet-800 text-xs text-violet-950 dark:text-violet-200 flex items-start gap-2.5">
+                                        <i class="fa-solid fa-shield-halved text-violet-600 dark:text-violet-400 text-base mt-0.5"></i>
+                                        <div>
+                                            <span class="font-bold">Admin Privileges & Password Controls</span>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Control what Admin can delete and modify. Passwords sync directly to the Google Sheet <code>Settings_Config</code> tab.</p>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center justify-between pt-2">
-                                        <span class="text-xs font-semibold ${s.adminDriveShared ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
-                                            <i class="fa-solid ${s.adminDriveShared ? 'fa-circle-check' : 'fa-clock'} mr-1"></i>
-                                            ${s.adminDriveShared ? 'Drive Access Authorized & Synced' : 'Ready to Send Authorization Mail'}
-                                        </span>
-                                        <button type="button" onclick="openShareDriveWithAdminModal()" class="px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center gap-1.5 shadow-xs">
-                                            <i class="fa-solid fa-paper-plane"></i> Send Auth Email & Share Drive
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        ${inputField('adminName', 'Admin Display Name', s.adminName, 'text', 'e.g. Er. Rajesh Chahar')}
+                                        ${inputField('adminEmail', 'Admin Official Email ID', s.adminEmail, 'text', 'admin@divineclasses.in')}
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        ${inputField('adminPassword', 'Master Admin Password', s.adminPassword, 'password', 'admin123')}
+                                        ${inputField('devPassword', 'Developer Login Password', s.devPassword, 'password', 'dev123')}
+                                    </div>
+
+                                    <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
+                                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">Role Permissions Toggles (for Client Handover):</h4>
+
+                                        <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 cursor-pointer select-none">
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-2">
+                                                    <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Allow Admin to Delete Feedback</p>
+                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${s.allowAdminFeedbackDelete === false ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'}">
+                                                        ${s.allowAdminFeedbackDelete === false ? 'Disabled' : 'Enabled'}
+                                                    </span>
+                                                </div>
+                                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">When ON, Admin sees a delete trashcan button on the Feedback Wall.</p>
+                                            </div>
+                                            <input type="checkbox" id="set-allowAdminFeedbackDelete" ${s.allowAdminFeedbackDelete === false ? '' : 'checked'} class="peer sr-only" aria-label="Allow Admin Feedback Delete">
+                                            <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        </label>
+
+                                        <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 cursor-pointer select-none">
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-2">
+                                                    <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Allow Admin to Delete Study Links</p>
+                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${s.allowAdminLinkDelete === false ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'}">
+                                                        ${s.allowAdminLinkDelete === false ? 'Disabled' : 'Enabled'}
+                                                    </span>
+                                                </div>
+                                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">When ON, Admin can delete external curated study links from External_Links_Hub.</p>
+                                            </div>
+                                            <input type="checkbox" id="set-allowAdminLinkDelete" ${s.allowAdminLinkDelete === false ? '' : 'checked'} class="peer sr-only" aria-label="Allow Admin Study Link Delete">
+                                            <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="pt-2 flex flex-wrap items-center justify-between gap-2">
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400"><i class="fa-solid fa-users-gear mr-1 text-violet-500"></i>Need to authorize or block student / faculty accounts?</p>
+                                        <button type="button" onclick="navigateTo('access')" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 dark:hover:bg-violet-900/60 border border-violet-200 dark:border-violet-800 transition flex items-center gap-1.5 cursor-pointer">
+                                            <i class="fa-solid fa-arrow-right"></i> Open Access Control Console
                                         </button>
                                     </div>
                                 </div>
                             `)}
 
-                            ${sectionCard('Client Demo Mode & Google Sheets Restructuring', 'fa-eye-slash', 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300', `
-                                <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Show "Requirement #N" Labels</p>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = requirement tags appear in page headers (development view). <strong>Turn OFF before showing the portal to a client</strong> — headers then show clean titles only.</p>
-                                    </div>
-                                    <input type="checkbox" id="set-showRequirementLabels" ${s.showRequirementLabels === false ? '' : 'checked'} class="peer sr-only" aria-label="Show Requirement Labels">
-                                    <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
-                                </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-2"><i class="fa-solid fa-circle-info mr-1 text-rose-500"></i> Current state: <strong>${s.showRequirementLabels === false ? 'OFF — clean client view' : 'ON — development view'}</strong>.</p>
-
-                                <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none mt-4">
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Master Switch: Show Dummy / Demo Data</p>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = all demo records populated into the app and Google Sheets. <strong>OFF = all dummy data rows are permanently deleted from Google Sheets</strong> (leaving only real production records or clean headers).</p>
-                                    </div>
-                                    <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} class="peer sr-only" aria-label="Show Dummy Demo Data">
-                                    <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
-                                </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-2"><i class="fa-solid fa-circle-info mr-1 text-rose-500"></i> Master state: <strong>${s.showDummyData === false ? 'OFF — all demo data wiped from Google Sheets' : 'ON — demo data active'}</strong>.</p>
-
-                                <!-- Per-Sheet Dummy Data Quick Manager -->
-                                <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <div>
-                                            <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">Per-Sheet Dummy Data Controls & Sheets Restructuring</h4>
-                                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Enable or disable dummy data for each sheet tab individually.</p>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <button type="button" onclick="openDummyDataManagerModal()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5">
-                                                <i class="fa-solid fa-table-list text-amber-300"></i>
-                                                <span>Open Sheet Manager Modal</span>
-                                            </button>
-                                            <button type="button" onclick="reStructureGoogleSheets()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 transition cursor-pointer shadow-xs flex items-center gap-1.5">
-                                                <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i>
-                                                <span>Restructure Tabs</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800 flex items-center justify-between gap-3 text-xs">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fa-solid fa-shield-halved text-indigo-600 dark:text-indigo-400 text-base"></i>
-                                            <div>
-                                                <span class="font-bold text-slate-900 dark:text-slate-100">External_Links_Hub: Permanent & Protected</span>
-                                                <p class="text-[11px] text-slate-600 dark:text-slate-400">All curated study links (NCERT, NDLI, Khan Academy, PhET, CBSE) are kept untouched and <strong>never deleted on disable by dev</strong>.</p>
-                                            </div>
-                                        </div>
-                                        <span class="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-300 dark:border-emerald-700 shrink-0">Permanent Hub</span>
-                                    </div>
-                                </div>
-                            `)}
-
-                            ${sectionCard('Admin Permissions', 'fa-user-shield', 'bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300', `
-                                <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Allow Admin to Delete Feedback</p>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = Admin sees a 🗑 Delete button on each Feedback Wall card. <strong>Turn OFF to hide it</strong> (e.g. for client handover).</p>
-                                    </div>
-                                    <input type="checkbox" id="set-allowAdminFeedbackDelete" ${s.allowAdminFeedbackDelete === false ? '' : 'checked'} class="peer sr-only" aria-label="Allow Admin Feedback Delete">
-                                    <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
-                                </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-circle-info mr-1 text-violet-500"></i> Current state: <strong>${s.allowAdminFeedbackDelete === false ? 'OFF — Admin cannot delete feedback' : 'ON — Admin can delete feedback'}</strong>. Developer always retains full control from this console.</p>
-                                <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none mt-4">
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Allow Admin to Delete Study Links</p>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = Admin sees a 🗑 Delete button on each External Study Material card. <strong>Turn OFF to hide it</strong> (e.g. for client handover).</p>
-                                    </div>
-                                    <input type="checkbox" id="set-allowAdminLinkDelete" ${s.allowAdminLinkDelete === false ? '' : 'checked'} class="peer sr-only" aria-label="Allow Admin Study Link Delete">
-                                    <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
-                                </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-circle-info mr-1 text-violet-500"></i> Current state: <strong>${s.allowAdminLinkDelete === false ? 'OFF — Admin cannot delete study links' : 'ON — Admin can delete study links'}</strong>. Developer always retains full control from this console.</p>
-                            `)}
-
-                            ${sectionCard("Coaching Owner's Google Drive Folder", 'fa-folder-tree', 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300', `
-                                ${inputField('driveFolderUrl', "Owner's Drive Folder Link (paste here)", s.driveFolderUrl, 'text', 'https://drive.google.com/drive/folders/...')}
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-4"><i class="fa-solid fa-circle-info mr-1 text-sky-500"></i> Paste the link of the <strong>coaching owner's Google Drive folder</strong> (open the folder in Drive → Copy link). All future uploads — study materials, photos, gallery banners — are saved <strong>inside this folder</strong> as <em>Divine Classes Portal Uploads/…</em>. If empty or the link is inaccessible, uploads fall back to the portal's own Drive.</p>
+                            <!-- 2. INSTITUTE PROFILE & CONTACTS -->
+                            ${sectionCard('profile', 'Institute Profile, Contact & Payments', 'fa-school', 'bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300', `
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    ${inputField('driveEmail', 'Google Drive Email ID', s.driveEmail, 'text', 'yourname@gmail.com')}
-                                    ${inputField('drivePassword', 'Google Account Password', s.drivePassword, 'password', 'Enter password')}
+                                    ${inputField('instituteName', 'Institute Name', s.instituteName, 'text', 'Divine Classes')}
+                                    ${inputField('tagline', 'Tagline / Mission', s.tagline, 'text', 'Empowering Aspirants for JEE & NEET')}
                                 </div>
-                                ${inputField('driveUrl', 'Drive Link to Open (My Drive or Folder)', s.driveUrl, 'text', 'https://drive.google.com/drive/my-drive')}
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1 text-sky-500"></i> Click any <strong>Open</strong> Drive button and Drive launches as the saved email (auto account switch via <code>?authuser=</code>). Google's own sign-in page will ask for the password — browsers cannot auto-fill passwords into Google's login page for security, so the saved password acts as your encrypted-in-transit portal note.</p>
+                                ${inputField('address', 'Center Address', s.address, 'text', 'Full postal address')}
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    ${inputField('phone', 'Helpline Phone (with country code)', s.phone, 'text', '+91 95556 78753')}
+                                    ${inputField('contactDisplay', 'Display Contact (Short)', s.contactDisplay, 'text', '9555-6787-53')}
+                                    ${inputField('email', 'Official Inquiry Email', s.email, 'text', 'contact@divineclasses.in')}
+                                    ${inputField('upiId', 'UPI Payment ID', s.upiId, 'text', 'divineclasses@upi')}
+                                </div>
+                                <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">Official Social Media Channels (Requirement #7):</label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        ${inputField('youtubeUrl', 'YouTube URL', s.youtubeUrl, 'text', 'https://www.youtube.com/@chem_crush9')}
+                                        ${inputField('instagramUrl', 'Instagram URL', s.instagramUrl, 'text', 'https://instagram.com')}
+                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://facebook.com')}
+                                    </div>
+                                </div>
+                            `)}
+
+                            <!-- 3. GOOGLE SHEET 2-WAY DATABASE MIRROR -->
+                            ${sectionCard('cloud_sync', 'Google Sheet 2-Way Sync & Live Tabs', 'fa-table-cells', 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300', `
+                                <div class="space-y-4">
+                                    <div class="p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-950 dark:text-emerald-200 flex items-start justify-between gap-3">
+                                        <div>
+                                            <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-cloud-arrow-down text-emerald-600"></i> Full 2-Way Dynamic Database Sync</span>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Every creation, update, or deletion in the app reflects in its respective Google Sheet tab automatically.</p>
+                                        </div>
+                                        <a href="${sheetUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 transition shadow-xs flex items-center gap-1">
+                                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Sheet
+                                        </a>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+                                            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Students_Master</p>
+                                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">${(state.students || []).length} Rows</p>
+                                        </div>
+                                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+                                            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Teachers_Roster</p>
+                                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">${(state.teachers || []).length} Rows</p>
+                                        </div>
+                                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+                                            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Batches_Roster</p>
+                                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">${(state.batches || []).length} Rows</p>
+                                        </div>
+                                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+                                            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Materials_Repo</p>
+                                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">${(state.materials || []).length} Rows</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                                        <button type="button" onclick="syncWithDatabase()" class="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5">
+                                            <i class="fa-solid fa-arrows-rotate"></i> Force Instant 2-Way Sync
+                                        </button>
+                                        <button type="button" onclick="reStructureGoogleSheets()" class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 transition cursor-pointer shadow-xs flex items-center gap-1.5">
+                                            <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i> Restructure Sheet Tabs Sequence
+                                        </button>
+                                    </div>
+                                </div>
+                            `)}
+
+                            <!-- 4. GOOGLE DRIVE STORAGE INTEGRATION -->
+                            ${sectionCard('drive', 'Google Drive Storage & Assignments Folder', 'fa-folder-tree', 'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300', `
+                                <div class="space-y-4">
+                                    <div class="p-3.5 bg-sky-50/70 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 text-xs text-sky-950 dark:text-sky-200 flex items-start gap-2.5">
+                                        <i class="fa-brands fa-google-drive text-sky-600 dark:text-sky-400 text-base mt-0.5"></i>
+                                        <div>
+                                            <span class="font-bold">Admin Google Drive Assignments Integration</span>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">All assignments, DPPs, and documents upload to Drive and mirror direct download links into the <strong>Materials_Repository</strong> sheet tab.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        ${inputField('adminDriveEmail', 'Admin Google / Gmail ID', s.adminEmail || '', 'email', 'admin@divineclasses.in')}
+                                        ${inputField('adminDriveFolderUrl', 'Admin Drive Folder Link (Optional)', s.adminDriveFolderUrl || '', 'url', 'https://drive.google.com/drive/folders/...')}
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                        <span class="text-xs font-semibold ${s.adminDriveShared ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+                                            <i class="fa-solid ${s.adminDriveShared ? 'fa-circle-check' : 'fa-clock'} mr-1"></i>
+                                            ${s.adminDriveShared ? 'Drive Access Authorized & Synced' : 'Ready to Send Authorization Mail'}
+                                        </span>
+                                        <button type="button" onclick="openShareDriveWithAdminModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-700 text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer">
+                                            <i class="fa-solid fa-paper-plane"></i> Send Auth Email & Share Drive
+                                        </button>
+                                    </div>
+
+                                    <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">Coaching Owner's Direct Drive Link (Optional):</label>
+                                        ${inputField('driveFolderUrl', "Owner's Drive Folder Link (paste here)", s.driveFolderUrl, 'text', 'https://drive.google.com/drive/folders/...')}
+                                    </div>
+                                </div>
+                            `)}
+
+                            <!-- 5. CLIENT DEMO MODE & RESTRUCTURING -->
+                            ${sectionCard('demo', 'Client Handover Mode & Demo Controls', 'fa-eye-slash', 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300', `
+                                <div class="space-y-4">
+                                    <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Show "Requirement #N" Labels</p>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = requirement tags appear in page headers (development view). <strong>Turn OFF before showing portal to coaching client</strong>.</p>
+                                        </div>
+                                        <input type="checkbox" id="set-showRequirementLabels" ${s.showRequirementLabels === false ? '' : 'checked'} class="peer sr-only" aria-label="Show Requirement Labels">
+                                        <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                    </label>
+
+                                    <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Master Switch: Show Dummy / Demo Data</p>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = demo records active. <strong>OFF = all demo rows are wiped from Google Sheets</strong> (leaves only real data).</p>
+                                        </div>
+                                        <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} class="peer sr-only" aria-label="Show Dummy Demo Data">
+                                        <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                    </label>
+
+                                    <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
+                                        <button type="button" onclick="openDummyDataManagerModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5">
+                                            <i class="fa-solid fa-table-list text-amber-300"></i> Open Per-Sheet Dummy Data Manager
+                                        </button>
+                                        <span class="text-xs font-bold ${s.showDummyData === false ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">
+                                            Status: ${s.showDummyData === false ? 'Demo Data Cleared' : 'Demo Data Active'}
+                                        </span>
+                                    </div>
+                                </div>
                             `)}
                         </div>
 
-                        <div class="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4">
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400"><i class="fa-solid fa-rotate mr-1"></i>Saving instantly syncs to the Cloud Database and mirrors to the Google Sheet.</p>
-                            <button type="submit" id="btn-save-settings" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all duration-200 shadow-lg shadow-purple-600/25 flex items-center gap-2 cursor-pointer">
-                                <i class="fa-solid fa-floppy-disk"></i> Save All Settings
-                            </button>
+                        <!-- Sticky / Bottom Action Save Bar -->
+                        <div class="sticky bottom-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:px-6 shadow-xl">
+                            <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Changes automatically sync 2-way with Google Sheet (<code>1v7RZX0R8...</code>)</span>
+                            </div>
+                            <div class="flex items-center gap-2.5 w-full sm:w-auto">
+                                <button type="submit" id="btn-save-settings" class="w-full sm:w-auto px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all duration-200 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 cursor-pointer">
+                                    <i class="fa-solid fa-floppy-disk"></i> Save All Settings
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -7391,40 +7584,49 @@
         updateNotificationBadge();
         startNotificationPoller();
 
-        // Auto-check for Cloud Database initial state
+        // Auto-check for Google Sheet backend state (GAS or Vercel)
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (remoteData) {
                     if (remoteData && remoteData.students) {
-                        // Merge local and remote notifications by ID to guarantee zero loss on refresh
-                        const notifMap = new Map();
-                        (state.notifications || []).forEach(n => {
-                            if (n && n.id) notifMap.set(n.id, n);
-                        });
-                        if (remoteData.notifications && Array.isArray(remoteData.notifications)) {
-                            remoteData.notifications.forEach(n => {
-                                if (n && n.id) {
-                                    if (!notifMap.has(n.id)) {
-                                        notifMap.set(n.id, n);
-                                    } else {
-                                        const local = notifMap.get(n.id);
-                                        notifMap.set(n.id, Object.assign({}, n, local));
-                                    }
-                                }
-                            });
-                        }
-                        state = Object.assign(state, remoteData);
-                        state.notifications = Array.from(notifMap.values()).filter(n => n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_')));
-                        saveStateLocally();
-                        loadAuthSession();
-                        updateRoleUI();
+                        mergeRemoteData(remoteData);
                         renderSidebar();
                         renderMainContent();
-                        updateNotificationBadge();
-                        updateSyncBadge('✓ Database Active', 'success');
+                        updateSyncBadge('✓ Google Sheet Synced', 'success');
                     }
                 })
                 .apiGetInitialData();
+        } else {
+            // Standalone Vercel mode: load live Google Sheet data quietly
+            fetch(GAS_WEBAPP_URL + '?action=getData')
+                .then(function (r) { return r.json(); })
+                .then(function (remoteData) {
+                    if (remoteData && remoteData.students) {
+                        mergeRemoteData(remoteData);
+                        renderSidebar();
+                        renderMainContent();
+                        updateSyncBadge('✓ Google Sheet Synced', 'success');
+                    }
+                })
+                .catch(function (err) {
+                    console.warn('Initial sheet fetch notice:', err);
+                });
         }
+
+        // Quiet background sync check when returning to window/tab
+        window.addEventListener('focus', function () {
+            if (typeof google === 'undefined') {
+                fetch(GAS_WEBAPP_URL + '?action=getData')
+                    .then(function (r) { return r.json(); })
+                    .then(function (remoteData) {
+                        if (remoteData && remoteData.students) {
+                            mergeRemoteData(remoteData);
+                            renderSidebar();
+                            renderMainContent();
+                        }
+                    })
+                    .catch(function () {});
+            }
+        });
     };
 </script>

@@ -33,6 +33,18 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 2b. JSON API: Get full live data merged from all Google Sheet tabs
+    if (e && e.parameter && (e.parameter.action === 'getData' || e.parameter.action === 'loadData')) {
+      const data = apiGetInitialData();
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(data) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 3. Regular Web App Page rendering
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
@@ -104,6 +116,21 @@ function doPost(e) {
       const email = (payload.email || (e && e.parameter && e.parameter.email) || '').trim();
       const folderLink = (payload.folderUrl || payload.folderLink || (e && e.parameter && e.parameter.folderUrl) || '').trim();
       const result = apiShareMaterialsDriveWithAdmin(email, folderLink);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. Get Data (Full live state merged from all Google Sheet tabs)
+    if (action === 'getData' || action === 'loadData') {
+      const data = apiGetInitialData();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 4. Two-Way Sync / Save Data (Persists to DB & all respective Google Sheet tabs)
+    if (action === 'syncData' || action === 'saveData') {
+      const stateToSave = payload.data || payload.fullData || payload;
+      const result = apiSyncAllData(stateToSave);
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -1308,10 +1335,524 @@ function mergeLinksFromSheet_(appData) {
 }
 
 /**
+ * Dynamically merges teachers from the Teachers_Roster sheet tab
+ */
+function mergeTeachersFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Teachers_Roster');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.teachers) appData.teachers = [];
+    const keepIds = {};
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const id = String(row[0] || '').trim();
+      const name = String(row[1] || '').trim();
+      if (!id && !name) continue;
+
+      const subject = String(row[2] || '').trim();
+      const email = String(row[3] || '').trim();
+      const password = String(row[4] || 'teacher123').trim();
+      const statusRaw = String(row[5] || 'Active').trim();
+      const status = /block/i.test(statusRaw) ? 'Blocked' : (/inactive/i.test(statusRaw) ? 'Inactive' : 'Active');
+      const phone = String(row[6] || '').trim();
+      const qualification = String(row[7] || '').trim();
+      const experience = String(row[8] || '').trim();
+
+      let teacher = null;
+      if (id) {
+        teacher = appData.teachers.find(t => String(t.id || '').trim() === id);
+      }
+      if (!teacher && email) {
+        teacher = appData.teachers.find(t => String(t.email || '').trim().toLowerCase() === email.toLowerCase());
+      }
+      if (!teacher && name) {
+        teacher = appData.teachers.find(t => String(t.name || '').trim().toLowerCase() === name.toLowerCase());
+      }
+
+      if (teacher) {
+        teacher.id = id || teacher.id;
+        teacher.name = name || teacher.name;
+        teacher.subject = subject || teacher.subject;
+        teacher.email = email || teacher.email;
+        teacher.password = password || teacher.password;
+        teacher.status = status;
+        teacher.phone = phone || teacher.phone;
+        teacher.qualification = qualification || teacher.qualification;
+        teacher.experience = experience || teacher.experience;
+        keepIds[teacher.id] = true;
+      } else {
+        const newId = id || ('t_' + Date.now().toString(36) + '_' + i);
+        appData.teachers.push({
+          id: newId,
+          name: name || 'Faculty Member',
+          subject: subject,
+          email: email,
+          password: password,
+          status: status,
+          phone: phone,
+          qualification: qualification,
+          experience: experience
+        });
+        keepIds[newId] = true;
+      }
+    }
+
+    if (Object.keys(keepIds).length > 0) {
+      appData.teachers = appData.teachers.filter(t => keepIds[t.id]);
+    }
+  } catch (e) {
+    Logger.log('mergeTeachersFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
+ * Dynamically merges batches from the Batches_Roster sheet tab
+ */
+function mergeBatchesFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Batches_Roster');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.batches) appData.batches = [];
+    const keepIds = {};
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const id = String(row[0] || '').trim();
+      const name = String(row[1] || '').trim();
+      if (!id && !name) continue;
+
+      const subject = String(row[2] || '').trim();
+      const schedule = String(row[3] || '').trim();
+      const room = String(row[4] || '').trim();
+      const teacher = String(row[5] || '').trim();
+
+      let batch = null;
+      if (id) {
+        batch = appData.batches.find(b => String(b.id || '').trim() === id);
+      }
+      if (!batch && name) {
+        batch = appData.batches.find(b => String(b.name || '').trim().toLowerCase() === name.toLowerCase());
+      }
+
+      if (batch) {
+        batch.id = id || batch.id;
+        batch.name = name || batch.name;
+        batch.subject = subject || batch.subject;
+        batch.schedule = schedule || batch.schedule;
+        batch.room = room || batch.room;
+        batch.teacher = teacher || batch.teacher;
+        keepIds[batch.id] = true;
+      } else {
+        const newId = id || ('b_' + Date.now().toString(36) + '_' + i);
+        appData.batches.push({
+          id: newId,
+          name: name || 'General Batch',
+          subject: subject,
+          schedule: schedule,
+          room: room,
+          teacher: teacher,
+          studentIds: []
+        });
+        keepIds[newId] = true;
+      }
+    }
+
+    if (Object.keys(keepIds).length > 0) {
+      appData.batches = appData.batches.filter(b => keepIds[b.id]);
+    }
+  } catch (e) {
+    Logger.log('mergeBatchesFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
+ * Dynamically merges assignments & DPPs from the Materials_Repository sheet tab
+ */
+function mergeMaterialsFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Materials_Repository');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.materials) appData.materials = [];
+    const keepIds = {};
+    const tz = Session.getScriptTimeZone();
+
+    const batchNameToId = {};
+    (appData.batches || []).forEach(b => {
+      batchNameToId[String(b.name || '').toLowerCase()] = b.id;
+    });
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const id = String(row[0] || '').trim();
+      const title = String(row[1] || '').trim();
+      if (!id && !title) continue;
+
+      const batchName = String(row[2] || '').trim();
+      const category = String(row[3] || 'Assignment PDF').trim();
+      let uploadDate = row[4];
+      if (uploadDate instanceof Date && !isNaN(uploadDate)) {
+        uploadDate = Utilities.formatDate(uploadDate, tz, 'dd MMM yyyy');
+      } else {
+        uploadDate = String(uploadDate || '').trim();
+      }
+      const uploadedBy = String(row[5] || 'Faculty').trim();
+      const fileSize = String(row[6] || 'PDF').trim();
+      const downloads = Number(row[7]) || 0;
+      const description = String(row[8] || '').trim();
+      const downloadUrl = String(row[9] || '').trim();
+      const driveUrl = String(row[10] || '').trim();
+
+      const batchId = batchNameToId[batchName.toLowerCase()] || (appData.batches && appData.batches[0] ? appData.batches[0].id : 'b1');
+
+      let mat = null;
+      if (id) {
+        mat = appData.materials.find(m => String(m.id || '').trim() === id);
+      }
+      if (!mat && title) {
+        mat = appData.materials.find(m => String(m.title || '').trim().toLowerCase() === title.toLowerCase());
+      }
+
+      if (mat) {
+        mat.id = id || mat.id;
+        mat.title = title || mat.title;
+        mat.batchId = batchId || mat.batchId;
+        mat.category = category || mat.category;
+        mat.uploadDate = uploadDate || mat.uploadDate;
+        mat.uploadedBy = uploadedBy || mat.uploadedBy;
+        mat.fileSize = fileSize || mat.fileSize;
+        mat.downloads = downloads;
+        mat.description = description || mat.description;
+        if (downloadUrl) mat.downloadUrl = downloadUrl;
+        if (driveUrl) mat.driveUrl = driveUrl;
+        keepIds[mat.id] = true;
+      } else {
+        const newId = id || ('m_' + Date.now().toString(36) + '_' + i);
+        appData.materials.push({
+          id: newId,
+          title: title || 'Study Document',
+          batchId: batchId,
+          category: category,
+          uploadDate: uploadDate || 'October 2026',
+          uploadedBy: uploadedBy,
+          fileSize: fileSize,
+          downloads: downloads,
+          description: description,
+          downloadUrl: downloadUrl,
+          driveUrl: driveUrl
+        });
+        keepIds[newId] = true;
+      }
+    }
+
+    if (Object.keys(keepIds).length > 0) {
+      appData.materials = appData.materials.filter(m => keepIds[m.id]);
+    }
+  } catch (e) {
+    Logger.log('mergeMaterialsFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
+ * Dynamically merges offline tests from the Offline_Test_Marks sheet tab
+ */
+function mergeTestsFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Offline_Test_Marks');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.offlineTests) appData.offlineTests = [];
+    const keepIds = {};
+    const tz = Session.getScriptTimeZone();
+
+    const batchNameToId = {};
+    (appData.batches || []).forEach(b => {
+      batchNameToId[String(b.name || '').toLowerCase()] = b.id;
+    });
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const id = String(row[0] || '').trim();
+      const title = String(row[1] || '').trim();
+      if (!id && !title) continue;
+
+      const subject = String(row[2] || '').trim();
+      let date = row[3];
+      if (date instanceof Date && !isNaN(date)) {
+        date = Utilities.formatDate(date, tz, 'dd MMM yyyy');
+      } else {
+        date = String(date || '').trim();
+      }
+      const maxMarks = Number(row[4]) || 100;
+      const batchName = String(row[5] || '').trim();
+      const batchId = batchNameToId[batchName.toLowerCase()] || (appData.batches && appData.batches[0] ? appData.batches[0].id : 'b1');
+
+      let test = null;
+      if (id) {
+        test = appData.offlineTests.find(t => String(t.id || '').trim() === id);
+      }
+      if (!test && title) {
+        test = appData.offlineTests.find(t => String(t.title || '').trim().toLowerCase() === title.toLowerCase());
+      }
+
+      if (test) {
+        test.id = id || test.id;
+        test.title = title || test.title;
+        test.subject = subject || test.subject;
+        test.date = date || test.date;
+        test.maxMarks = maxMarks || test.maxMarks;
+        test.batchId = batchId || test.batchId;
+        keepIds[test.id] = true;
+      } else {
+        const newId = id || ('t_' + Date.now().toString(36) + '_' + i);
+        appData.offlineTests.push({
+          id: newId,
+          title: title || 'Offline Test',
+          subject: subject,
+          date: date,
+          maxMarks: maxMarks,
+          batchId: batchId,
+          marks: {}
+        });
+        keepIds[newId] = true;
+      }
+    }
+
+    if (Object.keys(keepIds).length > 0) {
+      appData.offlineTests = appData.offlineTests.filter(t => keepIds[t.id]);
+    }
+  } catch (e) {
+    Logger.log('mergeTestsFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
+ * Dynamically merges gallery banners from the Gallery_Banners sheet tab
+ */
+function mergeGalleryFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Gallery_Banners');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.gallery) appData.gallery = [];
+    const keepIds = {};
+    const tz = Session.getScriptTimeZone();
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const id = String(row[0] || '').trim();
+      const title = String(row[1] || '').trim();
+      if (!id && !title) continue;
+
+      const category = String(row[2] || '').trim();
+      let date = row[3];
+      if (date instanceof Date && !isNaN(date)) {
+        date = Utilities.formatDate(date, tz, 'dd MMM yyyy');
+      } else {
+        date = String(date || '').trim();
+      }
+      const caption = String(row[4] || '').trim();
+      const badge = String(row[5] || '').trim();
+      const imageUrl = String(row[6] || '').trim();
+
+      let item = null;
+      if (id) {
+        item = appData.gallery.find(g => String(g.id || '').trim() === id);
+      }
+      if (!item && title) {
+        item = appData.gallery.find(g => String(g.title || '').trim().toLowerCase() === title.toLowerCase());
+      }
+
+      if (item) {
+        item.id = id || item.id;
+        item.title = title || item.title;
+        item.category = category || item.category;
+        item.date = date || item.date;
+        item.caption = caption || item.caption;
+        item.badge = badge || item.badge;
+        if (imageUrl) item.imageUrl = imageUrl;
+        keepIds[item.id] = true;
+      } else {
+        const newId = id || ('g_' + Date.now().toString(36) + '_' + i);
+        appData.gallery.push({
+          id: newId,
+          title: title || 'Gallery Image',
+          category: category,
+          date: date,
+          caption: caption,
+          badge: badge,
+          imageUrl: imageUrl
+        });
+        keepIds[newId] = true;
+      }
+    }
+
+    if (Object.keys(keepIds).length > 0) {
+      appData.gallery = appData.gallery.filter(g => keepIds[g.id]);
+    }
+  } catch (e) {
+    Logger.log('mergeGalleryFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
+ * Dynamically merges feedback from the Feedback_Responses sheet tab
+ */
+function mergeFeedbackFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Feedback_Responses');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.feedbacks) appData.feedbacks = [];
+    const keepKeys = {};
+    const tz = Session.getScriptTimeZone();
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const authorName = String(row[0] || '').trim();
+      const comment = String(row[6] || '').trim();
+      if (!authorName && !comment) continue;
+
+      const role = String(row[1] || 'Student').trim();
+      const batchName = String(row[2] || '').trim();
+      const category = String(row[3] || 'General').trim();
+      const rating = Number(row[4]) || 5;
+      let date = row[5];
+      if (date instanceof Date && !isNaN(date)) {
+        date = Utilities.formatDate(date, tz, 'dd MMM yyyy');
+      } else {
+        date = String(date || '').trim();
+      }
+
+      const key = (authorName + '_' + date + '_' + comment.slice(0, 20)).toLowerCase();
+      let fb = appData.feedbacks.find(f => (String(f.authorName || '') + '_' + String(f.date || '') + '_' + String(f.comment || '').slice(0, 20)).toLowerCase() === key);
+
+      if (fb) {
+        fb.authorName = authorName || fb.authorName;
+        fb.role = role || fb.role;
+        fb.batchName = batchName || fb.batchName;
+        fb.category = category || fb.category;
+        fb.rating = rating;
+        fb.date = date || fb.date;
+        fb.comment = comment || fb.comment;
+        keepKeys[key] = true;
+      } else {
+        const newFb = {
+          id: 'fb_' + Date.now().toString(36) + '_' + i,
+          authorName: authorName || 'Anonymous',
+          role: role,
+          batchName: batchName,
+          category: category,
+          rating: rating,
+          date: date || 'October 2026',
+          comment: comment
+        };
+        appData.feedbacks.push(newFb);
+        keepKeys[key] = true;
+      }
+    }
+
+    if (Object.keys(keepKeys).length > 0) {
+      appData.feedbacks = appData.feedbacks.filter(f => {
+        const k = (String(f.authorName || '') + '_' + String(f.date || '') + '_' + String(f.comment || '').slice(0, 20)).toLowerCase();
+        return keepKeys[k];
+      });
+    }
+  } catch (e) {
+    Logger.log('mergeFeedbackFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
+ * Dynamically merges settings from the Settings_Config sheet tab
+ */
+function mergeSettingsFromSheet_(appData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return appData;
+    const sheet = ss.getSheetByName('Settings_Config');
+    if (!sheet) return appData;
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return appData;
+
+    if (!appData.settings) appData.settings = {};
+    for (let i = 1; i < values.length; i++) {
+      const param = String(values[i][0] || '').trim().toLowerCase();
+      const val = String(values[i][1] || '').trim();
+      if (!param || !val) continue;
+
+      if (param.indexOf('institute name') !== -1) {
+        if (!/^mia$/i.test(val)) appData.settings.instituteName = val;
+      } else if (param.indexOf('tagline') !== -1) {
+        appData.settings.tagline = val;
+      } else if (param.indexOf('helpline') !== -1 || param === 'phone') {
+        appData.settings.phone = val;
+      } else if (param.indexOf('display contact') !== -1) {
+        appData.settings.contactDisplay = val;
+      } else if (param.indexOf('official email') !== -1) {
+        appData.settings.email = val;
+      } else if (param.indexOf('address') !== -1) {
+        appData.settings.address = val;
+      } else if (param.indexOf('upi') !== -1) {
+        appData.settings.upiId = val;
+      } else if (param.indexOf('admin name') !== -1) {
+        appData.settings.adminName = val;
+      } else if (param.indexOf('admin password') !== -1) {
+        appData.settings.adminPassword = val;
+      } else if (param.indexOf('admin email') !== -1) {
+        appData.settings.adminEmail = val;
+      } else if (param.indexOf('admin google drive folder link') !== -1) {
+        appData.settings.adminDriveFolderUrl = val;
+      } else if (param.indexOf('facebook') !== -1) {
+        appData.settings.facebookUrl = val;
+      } else if (param.indexOf('instagram') !== -1) {
+        appData.settings.instagramUrl = val;
+      } else if (param.indexOf('youtube') !== -1) {
+        appData.settings.youtubeUrl = val;
+      }
+    }
+  } catch (e) {
+    Logger.log('mergeSettingsFromSheet_ error: ' + e.toString());
+  }
+  return appData;
+}
+
+/**
  * Initializes or returns the Database records
- * Primary source is Cloud Database (PropertiesService)
- * Students are dynamically merged from the Students_Master sheet tab
- * Student access (Active/Blocked) is controlled from the app UI only
+ * Primary source is Cloud Database (PropertiesService) & Google Sheet tabs
  */
 function apiGetInitialData() {
   try {
@@ -1336,12 +1877,17 @@ function apiGetInitialData() {
       appData = getDefaultSeedData();
     }
 
-    // 2b. Dynamically merge students added/edited in the Students_Master sheet tab
+    // 2b. Dynamically merge records added/edited/deleted directly in Google Sheet tabs
     appData = mergeStudentsFromSheet_(appData);
-
-    // 2c. Dynamically merge study links from the External_Links_Hub sheet tab
-    //     (always visible to admin/teacher/student — never dummy-stripped)
+    appData = mergeTeachersFromSheet_(appData);
+    appData = mergeBatchesFromSheet_(appData);
+    appData = mergeMaterialsFromSheet_(appData);
+    appData = mergeTestsFromSheet_(appData);
+    appData = mergeGalleryFromSheet_(appData);
+    appData = mergeFeedbackFromSheet_(appData);
     appData = mergeLinksFromSheet_(appData);
+    appData = mergeSettingsFromSheet_(appData);
+
     // Safety: curated study portals are permanent — re-seed if list ended up empty
     if (!appData.externalLinks || appData.externalLinks.length === 0) {
       appData.externalLinks = getDefaultSeedData().externalLinks;
@@ -1809,33 +2355,20 @@ function syncReadableSheets(ss, data) {
   try {
     const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
 
-    // Helper: extracts exactly 5 records for a table, falling back to seed data if empty
-    function getFiveRecords_(tableKey, filterFn) {
+    // Helper: extracts all records for a table (no artificial limits)
+    function getAllRecords_(tableKey, filterFn) {
       let list = Array.isArray(data[tableKey]) ? data[tableKey].slice() : [];
       if (filterFn) list = list.filter(filterFn);
-      if (list.length < 5 && seed && Array.isArray(seed[tableKey])) {
-        const have = {};
-        list.forEach(function(item) {
-          const key = item.id || item.roll || item.title || item.name;
-          if (key) have[key] = true;
-        });
-        seed[tableKey].forEach(function(item) {
-          const key = item.id || item.roll || item.title || item.name;
-          if ((!key || !have[key]) && list.length < 5) {
-            list.push(JSON.parse(JSON.stringify(item)));
-          }
-        });
-      }
-      return list.slice(0, 5);
+      return list;
     }
 
-    // A. Sync Students Sheet (Students_Master) - Exactly 5 Records (6 Rows Total)
+    // A. Sync Students Sheet (Students_Master) - All Records
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       stuSheet.clear();
       const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
       const rows = [headers];
-      const stuList = getFiveRecords_('students');
+      const stuList = getAllRecords_('students');
       stuList.forEach(function(s) {
         const total = Number(s.totalFee) || 0;
         const paid = Number(s.paidFee) || 0;
@@ -1869,13 +2402,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
     }
 
-    // B. Sync Teachers Sheet (Teachers_Roster) - Exactly 5 Records (6 Rows Total)
+    // B. Sync Teachers Sheet (Teachers_Roster) - All Records
     {
       let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
       teachSheet.clear();
       const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
       const trRows = [trHeaders];
-      const teachList = getFiveRecords_('teachers');
+      const teachList = getAllRecords_('teachers');
       teachList.forEach(function(tr) {
         trRows.push([
           tr.id || '',
@@ -1904,13 +2437,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(teachSheet, trHeaders.length, trRows.length, '#0284c7', '#0284c7');
     }
 
-    // C. Sync Batches Sheet (Batches_Roster) - Exactly 5 Records (6 Rows Total)
+    // C. Sync Batches Sheet (Batches_Roster) - All Records
     {
       let batchSheet = getOrCreateSheet(ss, 'Batches_Roster', ['Batches', 'Batches Roster']);
       batchSheet.clear();
       const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
       const bRows = [bHeaders];
-      const batchList = getFiveRecords_('batches');
+      const batchList = getAllRecords_('batches');
       batchList.forEach(function(b) {
         bRows.push([
           b.id || '',
@@ -1919,7 +2452,7 @@ function syncReadableSheets(ss, data) {
           b.schedule || '',
           b.room || '',
           b.teacher || '',
-          (b.studentIds || []).length || 2
+          (b.studentIds || []).length || 0
         ]);
       });
       batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
@@ -1927,7 +2460,7 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
     }
 
-    // D. Sync Offline Tests Sheet (Offline_Test_Marks) - Exactly 5 Test Records (6 Rows Total)
+    // D. Sync Offline Tests Sheet (Offline_Test_Marks) - All Test Records
     {
       let testSheet = getOrCreateSheet(ss, 'Offline_Test_Marks', ['Test_Marks', 'Offline Tests']);
       testSheet.clear();
@@ -1937,7 +2470,7 @@ function syncReadableSheets(ss, data) {
       (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
       const batchMap = {};
       (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-      const testList = getFiveRecords_('offlineTests');
+      const testList = getAllRecords_('offlineTests');
       testList.forEach(function(t) {
         const marks = t.marks || {};
         let topScorer = '-';
@@ -1972,13 +2505,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
     }
 
-    // E. Sync Feedback Sheet (Feedback_Responses) - Exactly 5 Records (6 Rows Total)
+    // E. Sync Feedback Sheet (Feedback_Responses) - All Records
     {
       let fbSheet = getOrCreateSheet(ss, 'Feedback_Responses', ['Feedback', 'Feedback Wall']);
       fbSheet.clear();
       const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
       const fbRows = [fbHeaders];
-      const fbList = getFiveRecords_('feedbacks');
+      const fbList = getAllRecords_('feedbacks');
       fbList.forEach(function(f) {
         fbRows.push([
           f.authorName || '',
@@ -1995,7 +2528,7 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
     }
 
-    // F. Sync Materials Sheet (Materials_Repository) - Auto-synced with all uploads
+    // F. Sync Materials Sheet (Materials_Repository) - All Records with URLs
     {
       let matSheet = getOrCreateSheet(ss, 'Materials_Repository', ['Materials', 'Study Materials']);
       matSheet.clear();
@@ -2004,17 +2537,7 @@ function syncReadableSheets(ss, data) {
       const batchMap = {};
       (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
       
-      // Preserve all real uploads, pad with seed materials up to 5 if fewer
-      let matList = Array.isArray(data.materials) ? data.materials.slice() : [];
-      if (matList.length < 5 && seed && Array.isArray(seed.materials)) {
-        const have = {};
-        matList.forEach(function(item) { if (item.id) have[item.id] = true; });
-        seed.materials.forEach(function(item) {
-          if ((!item.id || !have[item.id]) && matList.length < 5) {
-            matList.push(JSON.parse(JSON.stringify(item)));
-          }
-        });
-      }
+      const matList = getAllRecords_('materials');
       matList.forEach(function(m) {
         mRows.push([
           m.id || '',
@@ -2035,13 +2558,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
     }
 
-    // G. Sync Gallery Banners Sheet (Gallery_Banners) - Exactly 5 Records (6 Rows Total)
+    // G. Sync Gallery Banners Sheet (Gallery_Banners) - All Records
     {
       let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
       galSheet.clear();
       const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
       const gRows = [gHeaders];
-      const galList = getFiveRecords_('gallery');
+      const galList = getAllRecords_('gallery');
       galList.forEach(function(g) {
         gRows.push([
           g.id || '',
