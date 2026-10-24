@@ -316,6 +316,48 @@ function apiGetDriveInfo() {
 }
 
 /**
+ * Uploads a base64 or data-URL student or faculty photograph to the Developer's Google Drive.
+ * Stored in: Divine Classes Portal Uploads -> Student Photographs
+ * Sets file permission to Anyone with link can view.
+ * Returns the shareable Google Drive URL.
+ */
+function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name) {
+  if (!base64OrDataUrl || typeof base64OrDataUrl !== 'string') return '';
+  const str = base64OrDataUrl.trim();
+  if (!str) return '';
+  // If already an HTTP / Google Drive link, return it as-is
+  if (/^https?:\/\//i.test(str)) {
+    return str;
+  }
+  let base64 = str;
+  let mimeType = 'image/jpeg';
+  const match = str.match(/^data:([^;]+);base64,(.+)$/);
+  if (match) {
+    mimeType = match[1];
+    base64 = match[2];
+  }
+  try {
+    const folder = getDriveSubFolder(DRIVE_FOLDERS.PHOTOS);
+    const decodedBytes = Utilities.base64Decode(base64);
+    const safeName = (name || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const ext = mimeType.indexOf('png') !== -1 ? '.png' : (mimeType.indexOf('webp') !== -1 ? '.webp' : '.jpg');
+    const fileName = (prefix || 'profile') + '_' + safeName + '_' + Date.now() + ext;
+    const blob = Utilities.newBlob(decodedBytes, mimeType, fileName);
+    const file = folder.createFile(blob);
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      Logger.log('Photo sharing error: ' + shareErr.toString());
+    }
+    const fileId = file.getId();
+    return 'https://drive.google.com/file/d/' + fileId + '/view?usp=sharing';
+  } catch (err) {
+    Logger.log('uploadPhotoToDeveloperDrive_ error: ' + err.toString());
+    return str;
+  }
+}
+
+/**
  * Uploads an assignment / DPP / test paper file to Google Drive, saves the
  * material record (with its URL) to the Cloud Database, and mirrors it to
  * the Materials_Repository Google Sheet tab.
@@ -347,7 +389,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
     }
 
     const fileName = originalFileName || ('Material_' + Date.now() + '.' + ext);
-    
+
     // Resolve target folder (use authorized admin folder if configured)
     let folder;
     const currentSettings = dbGetTable('settings') || {};
@@ -560,7 +602,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
     const instituteName = 'Divine Classes';
     const adminName = data.settings.adminName || 'Admin';
     const subject = 'Action Required: Divine Classes Study Materials & Assignment Drive Access';
-    
+
     const textBody = 'Dear ' + adminName + ',\n\n' +
       'Google Drive Editor access has been granted to your email (' + emailToUse + ') for the official Divine Classes Study Materials & Assignments Folder.\n\n' +
       'Click this link to authorize and open the folder in your Google Drive:\n' +
@@ -572,35 +614,35 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
 
     const htmlBody = '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">' +
       '<div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #4f46e5;">' +
-        '<h1 style="color: #1e1b4b; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">DIVINE CLASSES</h1>' +
-        '<p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0; font-weight: 500;">Premier Coaching for JEE Advanced, NEET & Foundations</p>' +
+      '<h1 style="color: #1e1b4b; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">DIVINE CLASSES</h1>' +
+      '<p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0; font-weight: 500;">Premier Coaching for JEE Advanced, NEET & Foundations</p>' +
       '</div>' +
       '<div style="padding: 24px 0;">' +
-        '<div style="display: inline-block; padding: 4px 12px; background-color: #e0e7ff; color: #4338ca; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Admin Authorization Required</div>' +
-        '<h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Authorize Google Drive Access for Assignments & Materials</h2>' +
-        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>' + adminName + '</strong>,</p>' +
-        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">You have been designated as an authorized administrator for the <strong>Divine Classes Assignment & Study Material Cloud Repository</strong>. Your Google account (<strong>' + emailToUse + '</strong>) now has full Editor access to the folder.</p>' +
-        '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">' +
-          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📂 Shared Folder:</strong> ' + DRIVE_MATERIALS_FOLDER + '</p>' +
-          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📧 Authorized Email:</strong> ' + emailToUse + '</p>' +
-          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📊 Google Sheet Sync:</strong> Auto-logged to <code>Materials_Repository</code></p>' +
-          '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📲 Student Download:</strong> Instant 1-click mobile download & PDF preview</p>' +
-        '</div>' +
-        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Whenever you or faculty upload study material, test papers, or worksheets, the files are stored here and direct download links are published instantly for all enrolled students.</p>' +
-        '<div style="text-align: center; margin: 30px 0;">' +
-          '<a href="' + folderUrl + '" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);">' +
-            '🚀 Open & Authorize Google Drive Folder' +
-          '</a>' +
-        '</div>' +
-        '<p style="font-size: 12px; color: #64748b; line-height: 1.5; text-align: center;">If clicking the button does not open Drive directly, copy and open this link:<br>' +
-          '<a href="' + folderUrl + '" style="color: #4f46e5; word-break: break-all;">' + folderUrl + '</a>' +
-        '</p>' +
+      '<div style="display: inline-block; padding: 4px 12px; background-color: #e0e7ff; color: #4338ca; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Admin Authorization Required</div>' +
+      '<h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Authorize Google Drive Access for Assignments & Materials</h2>' +
+      '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>' + adminName + '</strong>,</p>' +
+      '<p style="font-size: 14px; line-height: 1.6; color: #334155;">You have been designated as an authorized administrator for the <strong>Divine Classes Assignment & Study Material Cloud Repository</strong>. Your Google account (<strong>' + emailToUse + '</strong>) now has full Editor access to the folder.</p>' +
+      '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">' +
+      '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📂 Shared Folder:</strong> ' + DRIVE_MATERIALS_FOLDER + '</p>' +
+      '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📧 Authorized Email:</strong> ' + emailToUse + '</p>' +
+      '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📊 Google Sheet Sync:</strong> Auto-logged to <code>Materials_Repository</code></p>' +
+      '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📲 Student Download:</strong> Instant 1-click mobile download & PDF preview</p>' +
+      '</div>' +
+      '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Whenever you or faculty upload study material, test papers, or worksheets, the files are stored here and direct download links are published instantly for all enrolled students.</p>' +
+      '<div style="text-align: center; margin: 30px 0;">' +
+      '<a href="' + folderUrl + '" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);">' +
+      '🚀 Open & Authorize Google Drive Folder' +
+      '</a>' +
+      '</div>' +
+      '<p style="font-size: 12px; color: #64748b; line-height: 1.5; text-align: center;">If clicking the button does not open Drive directly, copy and open this link:<br>' +
+      '<a href="' + folderUrl + '" style="color: #4f46e5; word-break: break-all;">' + folderUrl + '</a>' +
+      '</p>' +
       '</div>' +
       '<div style="border-top: 1px solid #f1f5f9; padding-top: 18px; font-size: 11px; color: #94a3b8; text-align: center;">' +
-        '<p style="margin: 0;">Main Apps Script code & system database hosted in Developer Google account. Client Admin authorized via email.</p>' +
-        '<p style="margin: 4px 0 0 0;">Divine Classes Paschimpuri New Delhi • Official Portal System</p>' +
+      '<p style="margin: 0;">Main Apps Script code & system database hosted in Developer Google account. Client Admin authorized via email.</p>' +
+      '<p style="margin: 4px 0 0 0;">Divine Classes Paschimpuri New Delhi • Official Portal System</p>' +
       '</div>' +
-    '</div>';
+      '</div>';
 
     let emailSent = false;
     let mailError = '';
@@ -842,68 +884,47 @@ function isDummyForSheetEnabled_(settings, sheetKey) {
 function stripDummyData_(appData, targetTable) {
   if (!appData || !appData.settings) return appData;
   const dummyStudentIds = {};
-  (appData.students || []).forEach(function(s) {
+  (appData.students || []).forEach(function (s) {
     if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
   });
 
   const tbls = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'];
-  tbls.forEach(function(tbl) {
+  tbls.forEach(function (tbl) {
     if (!isDummyForSheetEnabled_(appData.settings, tbl) || targetTable) {
-      appData[tbl] = (appData[tbl] || []).filter(function(r) { return !isDummyRecord_(r); });
+      appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
     }
   });
 
   if (!isDummyForSheetEnabled_(appData.settings, 'students') || targetTable === 'students') {
-    (appData.batches || []).forEach(function(b) {
+    (appData.batches || []).forEach(function (b) {
       if (Array.isArray(b.studentIds)) {
-        b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+        b.studentIds = b.studentIds.filter(function (id) { return !dummyStudentIds[id]; });
       }
     });
-    (appData.offlineTests || []).forEach(function(t) {
+    (appData.offlineTests || []).forEach(function (t) {
       if (t && t.marks && typeof t.marks === 'object') {
-        Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
+        Object.keys(dummyStudentIds).forEach(function (sid) { delete t.marks[sid]; });
       }
     });
   }
   return appData;
 }
 
-// Re-injects missing dummy records (from current DB or seed) so client syncs
-// that carry a stripped state can never permanently wipe demo data.
+// USER RULE: Once dev has disabled demo data (showDummyData === false),
+// demo records must NEVER be recreated, restored, or re-injected!
 function restoreDummyData_(incoming) {
   if (!incoming) return incoming;
-  let cur = null;
-  try { cur = dbLoadAll(); } catch (e) {}
-  const incomingOff = !incoming.settings || incoming.settings.showDummyData === false;
-  const dbWasOff = !!(cur && cur.settings && cur.settings.showDummyData === false);
-  // Restore when the client sends a stripped view (toggle OFF), or when the
-  // toggle was just flipped back ON from a previously-stripped session
-  // (client state is still missing the dummy records at that moment).
-  if (!incomingOff && !dbWasOff) return incoming;
-  const src = cur || getDefaultSeedData();
-  const dummyStudentIds = {};
-  // externalLinks excluded — study links are never stripped, so no restore needed
-  ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function(tbl) {
-    if (!Array.isArray(incoming[tbl])) incoming[tbl] = [];
-    const have = {};
-    incoming[tbl].forEach(function(r) { if (r && r.id) have[r.id] = true; });
-    (src[tbl] || []).forEach(function(r) {
-      if (r && r.id && !have[r.id] && isDummyRecord_(r)) incoming[tbl].push(r);
-    });
-  });
-  (src.students || []).forEach(function(s) {
-    if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
-  });
-  // Restore stripped dummy student references in batches/tests that still exist
-  (incoming.batches || []).forEach(function(b) {
-    if (!Array.isArray(b.studentIds)) b.studentIds = [];
-    Object.keys(dummyStudentIds).forEach(function(sid) {
-      const orig = (src.batches || []).find(function(ob) { return ob.id === b.id; });
-      if (orig && Array.isArray(orig.studentIds) && orig.studentIds.indexOf(sid) !== -1 && b.studentIds.indexOf(sid) === -1) {
-        b.studentIds.push(sid);
-      }
-    });
-  });
+  const isDemoDisabled = (incoming.settings && incoming.settings.showDummyData === false) ||
+    (incoming.settings && incoming.settings.demoDataPermanentlyDisabled === true) ||
+    PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+  if (isDemoDisabled) {
+    if (incoming.settings) {
+      incoming.settings.showDummyData = false;
+      incoming.settings.demoDataPermanentlyDisabled = true;
+    }
+    stripDummyData_(incoming);
+    return incoming;
+  }
   return incoming;
 }
 
@@ -943,7 +964,7 @@ function dbSetTable(tableName, tableData) {
 function dbLoadAll() {
   const result = {};
   let count = 0;
-  DB_TABLES.forEach(function(tbl) {
+  DB_TABLES.forEach(function (tbl) {
     const data = dbGetTable(tbl);
     if (data !== null) {
       result[tbl] = data;
@@ -955,7 +976,7 @@ function dbLoadAll() {
 
 function dbSaveAll(fullData) {
   if (!fullData) return false;
-  DB_TABLES.forEach(function(tbl) {
+  DB_TABLES.forEach(function (tbl) {
     if (fullData[tbl] !== undefined) {
       dbSetTable(tbl, fullData[tbl]);
     }
@@ -987,7 +1008,7 @@ function addTombstones_(key, values) {
   if (!values || !values.length) return;
   try {
     const cur = getTombstones_(key);
-    values.forEach(function(v) {
+    values.forEach(function (v) {
       v = String(v || '').trim();
       if (v && cur.indexOf(v) === -1) cur.push(v);
     });
@@ -1007,7 +1028,7 @@ function clearTombstone_(key, value) {
       cur.splice(i, 1);
       PropertiesService.getScriptProperties().setProperty('DB_tomb_' + key, JSON.stringify(cur));
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // Strips tombstoned students (by roll) and links (by URL) from a data object.
@@ -1019,11 +1040,11 @@ function applyTombstones_(appData) {
   if (deadRolls.length && Array.isArray(appData.students)) {
     const rollSet = {};
     const demoRolls = { 'DC-101': true, 'DC-102': true, 'DC-103': true, 'DC-104': true, 'DC-105': true };
-    deadRolls.forEach(function(r) {
+    deadRolls.forEach(function (r) {
       if (!demoRolls[r]) rollSet[r] = true;
     });
     const removedIds = {};
-    appData.students = appData.students.filter(function(s) {
+    appData.students = appData.students.filter(function (s) {
       if (s && s.roll && rollSet[String(s.roll).trim()]) {
         if (s.id) removedIds[s.id] = true;
         return false;
@@ -1031,14 +1052,14 @@ function applyTombstones_(appData) {
       return true;
     });
     if (Object.keys(removedIds).length > 0) {
-      (appData.batches || []).forEach(function(b) {
+      (appData.batches || []).forEach(function (b) {
         if (Array.isArray(b.studentIds)) {
-          b.studentIds = b.studentIds.filter(function(id) { return !removedIds[id]; });
+          b.studentIds = b.studentIds.filter(function (id) { return !removedIds[id]; });
         }
       });
-      (appData.offlineTests || []).forEach(function(t) {
+      (appData.offlineTests || []).forEach(function (t) {
         if (t && t.marks && typeof t.marks === 'object') {
-          Object.keys(removedIds).forEach(function(sid) { delete t.marks[sid]; });
+          Object.keys(removedIds).forEach(function (sid) { delete t.marks[sid]; });
         }
       });
     }
@@ -1046,8 +1067,8 @@ function applyTombstones_(appData) {
 
   if (deadUrls.length && Array.isArray(appData.externalLinks)) {
     const urlSet = {};
-    deadUrls.forEach(function(u) { urlSet[u] = true; });
-    appData.externalLinks = appData.externalLinks.filter(function(l) {
+    deadUrls.forEach(function (u) { urlSet[u] = true; });
+    appData.externalLinks = appData.externalLinks.filter(function (l) {
       return !(l && l.url && deadUrls.indexOf(String(l.url).trim()) !== -1);
     });
   }
@@ -1086,7 +1107,7 @@ function mergeStudentsFromSheet_(appData) {
       const r = String(values[i][0] || '').trim();
       if (r) sheetRollsNow[r] = true;
     }
-    getTombstones_('rolls').forEach(function(r) {
+    getTombstones_('rolls').forEach(function (r) {
       if (sheetRollsNow[r]) clearTombstone_('rolls', r);
     });
 
@@ -1110,15 +1131,16 @@ function mergeStudentsFromSheet_(appData) {
         dueDate = String(dueDate || '').trim();
       }
       const lastReminder = String(row[10] || '').trim() || 'Never';
+      const photoUrl = String(row[11] || '').trim();
 
       let stu = null;
       if (roll) {
-        stu = appData.students.find(function(s) { return String(s.roll || '').trim() === roll; });
+        stu = appData.students.find(function (s) { return String(s.roll || '').trim() === roll; });
       }
       // Name fallback only for rows WITHOUT a roll — so two people sharing the
       // same name (e.g. DC-110 & DC-111) don't overwrite each other.
       if (!stu && !roll && name) {
-        stu = appData.students.find(function(s) { return String(s.name || '').trim() === name; });
+        stu = appData.students.find(function (s) { return String(s.name || '').trim() === name; });
       }
 
       if (stu) {
@@ -1132,6 +1154,10 @@ function mergeStudentsFromSheet_(appData) {
         stu.paidFee = paidFee;
         if (dueDate && !/^fully paid$/i.test(dueDate)) stu.dueDate = dueDate;
         stu.lastReminder = lastReminder;
+        if (photoUrl && photoUrl !== 'Photo URL') {
+          stu.photo = photoUrl;
+          stu.photoUrl = photoUrl;
+        }
         updated++;
       } else {
         const slug = roll ? roll.toLowerCase().replace(/[^a-z0-9]/g, '') : Date.now().toString(36);
@@ -1147,7 +1173,8 @@ function mergeStudentsFromSheet_(appData) {
           paidFee: paidFee,
           dueDate: /^fully paid$/i.test(dueDate) ? '' : dueDate,
           lastReminder: lastReminder,
-          photo: null
+          photo: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : null,
+          photoUrl: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : ''
         });
         added++;
       }
@@ -1171,7 +1198,7 @@ function mergeStudentsFromSheet_(appData) {
       const removedIds = {};
       const removedRolls = [];
       const kept = [];
-      appData.students.forEach(function(s) {
+      appData.students.forEach(function (s) {
         const roll = String(s.roll || '').trim();
         const name = String(s.name || '').trim();
         // Keep if the student's roll row exists; name fallback only for roll-less records
@@ -1184,14 +1211,14 @@ function mergeStudentsFromSheet_(appData) {
       });
       if (Object.keys(removedIds).length > 0) {
         appData.students = kept;
-        (appData.batches || []).forEach(function(b) {
+        (appData.batches || []).forEach(function (b) {
           if (Array.isArray(b.studentIds)) {
-            b.studentIds = b.studentIds.filter(function(id) { return !removedIds[id]; });
+            b.studentIds = b.studentIds.filter(function (id) { return !removedIds[id]; });
           }
         });
-        (appData.offlineTests || []).forEach(function(t) {
+        (appData.offlineTests || []).forEach(function (t) {
           if (t && t.marks && typeof t.marks === 'object') {
-            Object.keys(removedIds).forEach(function(sid) { delete t.marks[sid]; });
+            Object.keys(removedIds).forEach(function (sid) { delete t.marks[sid]; });
           }
         });
         // PERMANENT: tombstone deleted rolls so no future save can resurrect them
@@ -1242,7 +1269,7 @@ function mergeLinksFromSheet_(appData) {
       const u = String(values[i][4] || '').trim();
       if (u) sheetUrlsNow[u] = true;
     }
-    getTombstones_('linkUrls').forEach(function(u) {
+    getTombstones_('linkUrls').forEach(function (u) {
       if (sheetUrlsNow[u]) clearTombstone_('linkUrls', u);
     });
 
@@ -1265,10 +1292,10 @@ function mergeLinksFromSheet_(appData) {
 
       let link = null;
       if (id) {
-        link = appData.externalLinks.find(function(l) { return String(l.id || '').trim() === id; });
+        link = appData.externalLinks.find(function (l) { return String(l.id || '').trim() === id; });
       }
       if (!link && url) {
-        link = appData.externalLinks.find(function(l) { return String(l.url || '').trim() === url; });
+        link = appData.externalLinks.find(function (l) { return String(l.url || '').trim() === url; });
       }
 
       if (link) {
@@ -1311,7 +1338,7 @@ function mergeLinksFromSheet_(appData) {
       }
       const deadUrls = [];
       const beforeCount = appData.externalLinks.length;
-      appData.externalLinks = appData.externalLinks.filter(function(l) {
+      appData.externalLinks = appData.externalLinks.filter(function (l) {
         const lid = String(l.id || '').trim();
         const lurl = String(l.url || '').trim();
         const alive = (lid && keepIds[lid]) || (lurl && keepUrls[lurl]);
@@ -1363,6 +1390,7 @@ function mergeTeachersFromSheet_(appData) {
       const phone = String(row[6] || '').trim();
       const qualification = String(row[7] || '').trim();
       const experience = String(row[8] || '').trim();
+      const photoUrl = String(row[9] || '').trim();
 
       let teacher = null;
       if (id) {
@@ -1385,6 +1413,10 @@ function mergeTeachersFromSheet_(appData) {
         teacher.phone = phone || teacher.phone;
         teacher.qualification = qualification || teacher.qualification;
         teacher.experience = experience || teacher.experience;
+        if (photoUrl && photoUrl !== 'Photo URL') {
+          teacher.photo = photoUrl;
+          teacher.photoUrl = photoUrl;
+        }
         keepIds[teacher.id] = true;
       } else {
         const newId = id || ('t_' + Date.now().toString(36) + '_' + i);
@@ -1397,7 +1429,9 @@ function mergeTeachersFromSheet_(appData) {
           status: status,
           phone: phone,
           qualification: qualification,
-          experience: experience
+          experience: experience,
+          photo: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : null,
+          photoUrl: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : ''
         });
         keepIds[newId] = true;
       }
@@ -1867,14 +1901,22 @@ function apiGetInitialData() {
         if (dataSheet) {
           const val = dataSheet.getRange(1, 1).getValue();
           if (val && typeof val === 'string' && val.trim().startsWith('{')) {
-            try { appData = JSON.parse(val); } catch (e) {}
+            try { appData = JSON.parse(val); } catch (e) { }
           }
         }
       }
     }
 
+    const isDemoDisabled = (appData && appData.settings && appData.settings.showDummyData === false) ||
+      (appData && appData.settings && appData.settings.demoDataPermanentlyDisabled === true) ||
+      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+
     if (!appData) {
-      appData = getDefaultSeedData();
+      if (isDemoDisabled) {
+        appData = { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: [], externalLinks: [], feedbacks: [], settings: { showDummyData: false, demoDataPermanentlyDisabled: true } };
+      } else {
+        appData = getDefaultSeedData();
+      }
     }
 
     // 2b. Dynamically merge records added/edited/deleted directly in Google Sheet tabs
@@ -1901,7 +1943,7 @@ function apiGetInitialData() {
 
     // Address normalization: migrate legacy "Club Road" spelling to "Club Rd"
     if (appData.settings && typeof appData.settings.address === 'string' &&
-        /Paschimpuri Pocket 2, Club Road New Delhi/i.test(appData.settings.address)) {
+      /Paschimpuri Pocket 2, Club Road New Delhi/i.test(appData.settings.address)) {
       appData.settings.address = appData.settings.address
         .replace(/Club Road/i, 'Club Rd');
     }
@@ -1913,6 +1955,14 @@ function apiGetInitialData() {
       }
     }
 
+    // Enforce demo data purge if disabled
+    if (isDemoDisabled) {
+      if (!appData.settings) appData.settings = {};
+      appData.settings.showDummyData = false;
+      appData.settings.demoDataPermanentlyDisabled = true;
+      stripDummyData_(appData);
+    }
+
     // Persist verified state in the Cloud Database
     dbSaveAll(appData);
 
@@ -1920,7 +1970,7 @@ function apiGetInitialData() {
     try {
       const ss = getDbSpreadsheet();
       if (ss) {
-        const sheetData = (appData.settings && appData.settings.showDummyData === false)
+        const sheetData = isDemoDisabled
           ? stripDummyData_(JSON.parse(JSON.stringify(appData)))
           : appData;
         syncReadableSheets(ss, sheetData);
@@ -1929,8 +1979,8 @@ function apiGetInitialData() {
       Logger.log('Sheet sync in apiGetInitialData: ' + sheetSyncErr.toString());
     }
 
-    // Developer toggle: hide seed/demo records from clients (DB keeps them)
-    return stripDummyData_(appData);
+    // Developer toggle: hide seed/demo records from clients (DB keeps clean state)
+    return isDemoDisabled ? stripDummyData_(appData) : appData;
   } catch (err) {
     Logger.log('apiGetInitialData error: ' + err.toString());
     const seed = getDefaultSeedData();
@@ -1964,8 +2014,8 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
   // never wipes seed/demo records when settings.showDummyData is false.
   let data = dbLoadAll();
   if (!data) data = getDefaultSeedData();
-  const student = (data.students || []).find(function(s) { 
-    return s.id === studentIdOrRoll || s.roll === studentIdOrRoll; 
+  const student = (data.students || []).find(function (s) {
+    return s.id === studentIdOrRoll || s.roll === studentIdOrRoll;
   });
   if (!student) return { success: false, message: 'Student not found in database' };
   student.status = (String(newStatus).toLowerCase() === 'blocked') ? 'Blocked' : 'Active';
@@ -2014,7 +2064,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
     // 1. Enable in config
     if (target === 'all' || !target) {
       appData.settings.showDummyData = true;
-      allTables.forEach(function(tbl) { appData.settings.dummyDataConfig[tbl] = true; });
+      allTables.forEach(function (tbl) { appData.settings.dummyDataConfig[tbl] = true; });
     } else {
       appData.settings.dummyDataConfig[target] = true;
       appData.settings.showDummyData = true;
@@ -2022,11 +2072,11 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
 
     // 2. CRITICAL: Inject the seed dummy records for the enabled table(s) into appData
     // so they are immediately created in the Google Sheet tabs!
-    tables.forEach(function(tbl) {
+    tables.forEach(function (tbl) {
       if (!Array.isArray(appData[tbl])) appData[tbl] = [];
       const have = {};
-      appData[tbl].forEach(function(r) { if (r && r.id) have[r.id] = true; });
-      (seed[tbl] || []).forEach(function(r) {
+      appData[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
+      (seed[tbl] || []).forEach(function (r) {
         if (r && r.id && !have[r.id]) {
           appData[tbl].push(JSON.parse(JSON.stringify(r)));
         }
@@ -2035,11 +2085,11 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
 
     // Ensure student IDs are linked into demo batches
     if (tables.indexOf('students') !== -1 || tables.indexOf('batches') !== -1) {
-      (seed.batches || []).forEach(function(sb) {
-        const mb = (appData.batches || []).find(function(b) { return b.id === sb.id; });
+      (seed.batches || []).forEach(function (sb) {
+        const mb = (appData.batches || []).find(function (b) { return b.id === sb.id; });
         if (mb && Array.isArray(sb.studentIds)) {
           if (!Array.isArray(mb.studentIds)) mb.studentIds = [];
-          sb.studentIds.forEach(function(sid) {
+          sb.studentIds.forEach(function (sid) {
             if (mb.studentIds.indexOf(sid) === -1) mb.studentIds.push(sid);
           });
         }
@@ -2048,11 +2098,11 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
 
     // If clientState was passed, also preserve any newly created real records from client
     if (clientState && typeof clientState === 'object') {
-      tables.forEach(function(tbl) {
+      tables.forEach(function (tbl) {
         if (Array.isArray(clientState[tbl])) {
           const existingIds = {};
-          (appData[tbl] || []).forEach(function(r) { if (r && r.id) existingIds[r.id] = true; });
-          clientState[tbl].forEach(function(cr) {
+          (appData[tbl] || []).forEach(function (r) { if (r && r.id) existingIds[r.id] = true; });
+          clientState[tbl].forEach(function (cr) {
             if (cr && cr.id && !existingIds[cr.id]) {
               appData[tbl].push(JSON.parse(JSON.stringify(cr)));
             }
@@ -2064,30 +2114,30 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
     // 1. Disable in config
     if (target === 'all' || !target) {
       appData.settings.showDummyData = false;
-      allTables.forEach(function(tbl) { appData.settings.dummyDataConfig[tbl] = false; });
+      allTables.forEach(function (tbl) { appData.settings.dummyDataConfig[tbl] = false; });
     } else {
       appData.settings.dummyDataConfig[target] = false;
-      const anyOn = allTables.some(function(tbl) { return appData.settings.dummyDataConfig[tbl] === true; });
+      const anyOn = allTables.some(function (tbl) { return appData.settings.dummyDataConfig[tbl] === true; });
       appData.settings.showDummyData = anyOn;
     }
 
     // 2. CRITICAL: Delete all dummy records for the disabled table(s) from appData
     // so they are completely removed from the Google Sheet tabs!
-    tables.forEach(function(tbl) {
-      appData[tbl] = (appData[tbl] || []).filter(function(r) { return !isDummyRecord_(r); });
+    tables.forEach(function (tbl) {
+      appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
     });
 
     if (tables.indexOf('students') !== -1) {
       const dummyStudentIds = {};
-      (seed.students || []).forEach(function(s) { dummyStudentIds[s.id] = true; });
-      (appData.batches || []).forEach(function(b) {
+      (seed.students || []).forEach(function (s) { dummyStudentIds[s.id] = true; });
+      (appData.batches || []).forEach(function (b) {
         if (Array.isArray(b.studentIds)) {
-          b.studentIds = b.studentIds.filter(function(id) { return !dummyStudentIds[id]; });
+          b.studentIds = b.studentIds.filter(function (id) { return !dummyStudentIds[id]; });
         }
       });
-      (appData.offlineTests || []).forEach(function(t) {
+      (appData.offlineTests || []).forEach(function (t) {
         if (t && t.marks && typeof t.marks === 'object') {
-          Object.keys(dummyStudentIds).forEach(function(sid) { delete t.marks[sid]; });
+          Object.keys(dummyStudentIds).forEach(function (sid) { delete t.marks[sid]; });
         }
       });
     }
@@ -2136,7 +2186,7 @@ function apiRestructureAllSheets() {
     // Clear any deletion tombstones that might suppress demo rolls
     try {
       PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
-    } catch (tErr) {}
+    } catch (tErr) { }
 
     let appData = dbLoadAll();
     if (!appData) appData = getDefaultSeedData();
@@ -2147,16 +2197,16 @@ function apiRestructureAllSheets() {
     if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
       appData.settings.dummyDataConfig = {};
     }
-    ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function(tbl) {
+    ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function (tbl) {
       appData.settings.dummyDataConfig[tbl] = true;
     });
 
     // Populate each table with exactly 5 records (so each sheet tab has 1 header + 5 records = 6 rows)
-    ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function(tbl) {
+    ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
       if (!Array.isArray(appData[tbl])) appData[tbl] = [];
       const have = {};
-      appData[tbl].forEach(function(r) { if (r && r.id) have[r.id] = true; });
-      (seed[tbl] || []).slice(0, 5).forEach(function(r) {
+      appData[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
+      (seed[tbl] || []).slice(0, 5).forEach(function (r) {
         if (r && r.id && !have[r.id]) {
           appData[tbl].push(JSON.parse(JSON.stringify(r)));
         }
@@ -2197,7 +2247,7 @@ function apiRestructureAllSheets() {
         try {
           ss.setActiveSheet(sh);
           ss.moveActiveSheet(i + 1);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
@@ -2228,10 +2278,22 @@ function apiRestructureAllSheets() {
  */
 function apiSyncAllData(fullData) {
   try {
-    // 0. Dummy-data safety: if client state was stripped (showDummyData off),
-    //    re-inject seed/demo records into cloud database backup so demo data is never lost.
-    try { restoreDummyData_(fullData); } catch (dummyErr) {
-      Logger.log('restoreDummyData_ notice: ' + dummyErr.toString());
+    const isDemoDisabled = (fullData && fullData.settings && fullData.settings.showDummyData === false) ||
+      (fullData && fullData.settings && fullData.settings.demoDataPermanentlyDisabled === true) ||
+      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+
+    if (isDemoDisabled) {
+      if (!fullData.settings) fullData.settings = {};
+      fullData.settings.showDummyData = false;
+      fullData.settings.demoDataPermanentlyDisabled = true;
+      try {
+        PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true');
+      } catch (pErr) { }
+      stripDummyData_(fullData);
+    } else {
+      try { restoreDummyData_(fullData); } catch (dummyErr) {
+        Logger.log('restoreDummyData_ notice: ' + dummyErr.toString());
+      }
     }
 
     // 0b. Deletion safety: strip tombstoned (manually sheet-deleted) records
@@ -2253,20 +2315,18 @@ function apiSyncAllData(fullData) {
         }
         jsonSheet.getRange(1, 1).setValue(JSON.stringify(fullData));
 
-        // DEVELOPER TOGGLE FOR GOOGLE SHEETS:
-        // When showDummyData is false: Human-readable sheets reflect ONLY real production records!
-        // When showDummyData is true: Human-readable sheets reflect demo records for presentation.
-        const sheetData = stripDummyData_(JSON.parse(JSON.stringify(fullData)));
+        // When demo data is disabled: Human-readable sheets reflect ONLY real production records!
+        const sheetData = isDemoDisabled ? stripDummyData_(JSON.parse(JSON.stringify(fullData))) : fullData;
         syncReadableSheets(ss, sheetData);
       }
     } catch (sheetErr) {
       Logger.log('Secondary sheet mirror notice (database is primary): ' + sheetErr.toString());
     }
 
-    return { 
-      success: true, 
-      storage: 'cloud_database', 
-      timestamp: new Date().toISOString() 
+    return {
+      success: true,
+      storage: 'cloud_database',
+      timestamp: new Date().toISOString()
     };
   } catch (err) {
     Logger.log('Database sync error: ' + err.toString());
@@ -2366,13 +2426,23 @@ function syncReadableSheets(ss, data) {
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       stuSheet.clear();
-      const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent'];
+      const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
       const rows = [headers];
       const stuList = getAllRecords_('students');
       stuList.forEach(function(s) {
         const total = Number(s.totalFee) || 0;
         const paid = Number(s.paidFee) || 0;
         const balance = total - paid;
+        let pUrl = s.photoUrl || s.photo || '';
+        if (pUrl && pUrl.startsWith('data:image')) {
+          try {
+            pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'student_' + (s.roll || s.id), s.name);
+            s.photo = pUrl;
+            s.photoUrl = pUrl;
+          } catch (e) {
+            Logger.log('Drive photo upload error for student: ' + e.toString());
+          }
+        }
         rows.push([
           s.roll || 'DC-101',
           s.name || 'Student Name',
@@ -2384,7 +2454,8 @@ function syncReadableSheets(ss, data) {
           paid,
           balance,
           balance <= 0 ? 'Fully Paid' : (s.dueDate || '2026-10-25'),
-          s.lastReminder || 'Never'
+          s.lastReminder || 'Never',
+          pUrl || ''
         ]);
       });
       stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
@@ -2406,10 +2477,20 @@ function syncReadableSheets(ss, data) {
     {
       let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
       teachSheet.clear();
-      const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
+      const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience', 'Photo URL'];
       const trRows = [trHeaders];
       const teachList = getAllRecords_('teachers');
       teachList.forEach(function(tr) {
+        let pUrl = tr.photoUrl || tr.photo || '';
+        if (pUrl && pUrl.startsWith('data:image')) {
+          try {
+            pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'teacher_' + (tr.id || 'faculty'), tr.name);
+            tr.photo = pUrl;
+            tr.photoUrl = pUrl;
+          } catch (e) {
+            Logger.log('Drive photo upload error for teacher: ' + e.toString());
+          }
+        }
         trRows.push([
           tr.id || '',
           tr.name || '',
@@ -2419,7 +2500,8 @@ function syncReadableSheets(ss, data) {
           tr.status || 'Active',
           tr.phone || '',
           tr.qualification || '',
-          tr.experience || ''
+          tr.experience || '',
+          pUrl || ''
         ]);
       });
       teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
@@ -2444,7 +2526,7 @@ function syncReadableSheets(ss, data) {
       const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
       const bRows = [bHeaders];
       const batchList = getAllRecords_('batches');
-      batchList.forEach(function(b) {
+      batchList.forEach(function (b) {
         bRows.push([
           b.id || '',
           b.name || '',
@@ -2467,17 +2549,17 @@ function syncReadableSheets(ss, data) {
       const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Conducted Date', 'Max Marks', 'Assigned Batch', 'Top Performer', 'Highest Score', 'Batch Average'];
       const tRows = [tHeaders];
       const studentMap = {};
-      (data.students || []).forEach(function(s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
+      (data.students || []).forEach(function (s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
       const batchMap = {};
-      (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
+      (data.batches || []).forEach(function (b) { batchMap[b.id] = b.name; });
       const testList = getAllRecords_('offlineTests');
-      testList.forEach(function(t) {
+      testList.forEach(function (t) {
         const marks = t.marks || {};
         let topScorer = '-';
         let topScore = 0;
         let totalScore = 0;
         let count = 0;
-        Object.keys(marks).forEach(function(sid) {
+        Object.keys(marks).forEach(function (sid) {
           const entry = marks[sid] || {};
           const sc = Number(entry.score) || 0;
           if (sc >= topScore) {
@@ -2512,7 +2594,7 @@ function syncReadableSheets(ss, data) {
       const fbHeaders = ['Author Name', 'Role (Parent/Student)', 'Batch', 'Category', 'Rating (Stars)', 'Date', 'Feedback Comment'];
       const fbRows = [fbHeaders];
       const fbList = getAllRecords_('feedbacks');
-      fbList.forEach(function(f) {
+      fbList.forEach(function (f) {
         fbRows.push([
           f.authorName || '',
           f.role || '',
@@ -2535,10 +2617,10 @@ function syncReadableSheets(ss, data) {
       const mHeaders = ['Material ID', 'Title', 'Batch Name', 'Category', 'Upload Date', 'Uploaded By', 'File Size', 'Downloads', 'Description', 'Download URL', 'Google Drive Link'];
       const mRows = [mHeaders];
       const batchMap = {};
-      (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-      
+      (data.batches || []).forEach(function (b) { batchMap[b.id] = b.name; });
+
       const matList = getAllRecords_('materials');
-      matList.forEach(function(m) {
+      matList.forEach(function (m) {
         mRows.push([
           m.id || '',
           m.title || '',
@@ -2565,7 +2647,7 @@ function syncReadableSheets(ss, data) {
       const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
       const gRows = [gHeaders];
       const galList = getAllRecords_('gallery');
-      galList.forEach(function(g) {
+      galList.forEach(function (g) {
         gRows.push([
           g.id || '',
           g.title || '',
@@ -2590,7 +2672,7 @@ function syncReadableSheets(ss, data) {
       linkSheet.clear();
       const lHeaders = ['Link ID', 'Resource Title', 'Provider / Portal', 'Subject Tag', 'External URL', 'Google Drive Shortcut Link', 'Description', 'Date Added'];
       const lRows = [lHeaders];
-      (data.externalLinks || []).forEach(function(l) {
+      (data.externalLinks || []).forEach(function (l) {
         lRows.push([
           l.id || '',
           l.title || '',
@@ -2658,7 +2740,7 @@ function syncReadableSheets(ss, data) {
 
 function apiUpdateStudentAuth(studentId, newPassword, newStatus) {
   const data = apiGetInitialData();
-  const student = (data.students || []).find(function(s) { return s.id === studentId; });
+  const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
   if (newPassword) student.password = String(newPassword).trim();
   if (newStatus) {
@@ -2673,7 +2755,7 @@ function apiUpdateStudentAuth(studentId, newPassword, newStatus) {
  */
 function apiUpdateTeacherAuth(teacherId, newPassword, newStatus) {
   const data = apiGetInitialData();
-  const teacher = (data.teachers || []).find(function(t) { return t.id === teacherId; });
+  const teacher = (data.teachers || []).find(function (t) { return t.id === teacherId; });
   if (!teacher) return { success: false, message: 'Teacher not found' };
   if (newPassword) teacher.password = String(newPassword).trim();
   if (newStatus) {
@@ -2688,7 +2770,7 @@ function apiUpdateTeacherAuth(teacherId, newPassword, newStatus) {
  */
 function apiUpdateStudentProfile(studentId, profileData) {
   const data = apiGetInitialData();
-  const student = (data.students || []).find(function(s) { return s.id === studentId; });
+  const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
   if (profileData) {
     if (profileData.name !== undefined) student.name = String(profileData.name).trim();
@@ -2700,13 +2782,13 @@ function apiUpdateStudentProfile(studentId, profileData) {
     if (profileData.paidFee !== undefined) student.paidFee = Number(profileData.paidFee) || 0;
     if (profileData.dueDate !== undefined) student.dueDate = String(profileData.dueDate).trim();
     if (profileData.status !== undefined) student.status = String(profileData.status).trim();
-    
+
     if (profileData.photo !== undefined) student.photo = profileData.photo;
-    
+
     // Batch re-assignment if specified
     if (profileData.batchId !== undefined) {
-      (data.batches || []).forEach(function(b) {
-        b.studentIds = (b.studentIds || []).filter(function(id) { return id !== studentId; });
+      (data.batches || []).forEach(function (b) {
+        b.studentIds = (b.studentIds || []).filter(function (id) { return id !== studentId; });
         if (b.id === profileData.batchId && student.status !== 'Inactive') {
           b.studentIds.push(studentId);
         }
@@ -2721,9 +2803,14 @@ function apiUpdateStudentProfile(studentId, profileData) {
  */
 function apiUpdateStudentPhoto(studentId, photoDataUrl) {
   const data = apiGetInitialData();
-  const student = (data.students || []).find(function(s) { return s.id === studentId; });
+  const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
-  student.photo = photoDataUrl;
+  let finalUrl = photoDataUrl || '';
+  if (photoDataUrl && photoDataUrl.startsWith('data:image')) {
+    finalUrl = uploadPhotoToDeveloperDrive_(photoDataUrl, 'student_' + (student.roll || student.id), student.name);
+  }
+  student.photo = finalUrl;
+  student.photoUrl = finalUrl;
   return apiSyncAllData(data);
 }
 
@@ -2732,12 +2819,12 @@ function apiUpdateStudentPhoto(studentId, photoDataUrl) {
  */
 function apiUpdateTeacherProfile(teacherId, profileData) {
   const data = apiGetInitialData();
-  const teacher = (data.teachers || []).find(function(t) { return t.id === teacherId; });
+  const teacher = (data.teachers || []).find(function (t) { return t.id === teacherId; });
   if (!teacher) return { success: false, message: 'Teacher not found' };
   if (profileData) {
     if (profileData.name !== undefined) {
       teacher.name = String(profileData.name).trim();
-      teacher.initials = teacher.name.split(' ').map(function(n) { return n[0]; }).join('').slice(0, 2).toUpperCase();
+      teacher.initials = teacher.name.split(' ').map(function (n) { return n[0]; }).join('').slice(0, 2).toUpperCase();
     }
     if (profileData.email !== undefined) teacher.email = String(profileData.email).trim();
     if (profileData.subject !== undefined) teacher.subject = String(profileData.subject).trim();
@@ -2748,6 +2835,14 @@ function apiUpdateTeacherProfile(teacherId, profileData) {
     if (profileData.bio !== undefined) teacher.bio = String(profileData.bio).trim();
     if (profileData.password !== undefined) teacher.password = String(profileData.password).trim();
     if (profileData.status !== undefined) teacher.status = String(profileData.status).trim();
+    if (profileData.photo !== undefined) {
+      let finalPhotoUrl = profileData.photo || '';
+      if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image')) {
+        finalPhotoUrl = uploadPhotoToDeveloperDrive_(finalPhotoUrl, 'teacher_' + (teacher.id || 'faculty'), teacher.name);
+      }
+      teacher.photo = finalPhotoUrl;
+      teacher.photoUrl = finalPhotoUrl;
+    }
   }
   return apiSyncAllData(data);
 }

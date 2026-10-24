@@ -777,13 +777,15 @@
             });
             showToast('All Demo Data ENABLED: Demo records restored and written to Google Sheets.', 'success');
         } else {
+            state.settings.showDummyData = false;
+            state.settings.demoDataPermanentlyDisabled = true;
             ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
                 state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
             });
-            showToast('All Demo Data DISABLED: Demo records deleted completely from Google Sheets.', 'info');
+            showToast('All Demo Data DISABLED: Demo records permanently deleted from Google Sheets.', 'info');
         }
 
-        saveStateLocally();
+        saveStateLocally(false, true);
         updateRoleUI();
         renderSidebar();
         renderMainContent();
@@ -1235,6 +1237,37 @@
         return escapeHtml(str);
     }
 
+    function isRequirementLabelsEnabled() {
+        if (!state || !state.settings) return false;
+        // When demo data is disabled or requirement labels is off, disable all demo/req badges for admin, teacher & student
+        if (state.settings.showDummyData === false) return false;
+        if (state.settings.showRequirementLabels === false) return false;
+        return true;
+    }
+
+    function formatPhotoUrl(url) {
+        if (!url || typeof url !== 'string') return '';
+        const trimmed = url.trim();
+        if (!trimmed) return '';
+        if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+
+        let fileId = '';
+        let m = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (m) fileId = m[1];
+        if (!fileId) {
+            m = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (m) fileId = m[1];
+        }
+        if (!fileId) {
+            m = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (m) fileId = m[1];
+        }
+        if (fileId) {
+            return `https://lh3.googleusercontent.com/d/${fileId}`;
+        }
+        return trimmed;
+    }
+
     let autoSyncTimer = null;
 
     function updateSyncBadge(text, status) {
@@ -1269,6 +1302,14 @@
             });
         }
         state = Object.assign(state, remoteData);
+        // USER RULE: If developer disabled demo data, never allow remote dummy records to enter state
+        if (state.settings && (state.settings.showDummyData === false || state.settings.demoDataPermanentlyDisabled === true)) {
+            state.settings.showDummyData = false;
+            state.settings.demoDataPermanentlyDisabled = true;
+            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
+                state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
+            });
+        }
         state.notifications = Array.from(notifMap.values()).filter(function (n) {
             return n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_'));
         });
@@ -1278,9 +1319,11 @@
         updateNotificationBadge();
     }
 
-    function autoSyncToDatabase() {
+    function autoSyncToDatabase(immediate) {
         if (autoSyncTimer) clearTimeout(autoSyncTimer);
         updateSyncBadge('Syncing to Google Sheet...', 'syncing');
+
+        const delay = immediate ? 0 : 50; // Ultra-fast auto-sync as soon as data is added
 
         autoSyncTimer = setTimeout(function () {
             if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -1312,11 +1355,19 @@
                     updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
                 });
             }
-        }, 400);
+        }, delay);
     }
     const autoSyncToGoogleSheet = autoSyncToDatabase;
 
-    function saveStateLocally(skipRemoteSync) {
+    function saveStateLocally(skipRemoteSync, immediate) {
+        // Enforce demo data purge if disabled by developer
+        if (state.settings && (state.settings.showDummyData === false || state.settings.demoDataPermanentlyDisabled === true)) {
+            state.settings.showDummyData = false;
+            state.settings.demoDataPermanentlyDisabled = true;
+            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
+                state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
+            });
+        }
         try {
             const safeMaterials = (state.materials || []).map(function (m) {
                 if (m && m.downloadUrl && m.downloadUrl.length > 400000) {
@@ -1344,8 +1395,8 @@
         }
 
         if (!skipRemoteSync) {
-            // Real-time automatic Cloud Database & Google Sheet persistence
-            autoSyncToDatabase();
+            // Real-time automatic Cloud Database & Google Sheet persistence as soon as data is added
+            autoSyncToDatabase(immediate !== false);
         }
     }
 
@@ -1747,20 +1798,22 @@
                         </div>
                     `;
             } else if (state.currentRole === 'admin') {
+                const showReq = isRequirementLabelsEnabled();
                 roleBanner.innerHTML = `
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span><strong>Admin Mode Active:</strong> Student Fees Management & Automated Reminder Buttons are visible. You can also manage batches, gallery banners, and materials.</span>
+                            <span><strong>Admin Mode Active:</strong> Student Fees Management & Automated Payment Reminders are active. Batch management, gallery banners, and materials are accessible.</span>
                         </div>
-                        <span class="text-[11px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">Req #2 & #5 Enabled</span>
+                        ${showReq ? `<span class="text-[11px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">Req #2 & #5 Enabled</span>` : `<span class="text-[11px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">Admin Portal</span>`}
                     `;
             } else if (state.currentRole === 'teacher') {
+                const showReq = isRequirementLabelsEnabled();
                 roleBanner.innerHTML = `
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                            <span><strong>Teacher Mode Active:</strong> Student Fees are strictly hidden (Req #2). You can manage batches, upload assignments/worksheets, and enter offline test marks.</span>
+                            <span><strong>Teacher Mode Active:</strong> Student Fees are strictly confidential${showReq ? ' (Req #2)' : ''}. You can manage batches, upload assignments/worksheets, and enter offline test marks.</span>
                         </div>
-                        <span class="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">Fees Hidden from Teacher</span>
+                        <span class="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">Faculty Portal</span>
                     `;
             } else {
                 const currentStudent = state.students.find(s => s.id === state.activeStudentId && s.status !== 'Inactive') || state.students.find(s => s.status !== 'Inactive') || state.students[0];
@@ -1768,7 +1821,7 @@
                 roleBanner.innerHTML = `
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full ${isCurBlocked ? 'bg-rose-500 animate-ping' : 'bg-sky-500'}"></span>
-                            <span><strong>Student / Parent Mode:</strong> Logged in as <strong>${currentStudent.name}</strong> (${currentStudent.roll}). ${isCurBlocked ? '<span class="text-rose-700 font-bold bg-rose-100 px-2 py-0.5 rounded ml-1">🚫 ACCESS BLOCKED BY ADMIN</span>' : 'Download assignments, track offline test marks, view teacher profiles, and submit feedback.'}</span>
+                            <span><strong>Student / Parent Mode:</strong> Logged in as <strong>${escapeHtml(currentStudent ? currentStudent.name : 'Student')}</strong> (${escapeHtml(currentStudent ? currentStudent.roll : '')}). ${isCurBlocked ? '<span class="text-rose-700 font-bold bg-rose-100 px-2 py-0.5 rounded ml-1">🚫 ACCESS BLOCKED BY ADMIN</span>' : 'Download assignments, track offline test marks, view teacher profiles, and submit feedback.'}</span>
                         </div>
                         <span class="text-[11px] font-semibold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md">Student Portal</span>
                     `;
@@ -1886,7 +1939,7 @@
         let title = rawTitle;
         let subtitle = rawSubtitle;
         // Client demo mode: strip "Requirement #N:" tags from page headers when OFF
-        if (state.settings && state.settings.showRequirementLabels === false) {
+        if (!isRequirementLabelsEnabled()) {
             subtitle = subtitle.replace(/^Requirement\s*[^:]*:\s*/i, '');
         }
         if (titleEl) titleEl.textContent = title;
@@ -2102,8 +2155,8 @@
                     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
                             <div>
-                                <h2 class="text-base font-bold text-slate-900">10-Point Institute Requirement Hub</h2>
-                                <p class="text-xs text-slate-500">Every module below is connected to your data and role permissions</p>
+                                <h2 class="text-base font-bold text-slate-900">${isRequirementLabelsEnabled() ? '10-Point Institute Requirement Hub' : 'Institute Core Modules & Navigation'}</h2>
+                                <p class="text-xs text-slate-500">${isRequirementLabelsEnabled() ? 'Every module below is connected to your data and role permissions' : 'Quickly access and manage all coaching operations and student services'}</p>
                             </div>
                             <span class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-700 self-start sm:self-auto">
                                 Mode: <strong class="capitalize text-indigo-600">${state.currentRole}</strong>
@@ -2206,7 +2259,7 @@
                     <!-- Requirement 7 Highlight Banner: Social Media Links -->
                     <div class="bg-gradient-to-r from-indigo-700 via-violet-700 to-purple-800 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
                         <div>
-                            <span class="text-[10px] tracking-wide font-bold bg-white/20 px-2.5 py-1 rounded-full">Requirement #7 • Social Media Channels</span>
+                            <span class="text-[10px] tracking-wide font-bold bg-white/20 px-2.5 py-1 rounded-full">${isRequirementLabelsEnabled() ? 'Requirement #7 • Social Media Channels' : 'Official Social Media Channels'}</span>
                             <h3 class="text-lg font-bold mt-2">Connect With Divine Classes on Official Channels</h3>
                             <p class="text-xs text-indigo-100 mt-1">Watch free YouTube concept marathons, topper interviews on Instagram, and daily exam schedules on Facebook.</p>
                         </div>
@@ -2801,6 +2854,65 @@
         showToast('Photo cleared. Click "Save Changes" to apply.', 'info');
     }
 
+    function handleEditStudentPhotoUrlChange(val) {
+        const trimmed = (val || '').trim();
+        const hiddenInput = document.getElementById('edit-stu-photo-val');
+        const previewContainer = document.getElementById('edit-stu-photo-preview');
+        if (hiddenInput) hiddenInput.value = trimmed;
+        if (previewContainer) {
+            if (trimmed) {
+                previewContainer.innerHTML = `<img src="${formatPhotoUrl(trimmed)}" class="w-full h-full object-cover">`;
+            } else {
+                previewContainer.innerHTML = `<i class="fa-solid fa-user text-slate-300 text-xl"></i>`;
+            }
+        }
+    }
+
+    async function handleEditTeacherPhotoPick(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+            const photoDataUrl = await processImageUpload(file);
+            const hiddenInput = document.getElementById('edit-tch-photo-val');
+            const previewContainer = document.getElementById('edit-tch-photo-preview');
+            const urlInput = document.getElementById('edit-tch-photo-url-input');
+            if (hiddenInput) hiddenInput.value = photoDataUrl;
+            if (urlInput) urlInput.value = '';
+            if (previewContainer) {
+                previewContainer.innerHTML = `<img src="${photoDataUrl}" class="w-full h-full object-cover">`;
+            }
+            showToast('Faculty photo selected! Click "Save Faculty Record" to save.', 'success');
+        } catch (err) {
+            showToast('Failed to load image: ' + err, 'error');
+        }
+    }
+
+    function handleEditTeacherPhotoRemove() {
+        const hiddenInput = document.getElementById('edit-tch-photo-val');
+        const previewContainer = document.getElementById('edit-tch-photo-preview');
+        const urlInput = document.getElementById('edit-tch-photo-url-input');
+        if (hiddenInput) hiddenInput.value = '';
+        if (urlInput) urlInput.value = '';
+        if (previewContainer) {
+            previewContainer.innerHTML = `<i class="fa-solid fa-chalkboard-user text-slate-300 text-xl"></i>`;
+        }
+        showToast('Photo cleared. Click "Save Faculty Record" to apply.', 'info');
+    }
+
+    function handleEditTeacherPhotoUrlChange(val) {
+        const trimmed = (val || '').trim();
+        const hiddenInput = document.getElementById('edit-tch-photo-val');
+        const previewContainer = document.getElementById('edit-tch-photo-preview');
+        if (hiddenInput) hiddenInput.value = trimmed;
+        if (previewContainer) {
+            if (trimmed) {
+                previewContainer.innerHTML = `<img src="${formatPhotoUrl(trimmed)}" class="w-full h-full object-cover">`;
+            } else {
+                previewContainer.innerHTML = `<i class="fa-solid fa-chalkboard-user text-slate-300 text-xl"></i>`;
+            }
+        }
+    }
+
     function openEditStudentModal(studentId) {
         if (state.currentRole !== 'admin') {
             showToast('Only Admin can edit student records.', 'error');
@@ -2833,15 +2945,15 @@
                     <div class="flex items-center gap-3.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
                         <div id="edit-stu-photo-preview" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-200 bg-white flex items-center justify-center shrink-0 shadow-2xs">
                             ${stu.photo ? `
-                                <img src="${stu.photo}" class="w-full h-full object-cover">
+                                <img src="${formatPhotoUrl(stu.photo)}" class="w-full h-full object-cover">
                             ` : `
                                 <span class="text-indigo-600 font-bold text-lg">${stu.name.split(' ').map(n => n[0]).join('')}</span>
                             `}
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Student Passport Photo</p>
-                            <p class="text-[11px] text-slate-400">Used for ID Card, roster, and portal.</p>
-                            <div class="flex items-center gap-2 mt-1.5">
+                            <p class="text-[11px] text-slate-400">Stored in Developer Google Drive • Mirrored in Sheet.</p>
+                            <div class="flex flex-wrap items-center gap-2 mt-1.5">
                                 <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition inline-flex items-center gap-1 shadow-2xs">
                                     <i class="fa-solid fa-camera"></i>
                                     <span>Upload Photo</span>
@@ -2850,6 +2962,9 @@
                                 <button type="button" onclick="handleEditStudentPhotoRemove()" class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
                                     Remove
                                 </button>
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" id="edit-stu-photo-url-input" placeholder="Or paste Google Drive Photo link..." value="${escapeAttr(stu.photo && !stu.photo.startsWith('data:') ? stu.photo : '')}" oninput="handleEditStudentPhotoUrlChange(this.value)" class="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-mono text-[11px] bg-white">
                             </div>
                             <input type="hidden" id="edit-stu-photo-val" value="${escapeAttr(stu.photo || '')}">
                         </div>
@@ -3014,6 +3129,37 @@
                 </div>
 
                 <form onsubmit="handleSaveEditTeacher(event, '${tch.id}')" class="py-4 space-y-3.5 text-xs">
+                    <!-- Faculty Photo Card -->
+                    <div class="flex items-center gap-3.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                        <div id="edit-tch-photo-preview" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-200 bg-white flex items-center justify-center shrink-0 shadow-2xs">
+                            ${tch.photo ? `
+                                <img src="${formatPhotoUrl(tch.photo)}" class="w-full h-full object-cover">
+                            ` : `
+                                <div class="w-full h-full bg-gradient-to-tr ${tch.avatarColor || 'from-indigo-600 to-blue-600'} text-white flex items-center justify-center font-bold text-base">
+                                    ${escapeHtml(tch.initials || tch.name.slice(0, 2))}
+                                </div>
+                            `}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-bold text-slate-800">Faculty Member Photo</p>
+                            <p class="text-[11px] text-slate-400">Stored in Developer Google Drive • Mirrored in Sheet.</p>
+                            <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                                <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition inline-flex items-center gap-1 shadow-2xs">
+                                    <i class="fa-solid fa-camera"></i>
+                                    <span>Upload Photo</span>
+                                    <input type="file" accept="image/*" class="hidden" onchange="handleEditTeacherPhotoPick(event)">
+                                </label>
+                                <button type="button" onclick="handleEditTeacherPhotoRemove()" class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
+                                    Remove
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" id="edit-tch-photo-url-input" placeholder="Or paste Google Drive Photo link..." value="${escapeAttr(tch.photo && !tch.photo.startsWith('data:') ? tch.photo : '')}" oninput="handleEditTeacherPhotoUrlChange(this.value)" class="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-mono text-[11px] bg-white">
+                            </div>
+                            <input type="hidden" id="edit-tch-photo-val" value="${escapeAttr(tch.photo || '')}">
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Faculty Full Name *</label>
@@ -3096,7 +3242,8 @@
         const status = document.getElementById('edit-tch-status').value;
         const specialization = document.getElementById('edit-tch-spec').value.trim();
         const bio = document.getElementById('edit-tch-bio').value.trim();
-        const password = document.getElementById('edit-tch-pwd').value.trim();
+        const photoVal = document.getElementById('edit-tch-photo-val');
+        const photo = photoVal ? photoVal.value : (tch.photo || '');
 
         tch.name = name;
         tch.email = email;
@@ -3108,6 +3255,8 @@
         tch.specialization = specialization;
         tch.bio = bio;
         tch.password = password || 'teacher123';
+        tch.photo = photo;
+        tch.photoUrl = photo;
         tch.initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
         saveStateLocally();
@@ -3120,7 +3269,7 @@
                     showToast(`Faculty ${name} updated in Google Sheet & Database!`, 'success');
                 })
                 .apiUpdateTeacherProfile(teacherId, {
-                    name, email, subject, qualification, experience, phone, status, specialization, bio, password
+                    name, email, subject, qualification, experience, phone, status, specialization, bio, password, photo
                 });
         } else {
             showToast(`Faculty ${name} updated successfully!`, 'success');
@@ -3147,7 +3296,7 @@
                                 <i class="fa-solid fa-lock"></i>
                             </div>
                             <div>
-                                <p class="text-xs font-semibold tracking-wide text-emerald-300">Requirement #2 & #5 • Admin Confidential Fee Ledger</p>
+                                <p class="text-xs font-semibold tracking-wide text-emerald-300">${isRequirementLabelsEnabled() ? 'Requirement #2 & #5 • Admin Confidential Fee Ledger' : 'Admin Confidential Fee Ledger'}</p>
                                 <p class="text-xs text-emerald-100/90">Fee records are strictly hidden from Teachers and Students. Send instant WhatsApp/SMS reminders to parents below.</p>
                             </div>
                         </div>
@@ -3190,7 +3339,7 @@
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
-                                <h3 class="text-sm font-bold text-slate-900 font-heading">Student Fee Ledger & Automated Reminders (Req #5)</h3>
+                                <h3 class="text-sm font-bold text-slate-900 font-heading">Student Fee Ledger & Automated Reminders ${isRequirementLabelsEnabled() ? '<span class="text-xs font-normal text-slate-500">(Req #5)</span>' : ''}</h3>
                                 <p class="text-xs text-slate-500">Click WhatsApp or SMS reminder buttons to notify parent immediately</p>
                             </div>
                             <button onclick="exportFeesToCSV()" class="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto">
@@ -3207,7 +3356,7 @@
                                         <th class="py-3.5 px-4">Paid</th>
                                         <th class="py-3.5 px-4">Pending Balance</th>
                                         <th class="py-3.5 px-4">Status / Due Date</th>
-                                        <th class="py-3.5 px-4 text-right">Reminder Actions (Req #5)</th>
+                                        <th class="py-3.5 px-4 text-right">Reminder Actions ${isRequirementLabelsEnabled() ? '<span class="text-[11px] font-normal text-slate-400">(Req #5)</span>' : ''}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-xs">
@@ -3223,7 +3372,7 @@
                                                 <td class="py-3.5 px-4">
                                                     <div class="flex items-center gap-2.5">
                                                         ${stu.photo ? `
-                                                            <img src="${stu.photo}" alt="${escapeHtml(stu.name)}" class="w-8 h-8 rounded-full object-cover border border-indigo-200 shrink-0">
+                                                            <img src="${formatPhotoUrl(stu.photo)}" alt="${escapeHtml(stu.name)}" class="w-8 h-8 rounded-full object-cover border border-indigo-200 shrink-0">
                                                         ` : `
                                                             <div class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-bold text-xs flex items-center justify-center shrink-0">
                                                                 ${stu.name.split(' ').map(n => n[0]).join('')}
@@ -4937,7 +5086,7 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                         <div>
                             <h2 class="text-base font-bold text-slate-900 font-heading">Meet Our Mentor Faculty (${visibleTeachers.length})</h2>
-                            <p class="text-xs text-slate-500">Requirement #6: Complete teacher profiles, academic qualifications, and doubt-solving timings visible to all students.</p>
+                            <p class="text-xs text-slate-500">${isRequirementLabelsEnabled() ? 'Requirement #6: Complete teacher profiles, academic qualifications, and doubt-solving timings visible to all students.' : 'Complete faculty profiles, academic qualifications, and doubt-solving timings visible to all students.'}</p>
                         </div>
                         ${state.currentRole === 'admin' ? `
                         <button onclick="openAddTeacherModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
@@ -4950,9 +5099,13 @@
                         ${visibleTeachers.map(t => `
                             <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition flex flex-col justify-between">
                                 <div class="flex items-start gap-4">
-                                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br ${t.avatarColor} text-white font-bold text-xl flex items-center justify-center shrink-0 shadow-md">
-                                        ${t.initials}
-                                    </div>
+                                    ${t.photo ? `
+                                        <img src="${formatPhotoUrl(t.photo)}" alt="${escapeHtml(t.name)}" class="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shrink-0 shadow-md">
+                                    ` : `
+                                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br ${t.avatarColor || 'from-indigo-600 to-blue-600'} text-white font-bold text-xl flex items-center justify-center shrink-0 shadow-md">
+                                            ${escapeHtml(t.initials || t.name.slice(0, 2))}
+                                        </div>
+                                    `}
                                     <div class="flex-1">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <h3 class="text-base font-bold text-slate-900 font-heading">${t.name}</h3>
@@ -5041,6 +5194,31 @@
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <form onsubmit="handleAddTeacher(event)" class="space-y-3 mt-4">
+                    <!-- Faculty Photo Card -->
+                    <div class="flex items-center gap-3.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                        <div id="add-tch-photo-preview" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-200 bg-white flex items-center justify-center shrink-0 shadow-2xs">
+                            <i class="fa-solid fa-chalkboard-user text-slate-300 text-xl"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-bold text-slate-800">Faculty Member Photo</p>
+                            <p class="text-[11px] text-slate-400">Stored in Developer Google Drive • Mirrored in Sheet.</p>
+                            <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                                <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition inline-flex items-center gap-1 shadow-2xs">
+                                    <i class="fa-solid fa-camera"></i>
+                                    <span>Upload Photo</span>
+                                    <input type="file" accept="image/*" class="hidden" onchange="handleAddTeacherPhotoPick(event)">
+                                </label>
+                                <button type="button" onclick="handleAddTeacherPhotoRemove()" class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
+                                    Remove
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" id="add-tch-photo-url-input" placeholder="Or paste Google Drive Photo link..." oninput="handleAddTeacherPhotoUrlChange(this.value)" class="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-mono text-[11px] bg-white">
+                            </div>
+                            <input type="hidden" id="tr-photo-val" value="">
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Teacher Name *</label>
@@ -5078,10 +5256,56 @@
         openModal(modal);
     }
 
+    async function handleAddTeacherPhotoPick(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+            const photoDataUrl = await processImageUpload(file);
+            const hiddenInput = document.getElementById('tr-photo-val');
+            const previewContainer = document.getElementById('add-tch-photo-preview');
+            const urlInput = document.getElementById('add-tch-photo-url-input');
+            if (hiddenInput) hiddenInput.value = photoDataUrl;
+            if (urlInput) urlInput.value = '';
+            if (previewContainer) {
+                previewContainer.innerHTML = `<img src="${photoDataUrl}" class="w-full h-full object-cover">`;
+            }
+            showToast('Faculty photo selected!', 'success');
+        } catch (err) {
+            showToast('Failed to load image: ' + err, 'error');
+        }
+    }
+
+    function handleAddTeacherPhotoRemove() {
+        const hiddenInput = document.getElementById('tr-photo-val');
+        const previewContainer = document.getElementById('add-tch-photo-preview');
+        const urlInput = document.getElementById('add-tch-photo-url-input');
+        if (hiddenInput) hiddenInput.value = '';
+        if (urlInput) urlInput.value = '';
+        if (previewContainer) {
+            previewContainer.innerHTML = `<i class="fa-solid fa-chalkboard-user text-slate-300 text-xl"></i>`;
+        }
+    }
+
+    function handleAddTeacherPhotoUrlChange(val) {
+        const trimmed = (val || '').trim();
+        const hiddenInput = document.getElementById('tr-photo-val');
+        const previewContainer = document.getElementById('add-tch-photo-preview');
+        if (hiddenInput) hiddenInput.value = trimmed;
+        if (previewContainer) {
+            if (trimmed) {
+                previewContainer.innerHTML = `<img src="${formatPhotoUrl(trimmed)}" class="w-full h-full object-cover">`;
+            } else {
+                previewContainer.innerHTML = `<i class="fa-solid fa-chalkboard-user text-slate-300 text-xl"></i>`;
+            }
+        }
+    }
+
     function handleAddTeacher(e) {
         e.preventDefault();
         const name = document.getElementById('tr-name').value.trim();
         const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const photoVal = document.getElementById('tr-photo-val');
+        const photo = photoVal ? photoVal.value.trim() : '';
         state.teachers.push({
             id: 'tr' + Date.now(),
             name,
@@ -5092,7 +5316,9 @@
             bio: document.getElementById('tr-bio').value.trim(),
             email: 'faculty@divineclasses.in',
             avatarColor: 'from-rose-500 to-orange-500',
-            initials
+            initials,
+            photo: photo,
+            photoUrl: photo
         });
         saveStateLocally();
         closeModal();
@@ -5109,7 +5335,7 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                         <div>
                             <h2 class="text-base font-bold text-slate-900 font-heading">Hall of Fame: Result Banners & Coaching Gallery</h2>
-                            <p class="text-xs text-slate-500">Requirement #8: Admin can share previous year result banners and institute event photographs.</p>
+                            <p class="text-xs text-slate-500">${isRequirementLabelsEnabled() ? 'Requirement #8: Admin can share previous year result banners and institute event photographs.' : 'Previous year result banners, topper felicitations, and coaching event photographs.'}</p>
                         </div>
                         ${state.currentRole === 'admin' ? `
                         <button onclick="openAddGalleryModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
@@ -5234,7 +5460,7 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                         <div>
                             <h2 class="text-base font-bold text-slate-900 font-heading">External Study Material & Reference Portals</h2>
-                            <p class="text-xs text-slate-500">Requirement #9: Direct link buttons for curated study material from external educational websites.</p>
+                            <p class="text-xs text-slate-500">${isRequirementLabelsEnabled() ? 'Requirement #9: Direct link buttons for curated study material from external educational websites.' : 'Direct link buttons for curated study material and online resources from trusted educational websites.'}</p>
                         </div>
                         ${canAdd ? `
                         <button onclick="openAddLinkModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
@@ -5368,7 +5594,7 @@
                 <div class="fade-in grid grid-cols-1 lg:grid-cols-12 gap-6">
                     <!-- Left: Submit Feedback Form -->
                     <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs self-start">
-                        <span class="text-xs font-semibold text-indigo-600">Requirement #10</span>
+                        ${isRequirementLabelsEnabled() ? '<span class="text-xs font-semibold text-indigo-600">Requirement #10</span>' : ''}
                         <h2 class="text-base font-bold text-slate-900 mt-0.5 font-heading">Submit Parent / Student Feedback</h2>
                         <p class="text-xs text-slate-500 mt-1">We value suggestions from parents and students to continually elevate Divine Classes coaching standards.</p>
 
@@ -5546,7 +5772,7 @@
                             <div>
                                 <div class="flex flex-wrap items-center gap-2 mb-1.5">
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                        <i class="fa-solid fa-shield-halved mr-1"></i>Requirement #11 • Access Control & Passwords
+                                        <i class="fa-solid fa-shield-halved mr-1"></i>${isRequirementLabelsEnabled() ? 'Requirement #11 • Access Control & Passwords' : 'Access Control & Passwords'}
                                     </span>
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                         <i class="fa-solid fa-database mr-1"></i>Cloud Database Connected
@@ -5554,7 +5780,7 @@
                                 </div>
                                 <h2 class="text-xl font-bold font-heading">User Login & Database Authorization Management</h2>
                                 <p class="text-xs text-slate-300 max-w-2xl mt-1 leading-relaxed">
-                                    Manage student and teacher credentials in the persistent Cloud Database. Student <strong>Anil Kumar Chahar (DC-110)</strong> status is set to <strong>Blocked</strong> in the database.
+                                    Manage student and faculty credentials in the persistent Cloud Database, synchronized automatically with Google Sheets.
                                 </p>
                             </div>
 
@@ -5816,9 +6042,13 @@
                                             <tr class="hover:bg-slate-50/60 transition ${isBlocked ? 'bg-rose-50/20' : ''}">
                                                 <td class="py-3 px-4">
                                                     <div class="flex items-center gap-3">
-                                                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${tr.avatarColor || 'from-indigo-600 to-blue-600'} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                                                            ${tr.initials || tr.name.split(' ').map(n => n[0]).join('')}
-                                                        </div>
+                                                        ${tr.photo ? `
+                                                            <img src="${formatPhotoUrl(tr.photo)}" alt="${escapeHtml(tr.name)}" class="w-9 h-9 rounded-xl object-cover border border-indigo-200 shrink-0">
+                                                        ` : `
+                                                            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${tr.avatarColor || 'from-indigo-600 to-blue-600'} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                                                ${escapeHtml(tr.initials || tr.name.split(' ').map(n => n[0]).join(''))}
+                                                            </div>
+                                                        `}
                                                         <div>
                                                             <div class="font-bold text-slate-900">${tr.name}</div>
                                                             <div class="text-[11px] text-slate-500">${tr.subject}</div>
@@ -6707,7 +6937,7 @@
                                     ${inputField('upiId', 'UPI Payment ID', s.upiId, 'text', 'divineclasses@upi')}
                                 </div>
                                 <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60">
-                                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">Official Social Media Channels (Requirement #7):</label>
+                                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">${isRequirementLabelsEnabled() ? 'Official Social Media Channels (Requirement #7):' : 'Official Social Media Channels:'}</label>
                                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         ${inputField('youtubeUrl', 'YouTube URL', s.youtubeUrl, 'text', 'https://www.youtube.com/@chem_crush9')}
                                         ${inputField('instagramUrl', 'Instagram URL', s.instagramUrl, 'text', 'https://instagram.com')}
@@ -6873,6 +7103,20 @@
             state.settings.instituteName = 'Divine Classes';
         }
 
+        // USER RULE: Once dev has disabled demo data, it must NEVER be created or restored again!
+        if (state.settings.showDummyData === false) {
+            state.settings.demoDataPermanentlyDisabled = true;
+            state.settings.showRequirementLabels = false;
+            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
+                state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
+            });
+            if (state.settings.dummyDataConfig) {
+                Object.keys(state.settings.dummyDataConfig).forEach(function (dk) {
+                    state.settings.dummyDataConfig[dk] = false;
+                });
+            }
+        }
+
         // Smooth in-button feedback without re-rendering or screen shaking
         const saveBtn = document.getElementById('btn-save-settings');
         if (saveBtn) {
@@ -6880,8 +7124,8 @@
             saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving Settings...';
         }
 
-        // Persist locally and trigger debounced cloud sync
-        saveStateLocally();
+        // Persist locally and trigger immediate cloud sync
+        saveStateLocally(false, true);
         renderSidebar();
 
         showToast('All institute settings saved smoothly & synced to Cloud Database + Google Sheet!', 'success');
