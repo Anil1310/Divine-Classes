@@ -45,6 +45,50 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 2c. Save Offline Test Marks via GET (Executes with zero CORS/redirect failures from Vercel)
+    if (e && e.parameter && (e.parameter.action === 'saveTestMarks' || e.parameter.action === 'submitTestMarks' || e.parameter.action === 'submitAllMarks')) {
+      let testPayload = {};
+      if (e.parameter.data) {
+        try {
+          testPayload = JSON.parse(e.parameter.data);
+        } catch (jsonErr) {
+          testPayload = e.parameter;
+        }
+      } else {
+        testPayload = e.parameter;
+      }
+      const res = apiSaveTestMarks(testPayload);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2d. Sync Data via GET
+    if (e && e.parameter && (e.parameter.action === 'syncData' || e.parameter.action === 'saveData')) {
+      let statePayload = {};
+      if (e.parameter.data) {
+        try {
+          statePayload = JSON.parse(e.parameter.data);
+        } catch (jsonErr) {
+          statePayload = e.parameter;
+        }
+      } else {
+        statePayload = e.parameter;
+      }
+      const res = apiSyncAllData(statePayload);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 3. Regular Web App Page rendering
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
@@ -364,6 +408,17 @@ function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name, targetFolde
     Logger.log('uploadPhotoToDeveloperDrive_ error: ' + err.toString());
     return str;
   }
+}
+
+/**
+ * Safely loads the entire database from Cloud Properties or Spreadsheet
+ */
+function dbGetAll() {
+  let appData = (typeof dbLoadAll === 'function') ? dbLoadAll() : null;
+  if (!appData && typeof apiGetInitialData === 'function') {
+    appData = apiGetInitialData();
+  }
+  return appData || {};
 }
 
 /**
