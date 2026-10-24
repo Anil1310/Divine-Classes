@@ -31,7 +31,14 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
         rel="stylesheet">
     <style>
-        body {
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            position: fixed;
+            inset: 0;
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
         }
@@ -231,7 +238,7 @@
     <!-- Hidden Printable Area for Receipts & Report Cards -->
     <div id="printable-area" class="hidden"></div>
 
-    <div class="flex h-screen w-full overflow-hidden">
+    <div id="app-root" class="flex h-screen w-full overflow-hidden fixed inset-0">
         <!-- Mobile Sidebar Backdrop -->
         <div id="sidebar-backdrop" onclick="toggleMobileSidebar()"
             class="fixed inset-0 bg-slate-950/60 z-30 lg:hidden hidden backdrop-blur-2xs transition-opacity"></div>
@@ -8242,8 +8249,10 @@
                                                 </div>
                                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">When ON, Admin sees a delete trashcan button on the Feedback Wall.</p>
                                             </div>
-                                            <input type="checkbox" id="set-allowAdminFeedbackDelete" ${s.allowAdminFeedbackDelete === false ? '' : 'checked'} class="peer sr-only" aria-label="Allow Admin Feedback Delete">
-                                            <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                            <div class="relative w-11 h-6 shrink-0">
+                                                <input type="checkbox" id="set-allowAdminFeedbackDelete" ${s.allowAdminFeedbackDelete === false ? '' : 'checked'} class="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" aria-label="Allow Admin Feedback Delete">
+                                                <span class="w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 block pointer-events-none after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                            </div>
                                         </label>
 
                                         <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 cursor-pointer select-none">
@@ -8256,8 +8265,10 @@
                                                 </div>
                                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">When ON, Admin can delete external curated study links from External_Links_Hub.</p>
                                             </div>
-                                            <input type="checkbox" id="set-allowAdminLinkDelete" ${s.allowAdminLinkDelete === false ? '' : 'checked'} class="peer sr-only" aria-label="Allow Admin Study Link Delete">
-                                            <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                            <div class="relative w-11 h-6 shrink-0">
+                                                <input type="checkbox" id="set-allowAdminLinkDelete" ${s.allowAdminLinkDelete === false ? '' : 'checked'} class="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" aria-label="Allow Admin Study Link Delete">
+                                                <span class="w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 block pointer-events-none after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                            </div>
                                         </label>
                                     </div>
 
@@ -8372,8 +8383,10 @@
                                             <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Show "Requirement #N" Labels</p>
                                             <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = requirement tags appear in page headers (development view). <strong>Turn OFF before showing portal to coaching client</strong>.</p>
                                         </div>
-                                        <input type="checkbox" id="set-showRequirementLabels" ${s.showRequirementLabels === false ? '' : 'checked'} class="peer sr-only" aria-label="Show Requirement Labels">
-                                        <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        <div class="relative w-11 h-6 shrink-0">
+                                            <input type="checkbox" id="set-showRequirementLabels" ${s.showRequirementLabels === false ? '' : 'checked'} class="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" aria-label="Show Requirement Labels">
+                                            <span class="w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 block pointer-events-none after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        </div>
                                     </label>
 
                                     <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
@@ -8381,8 +8394,10 @@
                                             <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Master Switch: Show Dummy / Demo Data</p>
                                             <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = demo records active. <strong>OFF = all demo rows are wiped from Google Sheets</strong> (leaves only real data).</p>
                                         </div>
-                                        <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} class="peer sr-only" aria-label="Show Dummy Demo Data">
-                                        <span class="relative w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 shrink-0 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        <div class="relative w-11 h-6 shrink-0">
+                                            <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} class="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" aria-label="Show Dummy Demo Data">
+                                            <span class="w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 block pointer-events-none after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        </div>
                                     </label>
 
                                     <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
@@ -9234,5 +9249,17 @@
                     .catch(function () { });
             }
         });
+        // Ensure root window and app container never retain unexpected focus-scroll offset
+        window.addEventListener('scroll', function () {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        });
+        const appRootEl = document.getElementById('app-root');
+        if (appRootEl) {
+            appRootEl.addEventListener('scroll', function () {
+                if (appRootEl.scrollTop !== 0) appRootEl.scrollTop = 0;
+            });
+        }
     };
 </script>
