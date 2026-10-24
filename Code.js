@@ -911,64 +911,117 @@ function apiGetNotifications() {
   }
 }
 
+var OFFICIAL_GALLERY_BANNERS = [
+  {
+    id: 'g1',
+    title: 'Divine Classes JEE Advanced All India Top Rankers 2026',
+    category: 'Result Banner',
+    date: 'July 2026',
+    caption: 'Heartiest congratulations to our classroom achievers: AIR 42, AIR 118, and AIR 256 in JEE Advanced 2026.',
+    badge: 'AIR 42, 118, 256',
+    imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 'g2',
+    title: 'NEET Medical Selections Felicitation Ceremony',
+    category: 'Result Banner',
+    date: 'June 2026',
+    caption: '46 selections in Govt. Medical Colleges including AIIMS, MAMC, and LHMC. Highest score: 685/720.',
+    badge: '685/720 Highest',
+    imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 'g3',
+    title: 'Interactive Smart AC Classroom & Doubt Clearing Sessions',
+    category: 'Classroom Photo',
+    date: 'September 2026',
+    caption: 'Lecture Hall 101 equipped with interactive smart panels, live problem projections, and ergonomic seating.',
+    badge: 'Smart Hall 101',
+    imageUrl: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 'g4',
+    title: 'Annual Merit Scholarship & Trophy Distribution Day',
+    category: 'Event',
+    date: 'August 2026',
+    caption: 'Over ₹5 Lakhs worth of merit-cum-means scholarships awarded to meritorious students by Divine Classes management.',
+    badge: 'Annual Day',
+    imageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 'g5',
+    title: 'Intensive Sunday Full-Length Mock Test & Rank Analysis',
+    category: 'Event',
+    date: 'October 2026',
+    caption: 'Bi-weekly simulated entrance exam condition tests conducted across all Divine Classes examination halls.',
+    badge: 'Sunday Test Series',
+    imageUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80'
+  }
+];
+
+var OFFICIAL_EXTERNAL_LINKS = [
+  {
+    id: 'l1',
+    title: 'NCERT Official Portal - Free e-Textbooks (Class 6-12)',
+    provider: 'NCERT Official',
+    subject: 'Physics, Chemistry, Maths, Biology',
+    url: 'https://ncert.nic.in/textbook.php',
+    description: 'Download authentic chapter-by-chapter NCERT books and revised exemplary problems.',
+    icon: 'fa-book-open',
+    color: 'bg-blue-600'
+  },
+  {
+    id: 'l2',
+    title: 'National Digital Library of India (NDLI)',
+    provider: 'Ministry of Education & IIT Kharagpur',
+    subject: 'JEE / NEET / Olympiad',
+    url: 'https://ndl.iitkgp.ac.in/',
+    description: 'Vast repository of video lectures, solved past question archives, and academic monographs.',
+    icon: 'fa-building-columns',
+    color: 'bg-indigo-600'
+  },
+  {
+    id: 'l3',
+    title: 'Khan Academy India - Concept Mastery Modules',
+    provider: 'Khan Academy',
+    subject: 'Foundation Science & Calculus',
+    url: 'https://www.khanacademy.org/',
+    description: 'Bite-sized visual lessons, step-by-step calculus proofs, and interactive diagnostic quizzes.',
+    icon: 'fa-circle-play',
+    color: 'bg-emerald-600'
+  },
+  {
+    id: 'l4',
+    title: 'PhET Interactive STEM Laboratory Simulations',
+    provider: 'University of Colorado Boulder',
+    subject: 'Physics & Chemistry Labs',
+    url: 'https://phet.colorado.edu/',
+    description: 'Experiment with electrical circuits, wave interference, photo-electric effect, and chemical titrations virtually.',
+    icon: 'fa-flask',
+    color: 'bg-amber-600'
+  },
+  {
+    id: 'l5',
+    title: 'CBSE Academic Official Sample Papers & Marking Keys',
+    provider: 'CBSE Board',
+    subject: 'Class 10th & 12th Board Exams',
+    url: 'https://cbseacademic.nic.in/',
+    description: 'Official latest board examination blue-prints, competency-focused question banks, and answer rubrics.',
+    icon: 'fa-file-lines',
+    color: 'bg-purple-600'
+  }
+];
+
 /**
  * Seed dataset for Divine Classes (modularized via DummyData.js)
  */
 function getDefaultSeedData() {
-  if (typeof getDummySeedData === 'function') {
-    const data = getDummySeedData();
-    data.externalLinks = [
-      {
-        id: 'l1',
-        title: 'NCERT Official Portal - Free e-Textbooks (Class 6-12)',
-        provider: 'NCERT Official',
-        subject: 'Physics, Chemistry, Maths, Biology',
-        url: 'https://ncert.nic.in/textbook.php',
-        description: 'Download authentic chapter-by-chapter NCERT books and revised exemplary problems.',
-        icon: 'fa-book-open',
-        color: 'bg-blue-600'
-      },
-      {
-        id: 'l2',
-        title: 'National Digital Library of India (NDLI)',
-        provider: 'Ministry of Education & IIT Kharagpur',
-        subject: 'JEE / NEET / Olympiad',
-        url: 'https://ndl.iitkgp.ac.in/',
-        description: 'Vast repository of video lectures, solved past question archives, and academic monographs.',
-        icon: 'fa-building-columns',
-        color: 'bg-indigo-600'
-      },
-      {
-        id: 'l3',
-        title: 'Khan Academy India - Concept Mastery Modules',
-        provider: 'Khan Academy',
-        subject: 'Foundation Science & Calculus',
-        url: 'https://www.khanacademy.org/',
-        description: 'Bite-sized visual lessons, step-by-step calculus proofs, and interactive diagnostic quizzes.',
-        icon: 'fa-circle-play',
-        color: 'bg-emerald-600'
-      },
-      {
-        id: 'l4',
-        title: 'PhET Interactive STEM Laboratory Simulations',
-        provider: 'University of Colorado Boulder',
-        subject: 'Physics & Chemistry Labs',
-        url: 'https://phet.colorado.edu/',
-        description: 'Experiment with electrical circuits, wave interference, photo-electric effect, and chemical titrations virtually.',
-        icon: 'fa-flask',
-        color: 'bg-amber-600'
-      },
-      {
-        id: 'l5',
-        title: 'CBSE Academic Official Sample Papers & Marking Keys',
-        provider: 'CBSE Board',
-        subject: 'Class 10th & 12th Board Exams',
-        url: 'https://cbseacademic.nic.in/',
-        description: 'Official latest board examination blue-prints, competency-focused question banks, and answer rubrics.',
-        icon: 'fa-file-lines',
-        color: 'bg-purple-600'
-      }
-    ];
+  const data = (typeof getDummySeedData === 'function') ? getDummySeedData() : { batches: [], students: [], materials: [], offlineTests: [], teachers: [], feedbacks: [] };
+  data.externalLinks = OFFICIAL_EXTERNAL_LINKS.slice();
+  if (!Array.isArray(data.gallery) || data.gallery.length === 0) {
+    data.gallery = OFFICIAL_GALLERY_BANNERS.slice();
+  }
+  if (!data.settings) {
     data.settings = {
       instituteName: 'Divine Classes',
       tagline: 'Empowering Aspirants for JEE, NEET & Board Excellence',
@@ -997,9 +1050,8 @@ function getDefaultSeedData() {
         feedbacks: true
       }
     };
-    return data;
   }
-  return { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: [], externalLinks: [], feedbacks: [], settings: {} };
+  return data;
 }
 
 /**
@@ -1013,6 +1065,8 @@ function getDefaultSeedData() {
 
 function isDummyRecord_(rec) {
   if (!rec) return false;
+  // Gallery banners and external study links are PERMANENT institute assets — NEVER dummy!
+  if (rec.id && (String(rec.id).startsWith('g') || String(rec.id).startsWith('l'))) return false;
   if (rec.isDummy === true) return true;
   if (typeof DUMMY_SEED_ID_SET !== 'undefined' && DUMMY_SEED_ID_SET && DUMMY_SEED_ID_SET[rec.id] === true) return true;
   var fallbackIds = {
@@ -1021,14 +1075,13 @@ function isDummyRecord_(rec) {
     'm1': true, 'm2': true, 'm3': true, 'm4': true, 'm5': true,
     't1': true, 't2': true, 't3': true, 't4': true, 't5': true,
     'tr1': true, 'tr2': true, 'tr3': true, 'tr4': true, 'tr5': true,
-    'g1': true, 'g2': true, 'g3': true, 'g4': true, 'g5': true,
     'f1': true, 'f2': true, 'f3': true, 'f4': true, 'f5': true
   };
   return fallbackIds[rec.id] === true;
 }
 
 // Removes seed/demo records from the data RETURNED to clients (DB untouched).
-// externalLinks (study links) are ALWAYS kept — never stripped.
+// externalLinks and gallery banners are ALWAYS kept — never stripped.
 function isDummyForSheetEnabled_(settings, sheetKey) {
   if (!settings) return true;
   if (settings.showDummyData === false) return false;
@@ -1039,7 +1092,7 @@ function isDummyForSheetEnabled_(settings, sheetKey) {
 }
 
 // Removes seed/demo records per sheet or globally (DB untouched).
-// externalLinks (External_Links_Hub) are ALWAYS kept — never stripped or deleted!
+// externalLinks (External_Links_Hub) and gallery (Gallery_Banners) are ALWAYS kept — never stripped or deleted!
 function stripDummyData_(appData, targetTable) {
   if (!appData || !appData.settings) return appData;
   const dummyStudentIds = {};
@@ -1047,7 +1100,7 @@ function stripDummyData_(appData, targetTable) {
     if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
   });
 
-  const tbls = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'];
+  const tbls = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'feedbacks'];
   tbls.forEach(function (tbl) {
     if (!isDummyForSheetEnabled_(appData.settings, tbl) || targetTable) {
       appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
@@ -1930,15 +1983,25 @@ function mergeTestsFromSheet_(appData) {
  */
 function mergeGalleryFromSheet_(appData) {
   try {
-    const ss = getDbSpreadsheet();
-    if (!ss) return appData;
-    const sheet = ss.getSheetByName('Gallery_Banners');
-    if (!sheet) return appData;
-    const values = sheet.getDataRange().getValues();
-    if (!values || values.length <= 1) return appData;
-
+    if (!appData) appData = {};
     if (!appData.gallery) appData.gallery = [];
-    const keepIds = {};
+
+    const ss = getDbSpreadsheet();
+    if (!ss) {
+      if (appData.gallery.length === 0) appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
+      return appData;
+    }
+    const sheet = ss.getSheetByName('Gallery_Banners');
+    if (!sheet) {
+      if (appData.gallery.length === 0) appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
+      return appData;
+    }
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) {
+      if (appData.gallery.length === 0) appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
+      return appData;
+    }
+
     const tz = Session.getScriptTimeZone();
 
     for (let i = 1; i < values.length; i++) {
@@ -1974,7 +2037,6 @@ function mergeGalleryFromSheet_(appData) {
         item.caption = caption || item.caption;
         item.badge = badge || item.badge;
         if (imageUrl) item.imageUrl = imageUrl;
-        keepIds[item.id] = true;
       } else {
         const newId = id || ('g_' + Date.now().toString(36) + '_' + i);
         appData.gallery.push({
@@ -1986,15 +2048,18 @@ function mergeGalleryFromSheet_(appData) {
           badge: badge,
           imageUrl: imageUrl
         });
-        keepIds[newId] = true;
       }
     }
 
-    if (Object.keys(keepIds).length > 0) {
-      appData.gallery = appData.gallery.filter(g => keepIds[g.id]);
+    // Never leave gallery empty
+    if (appData.gallery.length === 0) {
+      appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
     }
   } catch (e) {
     Logger.log('mergeGalleryFromSheet_ error: ' + e.toString());
+    if (!appData.gallery || appData.gallery.length === 0) {
+      appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
+    }
   }
   return appData;
 }
@@ -2155,7 +2220,7 @@ function apiGetInitialData() {
 
     if (!appData) {
       if (isDemoDisabled) {
-        appData = { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: [], externalLinks: [], feedbacks: [], settings: { showDummyData: false, demoDataPermanentlyDisabled: true } };
+        appData = { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: OFFICIAL_GALLERY_BANNERS.slice(), externalLinks: OFFICIAL_EXTERNAL_LINKS.slice(), feedbacks: [], settings: { showDummyData: false, demoDataPermanentlyDisabled: true } };
       } else {
         appData = getDefaultSeedData();
       }
@@ -2172,9 +2237,12 @@ function apiGetInitialData() {
     appData = mergeLinksFromSheet_(appData);
     appData = mergeSettingsFromSheet_(appData);
 
-    // Safety: curated study portals are permanent — re-seed if list ended up empty
+    // Safety: curated study portals & gallery banners are permanent — re-seed if list ended up empty
     if (!appData.externalLinks || appData.externalLinks.length === 0) {
-      appData.externalLinks = getDefaultSeedData().externalLinks;
+      appData.externalLinks = OFFICIAL_EXTERNAL_LINKS.slice();
+    }
+    if (!appData.gallery || appData.gallery.length === 0) {
+      appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
     }
 
     // 2d. Strip manually-deleted (tombstoned) records — deletions are forever
@@ -2544,6 +2612,20 @@ function apiSyncAllData(fullData) {
     // 0b. Deletion safety: strip tombstoned (manually sheet-deleted) records
     try { applyTombstones_(fullData); } catch (tombErr) {
       Logger.log('applyTombstones_ notice: ' + tombErr.toString());
+    }
+
+    // 0c. Ensure Gallery Banners and External Links are preserved and merged from sheet
+    try {
+      fullData = mergeGalleryFromSheet_(fullData);
+      fullData = mergeLinksFromSheet_(fullData);
+      if (!Array.isArray(fullData.gallery) || fullData.gallery.length === 0) {
+        fullData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
+      }
+      if (!Array.isArray(fullData.externalLinks) || fullData.externalLinks.length === 0) {
+        fullData.externalLinks = OFFICIAL_EXTERNAL_LINKS.slice();
+      }
+    } catch (galMergeErr) {
+      Logger.log('Gallery merge in apiSyncAllData notice: ' + galMergeErr.toString());
     }
 
     // 1. Primary write: Cloud Database (instant, isolated, persistent)
@@ -2925,13 +3007,63 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
     }
 
-    // G. Sync Gallery Banners Sheet (Gallery_Banners) - All Records
+    // G. Sync Gallery Banners Sheet (Gallery_Banners) - All Records (PERMANENT - NEVER WIPED)
     {
       let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
+      let existingSheetRows = [];
+      try {
+        const vals = galSheet.getDataRange().getValues();
+        if (vals && vals.length > 1) {
+          const tz = Session.getScriptTimeZone();
+          for (let vi = 1; vi < vals.length; vi++) {
+            const vRow = vals[vi];
+            const vId = String(vRow[0] || '').trim();
+            const vTitle = String(vRow[1] || '').trim();
+            if (vId || vTitle) {
+              let vDate = vRow[3];
+              if (vDate instanceof Date && !isNaN(vDate)) {
+                vDate = Utilities.formatDate(vDate, tz, 'dd MMM yyyy');
+              } else {
+                vDate = String(vDate || '').trim();
+              }
+              existingSheetRows.push({
+                id: vId,
+                title: vTitle,
+                category: String(vRow[2] || '').trim(),
+                date: vDate,
+                caption: String(vRow[4] || '').trim(),
+                badge: String(vRow[5] || '').trim(),
+                imageUrl: String(vRow[6] || '').trim()
+              });
+            }
+          }
+        }
+      } catch (readErr) {
+        Logger.log('Reading existing Gallery_Banners notice: ' + readErr);
+      }
+
+      let galList = getAllRecords_('gallery');
+      if (!Array.isArray(galList)) galList = [];
+
+      // Merge sheet rows into galList if not already present
+      existingSheetRows.forEach(function (er) {
+        const found = galList.some(function (g) {
+          return (er.id && String(g.id || '').trim() === er.id) ||
+                 (er.title && String(g.title || '').trim().toLowerCase() === er.title.toLowerCase());
+        });
+        if (!found) {
+          galList.push(er);
+        }
+      });
+
+      // If still empty, fall back to official banners so sheet is never left empty
+      if (galList.length === 0) {
+        galList = OFFICIAL_GALLERY_BANNERS.slice();
+      }
+
       galSheet.clear();
       const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
       const gRows = [gHeaders];
-      const galList = getAllRecords_('gallery');
       galList.forEach(function (g) {
         let bannerUrl = g.imageUrl || '';
         if (bannerUrl && bannerUrl.startsWith('data:image/')) {

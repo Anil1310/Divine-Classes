@@ -36,12 +36,13 @@
         'm1': true, 'm2': true, 'm3': true, 'm4': true, 'm5': true,
         't1': true, 't2': true, 't3': true, 't4': true, 't5': true,
         'tr1': true, 'tr2': true, 'tr3': true, 'tr4': true, 'tr5': true,
-        'g1': true, 'g2': true, 'g3': true, 'g4': true, 'g5': true,
         'f1': true, 'f2': true, 'f3': true, 'f4': true, 'f5': true
     };
 
     function isDummyRecord(rec) {
         if (!rec) return false;
+        // Gallery banners and external study links are PERMANENT institute assets — NEVER dummy!
+        if (rec.id && (String(rec.id).startsWith('g') || String(rec.id).startsWith('l'))) return false;
         if (rec.isDummy === true) return true;
         if (rec.id && DUMMY_SEED_ID_SET[rec.id] === true) return true;
         return false;
@@ -373,7 +374,6 @@
             gallery: [
                 {
                     id: 'g1',
-                    isDummy: true,
                     title: 'Divine Classes JEE Advanced All India Top Rankers 2026',
                     category: 'Result Banner',
                     date: 'July 2026',
@@ -383,7 +383,6 @@
                 },
                 {
                     id: 'g2',
-                    isDummy: true,
                     title: 'NEET Medical Selections Felicitation Ceremony',
                     category: 'Result Banner',
                     date: 'June 2026',
@@ -393,7 +392,6 @@
                 },
                 {
                     id: 'g3',
-                    isDummy: true,
                     title: 'Interactive Smart AC Classroom & Doubt Clearing Sessions',
                     category: 'Classroom Photo',
                     date: 'September 2026',
@@ -403,7 +401,6 @@
                 },
                 {
                     id: 'g4',
-                    isDummy: true,
                     title: 'Annual Merit Scholarship & Trophy Distribution Day',
                     category: 'Event',
                     date: 'August 2026',
@@ -413,7 +410,6 @@
                 },
                 {
                     id: 'g5',
-                    isDummy: true,
                     title: 'Intensive Sunday Full-Length Mock Test & Rank Analysis',
                     category: 'Event',
                     date: 'October 2026',
@@ -1194,9 +1190,12 @@
                         state.notifications = parsed.notifications;
                     }
                     if (state.settings && state.settings.showDummyData === false) {
-                        ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
+                        ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'feedbacks'].forEach(function (tbl) {
                             state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
                         });
+                    }
+                    if (!state.gallery || !Array.isArray(state.gallery) || state.gallery.length === 0) {
+                        state.gallery = getDummySeedData().gallery;
                     }
                 }
             }
@@ -1404,9 +1403,12 @@
         if (state.settings && (state.settings.showDummyData === false || state.settings.demoDataPermanentlyDisabled === true)) {
             state.settings.showDummyData = false;
             state.settings.demoDataPermanentlyDisabled = true;
-            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
+            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'feedbacks'].forEach(function (tbl) {
                 state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
             });
+        }
+        if (!state.gallery || !Array.isArray(state.gallery) || state.gallery.length === 0) {
+            state.gallery = getDummySeedData().gallery;
         }
         try {
             const safeMaterials = (state.materials || []).map(function (m) {
@@ -7893,8 +7895,8 @@
                 state.materials = remoteData.materials || [];
                 state.offlineTests = remoteData.offlineTests || [];
                 state.teachers = remoteData.teachers || [];
-                state.gallery = remoteData.gallery || [];
-                state.externalLinks = remoteData.externalLinks || [];
+                state.gallery = (remoteData.gallery && remoteData.gallery.length > 0) ? remoteData.gallery : (state.gallery && state.gallery.length > 0 ? state.gallery : getDummySeedData().gallery);
+                state.externalLinks = (remoteData.externalLinks && remoteData.externalLinks.length > 0) ? remoteData.externalLinks : (state.externalLinks || []);
                 state.feedbacks = remoteData.feedbacks || [];
                 if (remoteData.settings) state.settings = Object.assign({}, state.settings, remoteData.settings);
                 saveStateLocally();
