@@ -89,6 +89,24 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 2e. Toggle Dummy / Demo Data via GET
+    if (e && e.parameter && (e.parameter.action === 'setDummyData' || e.parameter.action === 'toggleDemoData')) {
+      const target = e.parameter.target || 'all';
+      const enabled = e.parameter.enabled === 'false' ? false : true;
+      let clientState = null;
+      if (e.parameter.data) {
+        try { clientState = JSON.parse(e.parameter.data); } catch(err) { }
+      }
+      const res = apiSetDummyDataStatus(target, enabled, clientState);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 3. Regular Web App Page rendering
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
@@ -183,6 +201,16 @@ function doPost(e) {
     if (action === 'saveTestMarks' || action === 'submitTestMarks') {
       const testData = payload.data || payload;
       const result = apiSaveTestMarks(testData);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 6. Toggle Dummy / Demo Data via POST
+    if (action === 'setDummyData' || action === 'toggleDemoData') {
+      const target = payload.target || 'all';
+      const enabled = (payload.enabled !== undefined) ? !!payload.enabled : true;
+      const clientState = payload.data || payload.clientState || payload;
+      const result = apiSetDummyDataStatus(target, enabled, clientState);
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -2787,6 +2815,25 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
 }
 
 /**
+ * Ensures the Google Sheet has at least the required rows and columns
+ * so that sheet.getRange(...).setValues(...) never fails with out-of-bounds errors.
+ */
+function ensureSheetDimensions_(sheet, requiredRows, requiredCols) {
+  try {
+    const curRows = sheet.getMaxRows();
+    if (curRows < requiredRows) {
+      sheet.insertRowsAfter(curRows, requiredRows - curRows);
+    }
+    const curCols = sheet.getMaxColumns();
+    if (curCols < requiredCols) {
+      sheet.insertColumnsAfter(curCols, requiredCols - curCols);
+    }
+  } catch (err) {
+    Logger.log('ensureSheetDimensions_ error on ' + sheet.getName() + ': ' + err.toString());
+  }
+}
+
+/**
  * Generates human-friendly Google Sheets tab views for the client.
  * Respects showDummyData: when false, removes demo data and displays clean production records.
  */
@@ -2840,6 +2887,7 @@ function syncReadableSheets(ss, data) {
           pUrl || ''
         ]);
       });
+      ensureSheetDimensions_(stuSheet, rows.length, headers.length);
       stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
       stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
       for (let i = 1; i < rows.length; i++) {
@@ -2889,6 +2937,7 @@ function syncReadableSheets(ss, data) {
           pUrl || ''
         ]);
       });
+      ensureSheetDimensions_(teachSheet, trRows.length, trHeaders.length);
       teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
       teachSheet.getRange(1, 1, 1, trHeaders.length).setFontWeight('bold').setBackground('#0284c7').setFontColor('#ffffff');
       for (let i = 1; i < trRows.length; i++) {
@@ -2922,6 +2971,7 @@ function syncReadableSheets(ss, data) {
           (b.studentIds || []).length || 0
         ]);
       });
+      ensureSheetDimensions_(batchSheet, bRows.length, bHeaders.length);
       batchSheet.getRange(1, 1, bRows.length, bHeaders.length).setValues(bRows);
       batchSheet.getRange(1, 1, 1, bHeaders.length).setFontWeight('bold').setBackground('#059669').setFontColor('#ffffff');
       formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
@@ -3001,6 +3051,7 @@ function syncReadableSheets(ss, data) {
         }
       });
 
+      ensureSheetDimensions_(testSheet, tRows.length, tHeaders.length);
       testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
       testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
       formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
@@ -3024,6 +3075,7 @@ function syncReadableSheets(ss, data) {
           f.comment || ''
         ]);
       });
+      ensureSheetDimensions_(fbSheet, fbRows.length, fbHeaders.length);
       fbSheet.getRange(1, 1, fbRows.length, fbHeaders.length).setValues(fbRows);
       fbSheet.getRange(1, 1, 1, fbHeaders.length).setFontWeight('bold').setBackground('#7c3aed').setFontColor('#ffffff');
       formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
@@ -3054,6 +3106,7 @@ function syncReadableSheets(ss, data) {
           m.driveUrl || ''
         ]);
       });
+      ensureSheetDimensions_(matSheet, mRows.length, mHeaders.length);
       matSheet.getRange(1, 1, mRows.length, mHeaders.length).setValues(mRows);
       matSheet.getRange(1, 1, 1, mHeaders.length).setFontWeight('bold').setBackground('#2563eb').setFontColor('#ffffff');
       formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
@@ -3082,6 +3135,7 @@ function syncReadableSheets(ss, data) {
           bannerUrl
         ]);
       });
+      ensureSheetDimensions_(galSheet, gRows.length, gHeaders.length);
       galSheet.getRange(1, 1, gRows.length, gHeaders.length).setValues(gRows);
       galSheet.getRange(1, 1, 1, gHeaders.length).setFontWeight('bold').setBackground('#db2777').setFontColor('#ffffff');
       formatAndTrimSheet(galSheet, gHeaders.length, gRows.length, '#db2777', '#db2777');
@@ -3108,6 +3162,7 @@ function syncReadableSheets(ss, data) {
           l.dateAdded || ''
         ]);
       });
+      ensureSheetDimensions_(linkSheet, lRows.length, lHeaders.length);
       linkSheet.getRange(1, 1, lRows.length, lHeaders.length).setValues(lRows);
       linkSheet.getRange(1, 1, 1, lHeaders.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
       formatAndTrimSheet(linkSheet, lHeaders.length, lRows.length, '#4f46e5', '#4f46e5');
@@ -3153,6 +3208,7 @@ function syncReadableSheets(ss, data) {
       sRows.push(['External_Links_Hub Status', 'PERMANENT (All 5 portals active)', 'Curated official study links never deleted']);
       sRows.push(['Last Auto-Sync Timestamp', new Date().toLocaleString(), 'Time of last auto-sync from Web App']);
 
+      ensureSheetDimensions_(setSheet, sRows.length, sHeaders.length);
       setSheet.getRange(1, 1, sRows.length, sHeaders.length).setValues(sRows);
       setSheet.getRange(1, 1, 1, sHeaders.length).setFontWeight('bold').setBackground('#334155').setFontColor('#ffffff');
       formatAndTrimSheet(setSheet, sHeaders.length, sRows.length, '#334155', '#334155');

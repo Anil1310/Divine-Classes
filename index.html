@@ -1175,6 +1175,16 @@
                     })
                     .apiSyncAllData(state);
             }
+        } else {
+            // Standalone / Vercel fallback
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'setDummyData', target: sheetKey, enabled: willEnable, data: state })
+            })
+            .then(function (res) { return res.json(); })
+            .then(function () { updateSyncBadge('✓ Google Sheets Synced', 'success'); })
+            .catch(function (err) { console.warn('Remote sync error:', err); });
         }
     }
 
@@ -1213,7 +1223,8 @@
             showToast('All Demo Data Disabled: Demo records deleted from all tabs except External_Links_Hub & Settings_Config.', 'info');
         }
 
-        saveStateLocally(false, true);
+        // Save locally without triggering duplicate async background sync
+        saveStateLocally(true, true);
         updateRoleUI();
         renderSidebar();
         renderMainContent();
@@ -1243,6 +1254,20 @@
                     })
                     .apiSyncAllData(state);
             }
+        } else {
+            // Standalone / Vercel: POST 2-way sync to Google Apps Script endpoint
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'setDummyData', target: 'all', enabled: willEnable, data: state })
+            })
+            .then(function (res) { return res.json(); })
+            .then(function () {
+                updateSyncBadge('✓ Google Sheets & DB Synced', 'success');
+            })
+            .catch(function (err) {
+                console.warn('Remote sync error:', err);
+            });
         }
     }
 
