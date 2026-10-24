@@ -135,6 +135,14 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 5. Submit / Save Offline Test Marks
+    if (action === 'saveTestMarks' || action === 'submitTestMarks') {
+      const testData = payload.data || payload;
+      const result = apiSaveTestMarks(testData);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Unknown action: ' + action }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -321,7 +329,7 @@ function apiGetDriveInfo() {
  * Sets file permission to Anyone with link can view.
  * Returns the shareable Google Drive URL.
  */
-function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name) {
+function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name, targetFolderKey) {
   if (!base64OrDataUrl || typeof base64OrDataUrl !== 'string') return '';
   const str = base64OrDataUrl.trim();
   if (!str) return '';
@@ -337,7 +345,8 @@ function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name) {
     base64 = match[2];
   }
   try {
-    const folder = getDriveSubFolder(DRIVE_FOLDERS.PHOTOS);
+    const folderKey = targetFolderKey || (prefix === 'banner' ? DRIVE_FOLDERS.GALLERY : DRIVE_FOLDERS.PHOTOS);
+    const folder = getDriveSubFolder(folderKey);
     const decodedBytes = Utilities.base64Decode(base64);
     const safeName = (name || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_');
     const ext = mimeType.indexOf('png') !== -1 ? '.png' : (mimeType.indexOf('webp') !== -1 ? '.webp' : '.jpg');
@@ -354,6 +363,88 @@ function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name) {
   } catch (err) {
     Logger.log('uploadPhotoToDeveloperDrive_ error: ' + err.toString());
     return str;
+  }
+}
+
+/**
+ * Uploads a result banner to Google Drive and saves it to Cloud Database & Google Sheet
+ */
+function apiUploadBanner(data) {
+  try {
+    let driveUrl = data.imageUrl || '';
+    if (driveUrl && driveUrl.startsWith('data:image/')) {
+      driveUrl = uploadPhotoToDeveloperDrive_(driveUrl, 'banner', data.title || 'banner', DRIVE_FOLDERS.GALLERY);
+    }
+    const appData = dbGetAll();
+    if (!appData.gallery) appData.gallery = [];
+    const newBanner = {
+      id: 'g' + Date.now(),
+      title: data.title || 'Result Banner',
+      category: data.category || 'Result Banner',
+      badge: data.badge || 'Top Rank',
+      caption: data.caption || '',
+      imageUrl: driveUrl,
+      date: data.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT+5:30', 'MMMM yyyy')
+    };
+    appData.gallery.unshift(newBanner);
+    dbSaveAll(appData);
+    try {
+      const ss = getDbSpreadsheet();
+      if (ss) syncReadableSheets(ss, appData);
+    } catch (sErr) {
+      Logger.log('syncReadableSheets notice in apiUploadBanner: ' + sErr.toString());
+    }
+    return { success: true, banner: newBanner, driveUrl: driveUrl };
+  } catch (err) {
+    Logger.log('apiUploadBanner error: ' + err.toString());
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * Saves/updates marks for all students in an offline test and syncs to Google Sheet immediately
+ */
+function apiSaveTestMarks(data) {
+  try {
+    if (!data || !data.testId) return { success: false, error: 'Missing testId' };
+    const appData = dbGetAll();
+    if (!appData.offlineTests) appData.offlineTests = [];
+    let test = appData.offlineTests.find(function (t) { return t.id === data.testId; });
+    if (!test) {
+      test = {
+        id: data.testId,
+        title: data.title || 'Offline Test',
+        subject: data.subject || '',
+        date: data.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT+5:30', 'dd MMM yyyy'),
+        maxMarks: Number(data.maxMarks) || 100,
+        batchId: data.batchId || 'b1',
+        marks: {}
+      };
+      appData.offlineTests.unshift(test);
+    } else {
+      if (data.title) test.title = data.title;
+      if (data.subject) test.subject = data.subject;
+      if (data.date) test.date = data.date;
+      if (data.maxMarks) test.maxMarks = Number(data.maxMarks);
+      if (data.batchId) test.batchId = data.batchId;
+    }
+    if (data.marks && typeof data.marks === 'object') {
+      if (!test.marks) test.marks = {};
+      Object.keys(data.marks).forEach(function (sid) {
+        test.marks[sid] = data.marks[sid];
+      });
+    }
+    dbSaveAll(appData);
+    try {
+      const ss = getDbSpreadsheet();
+      if (ss) syncReadableSheets(ss, appData);
+    } catch (sErr) {
+      Logger.log('syncReadableSheets notice in apiSaveTestMarks: ' + sErr.toString());
+    }
+    return { success: true, test: test };
+  } catch (err) {
+    Logger.log('apiSaveTestMarks error: ' + err.toString());
+    return { success: false, error: err.toString() };
   }
 }
 
@@ -1619,7 +1710,7 @@ function mergeMaterialsFromSheet_(appData) {
 }
 
 /**
- * Dynamically merges offline tests from the Offline_Test_Marks sheet tab
+ * Dynamically merges offline tests and student marks from the Offline_Test_Marks sheet tab
  */
 function mergeTestsFromSheet_(appData) {
   try {
@@ -1634,61 +1725,144 @@ function mergeTestsFromSheet_(appData) {
     const keepIds = {};
     const tz = Session.getScriptTimeZone();
 
+    const header = values[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
+    const isStudentFormat = header.indexOf('student id') >= 0 || header.indexOf('roll no') >= 0 || header.indexOf('marks scored') >= 0 || header.indexOf('student name') >= 0;
+
     const batchNameToId = {};
-    (appData.batches || []).forEach(b => {
+    (appData.batches || []).forEach(function (b) {
       batchNameToId[String(b.name || '').toLowerCase()] = b.id;
     });
 
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i];
-      const id = String(row[0] || '').trim();
-      const title = String(row[1] || '').trim();
-      if (!id && !title) continue;
+    const studentMap = {};
+    (appData.students || []).forEach(function (s) {
+      if (s.id) studentMap[String(s.id).toLowerCase()] = s.id;
+      if (s.roll) studentMap[String(s.roll).toLowerCase()] = s.id;
+      if (s.name) studentMap[String(s.name).toLowerCase()] = s.id;
+    });
 
-      const subject = String(row[2] || '').trim();
-      let date = row[3];
-      if (date instanceof Date && !isNaN(date)) {
-        date = Utilities.formatDate(date, tz, 'dd MMM yyyy');
-      } else {
-        date = String(date || '').trim();
-      }
-      const maxMarks = Number(row[4]) || 100;
-      const batchName = String(row[5] || '').trim();
-      const batchId = batchNameToId[batchName.toLowerCase()] || (appData.batches && appData.batches[0] ? appData.batches[0].id : 'b1');
+    if (isStudentFormat) {
+      const colTestId = header.indexOf('test id') >= 0 ? header.indexOf('test id') : 0;
+      const colTitle = header.indexOf('test title') >= 0 ? header.indexOf('test title') : 1;
+      const colSubject = header.indexOf('subject') >= 0 ? header.indexOf('subject') : 2;
+      const colDate = header.indexOf('conducted date') >= 0 ? header.indexOf('conducted date') : 3;
+      const colMax = header.indexOf('max marks') >= 0 ? header.indexOf('max marks') : 4;
+      const colBatch = header.indexOf('assigned batch') >= 0 ? header.indexOf('assigned batch') : (header.indexOf('batch') >= 0 ? header.indexOf('batch') : 5);
+      const colStuId = header.indexOf('student id') >= 0 ? header.indexOf('student id') : 6;
+      const colRoll = header.indexOf('roll no') >= 0 ? header.indexOf('roll no') : 7;
+      const colStuName = header.indexOf('student name') >= 0 ? header.indexOf('student name') : 8;
+      const colScore = header.indexOf('marks scored') >= 0 ? header.indexOf('marks scored') : 9;
+      const colRemarks = header.indexOf('remarks') >= 0 ? header.indexOf('remarks') : 11;
 
-      let test = null;
-      if (id) {
-        test = appData.offlineTests.find(t => String(t.id || '').trim() === id);
-      }
-      if (!test && title) {
-        test = appData.offlineTests.find(t => String(t.title || '').trim().toLowerCase() === title.toLowerCase());
-      }
+      for (let i = 1; i < values.length; i++) {
+        const row = values[i];
+        const id = String(row[colTestId] || '').trim();
+        const title = String(row[colTitle] || '').trim();
+        if (!id && !title) continue;
 
-      if (test) {
-        test.id = id || test.id;
-        test.title = title || test.title;
-        test.subject = subject || test.subject;
-        test.date = date || test.date;
-        test.maxMarks = maxMarks || test.maxMarks;
-        test.batchId = batchId || test.batchId;
-        keepIds[test.id] = true;
-      } else {
-        const newId = id || ('t_' + Date.now().toString(36) + '_' + i);
-        appData.offlineTests.push({
-          id: newId,
-          title: title || 'Offline Test',
-          subject: subject,
-          date: date,
-          maxMarks: maxMarks,
-          batchId: batchId,
-          marks: {}
+        const subject = String(row[colSubject] || '').trim();
+        let date = row[colDate];
+        if (date instanceof Date && !isNaN(date)) {
+          date = Utilities.formatDate(date, tz, 'dd MMM yyyy');
+        } else {
+          date = String(date || '').trim();
+        }
+        const maxMarks = Number(row[colMax]) || 100;
+        const batchName = String(row[colBatch] || '').trim();
+        const batchId = batchNameToId[batchName.toLowerCase()] || (appData.batches && appData.batches[0] ? appData.batches[0].id : 'b1');
+
+        let test = appData.offlineTests.find(function (t) {
+          return (id && String(t.id || '').trim() === id) || (title && String(t.title || '').trim().toLowerCase() === title.toLowerCase());
         });
-        keepIds[newId] = true;
+
+        if (!test) {
+          test = {
+            id: id || ('t_' + Date.now().toString(36) + '_' + i),
+            title: title || 'Offline Test',
+            subject: subject,
+            date: date,
+            maxMarks: maxMarks,
+            batchId: batchId,
+            marks: {}
+          };
+          appData.offlineTests.push(test);
+        } else {
+          test.id = id || test.id;
+          test.title = title || test.title;
+          if (subject) test.subject = subject;
+          if (date) test.date = date;
+          if (maxMarks) test.maxMarks = maxMarks;
+          if (batchId) test.batchId = batchId;
+          if (!test.marks) test.marks = {};
+        }
+        keepIds[test.id] = true;
+
+        const rowStuId = String(row[colStuId] || '').trim();
+        const rowRoll = String(row[colRoll] || '').trim();
+        const rowName = String(row[colStuName] || '').trim();
+        const resolvedStuId = (rowStuId && studentMap[rowStuId.toLowerCase()]) ||
+                              (rowRoll && studentMap[rowRoll.toLowerCase()]) ||
+                              (rowName && studentMap[rowName.toLowerCase()]) ||
+                              (rowStuId && rowStuId !== '-' ? rowStuId : null);
+
+        if (resolvedStuId) {
+          const rawScore = row[colScore];
+          const score = (rawScore !== '' && rawScore !== null && !isNaN(Number(rawScore))) ? Number(rawScore) : 0;
+          const remarks = String(row[colRemarks] || '').trim();
+          test.marks[resolvedStuId] = {
+            score: score,
+            remarks: remarks || (test.marks[resolvedStuId] ? test.marks[resolvedStuId].remarks : '')
+          };
+        }
+      }
+    } else {
+      // Legacy format fallback
+      for (let i = 1; i < values.length; i++) {
+        const row = values[i];
+        const id = String(row[0] || '').trim();
+        const title = String(row[1] || '').trim();
+        if (!id && !title) continue;
+
+        const subject = String(row[2] || '').trim();
+        let date = row[3];
+        if (date instanceof Date && !isNaN(date)) {
+          date = Utilities.formatDate(date, tz, 'dd MMM yyyy');
+        } else {
+          date = String(date || '').trim();
+        }
+        const maxMarks = Number(row[4]) || 100;
+        const batchName = String(row[5] || '').trim();
+        const batchId = batchNameToId[batchName.toLowerCase()] || (appData.batches && appData.batches[0] ? appData.batches[0].id : 'b1');
+
+        let test = appData.offlineTests.find(function (t) {
+          return (id && String(t.id || '').trim() === id) || (title && String(t.title || '').trim().toLowerCase() === title.toLowerCase());
+        });
+
+        if (test) {
+          test.id = id || test.id;
+          test.title = title || test.title;
+          test.subject = subject || test.subject;
+          test.date = date || test.date;
+          test.maxMarks = maxMarks || test.maxMarks;
+          test.batchId = batchId || test.batchId;
+          keepIds[test.id] = true;
+        } else {
+          const newId = id || ('t_' + Date.now().toString(36) + '_' + i);
+          appData.offlineTests.push({
+            id: newId,
+            title: title || 'Offline Test',
+            subject: subject,
+            date: date,
+            maxMarks: maxMarks,
+            batchId: batchId,
+            marks: {}
+          });
+          keepIds[newId] = true;
+        }
       }
     }
 
     if (Object.keys(keepIds).length > 0) {
-      appData.offlineTests = appData.offlineTests.filter(t => keepIds[t.id]);
+      appData.offlineTests = appData.offlineTests.filter(function (t) { return keepIds[t.id]; });
     }
   } catch (e) {
     Logger.log('mergeTestsFromSheet_ error: ' + e.toString());
@@ -2564,46 +2738,80 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(batchSheet, bHeaders.length, bRows.length, '#059669', '#059669');
     }
 
-    // D. Sync Offline Tests Sheet (Offline_Test_Marks) - All Test Records
+    // D. Sync Offline Tests Sheet (Offline_Test_Marks) - All Student Test Marks
     {
       let testSheet = getOrCreateSheet(ss, 'Offline_Test_Marks', ['Test_Marks', 'Offline Tests']);
       testSheet.clear();
-      const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Conducted Date', 'Max Marks', 'Assigned Batch', 'Top Performer', 'Highest Score', 'Batch Average'];
+      const tHeaders = ['Test ID', 'Test Title', 'Subject', 'Conducted Date', 'Max Marks', 'Assigned Batch', 'Student ID', 'Roll No', 'Student Name', 'Marks Scored', 'Percentage', 'Remarks', 'Status'];
       const tRows = [tHeaders];
+
       const studentMap = {};
-      (data.students || []).forEach(function (s) { studentMap[s.id] = s.name + ' (' + s.roll + ')'; });
+      (data.students || []).forEach(function (s) { studentMap[s.id] = s; });
+
       const batchMap = {};
-      (data.batches || []).forEach(function (b) { batchMap[b.id] = b.name; });
+      (data.batches || []).forEach(function (b) { batchMap[b.id] = b; });
+
       const testList = getAllRecords_('offlineTests');
       testList.forEach(function (t) {
         const marks = t.marks || {};
-        let topScorer = '-';
-        let topScore = 0;
-        let totalScore = 0;
-        let count = 0;
+        const maxMarks = Number(t.maxMarks) || 100;
+        const bObj = batchMap[t.batchId];
+        const batchName = bObj ? bObj.name : (t.batchId || 'All Batches');
+
+        const targetStudentIds = [];
+        if (bObj && Array.isArray(bObj.studentIds) && bObj.studentIds.length > 0) {
+          bObj.studentIds.forEach(function (sid) {
+            if (targetStudentIds.indexOf(sid) === -1) targetStudentIds.push(sid);
+          });
+        }
         Object.keys(marks).forEach(function (sid) {
-          const entry = marks[sid] || {};
-          const sc = Number(entry.score) || 0;
-          if (sc >= topScore) {
-            topScore = sc;
-            topScorer = (studentMap[sid] || sid) + ' (' + sc + '/' + t.maxMarks + ')';
-          }
-          totalScore += sc;
-          count++;
+          if (targetStudentIds.indexOf(sid) === -1) targetStudentIds.push(sid);
         });
-        const avg = count > 0 && t.maxMarks ? Math.round((totalScore / (count * t.maxMarks)) * 100) + '%' : '-';
-        tRows.push([
-          t.id || '',
-          t.title || '',
-          t.subject || '',
-          t.date || '',
-          t.maxMarks || 100,
-          batchMap[t.batchId] || t.batchId || 'All Batches',
-          topScorer,
-          topScore ? topScore + ' / ' + t.maxMarks : '-',
-          avg
-        ]);
+
+        if (targetStudentIds.length === 0) {
+          tRows.push([
+            t.id || '',
+            t.title || '',
+            t.subject || '',
+            t.date || '',
+            maxMarks,
+            batchName,
+            '-',
+            '-',
+            'No Students Enrolled',
+            0,
+            '0%',
+            'No marks recorded yet',
+            'Pending'
+          ]);
+        } else {
+          targetStudentIds.forEach(function (sid) {
+            const stu = studentMap[sid] || { id: sid, roll: '-', name: 'Student ' + sid };
+            const m = marks[sid] || { score: 0, remarks: '' };
+            const score = Number(m.score) || 0;
+            const pct = maxMarks > 0 ? Math.round((score / maxMarks) * 100) + '%' : '0%';
+            const remarks = m.remarks || '';
+            const status = score > 0 ? 'Evaluated' : 'Pending';
+
+            tRows.push([
+              t.id || '',
+              t.title || '',
+              t.subject || '',
+              t.date || '',
+              maxMarks,
+              batchName,
+              stu.id || sid,
+              stu.roll || '',
+              stu.name || '',
+              score,
+              pct,
+              remarks,
+              status
+            ]);
+          });
+        }
       });
+
       testSheet.getRange(1, 1, tRows.length, tHeaders.length).setValues(tRows);
       testSheet.getRange(1, 1, 1, tHeaders.length).setFontWeight('bold').setBackground('#d97706').setFontColor('#ffffff');
       formatAndTrimSheet(testSheet, tHeaders.length, tRows.length, '#d97706', '#d97706');
@@ -2670,6 +2878,11 @@ function syncReadableSheets(ss, data) {
       const gRows = [gHeaders];
       const galList = getAllRecords_('gallery');
       galList.forEach(function (g) {
+        let bannerUrl = g.imageUrl || '';
+        if (bannerUrl && bannerUrl.startsWith('data:image/')) {
+          bannerUrl = uploadPhotoToDeveloperDrive_(bannerUrl, 'banner', g.title || 'banner', DRIVE_FOLDERS.GALLERY);
+          g.imageUrl = bannerUrl;
+        }
         gRows.push([
           g.id || '',
           g.title || '',
@@ -2677,7 +2890,7 @@ function syncReadableSheets(ss, data) {
           g.date || '',
           g.caption || '',
           g.badge || '',
-          g.imageUrl || ''
+          bannerUrl
         ]);
       });
       galSheet.getRange(1, 1, gRows.length, gHeaders.length).setValues(gRows);
