@@ -213,7 +213,7 @@
 
 </head>
 
-<body class="text-slate-800 antialiased selection:bg-indigo-600 selection:text-white bg-slate-50 min-h-screen">
+<body class="text-slate-800 antialiased selection:bg-indigo-600 selection:text-white bg-slate-50 h-screen overflow-hidden">
 
     <!-- Toast Notification Container -->
     <div id="toast-container"
@@ -231,14 +231,14 @@
     <!-- Hidden Printable Area for Receipts & Report Cards -->
     <div id="printable-area" class="hidden"></div>
 
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen w-full overflow-hidden">
         <!-- Mobile Sidebar Backdrop -->
         <div id="sidebar-backdrop" onclick="toggleMobileSidebar()"
             class="fixed inset-0 bg-slate-950/60 z-30 lg:hidden hidden backdrop-blur-2xs transition-opacity"></div>
 
         <!-- Sidebar Navigation -->
         <aside id="sidebar"
-            class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:inset-0 shrink-0 border-r border-slate-800">
+            class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:h-full lg:shrink-0 border-r border-slate-800">
             <!-- Brand Logo -->
             <div class="flex items-center justify-between px-5 h-16 bg-slate-950 border-b border-slate-800">
                 <div class="flex items-center gap-3">
@@ -323,7 +323,7 @@
         </aside>
 
         <!-- Main Content Wrapper -->
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
             <!-- Top Header with Role Switcher & Live Database Sync -->
             <header id="app-header" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
                 <div class="px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3">
@@ -415,9 +415,14 @@
             </header>
 
             <!-- Scrollable Main Workspace -->
-            <main id="main-content" class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <main id="main-content" class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
                 <!-- Dynamic Views Injected Here -->
             </main>
+
+            <!-- Mobile Bottom App Bar (Android Style 5-6 Buttons) -->
+            <nav id="mobile-bottom-nav" class="lg:hidden shrink-0 bg-slate-900 border-t border-slate-800 px-1 py-1.5 z-30 flex items-center justify-around shadow-2xl">
+                <!-- Rendered dynamically by renderMobileBottomNav() -->
+            </nav>
         </div>
     </div>
 
@@ -2213,6 +2218,7 @@
         const header = document.getElementById('app-header') || document.querySelector('header');
         const roleBanner = document.getElementById('role-banner');
         const mobileNav = document.getElementById('mobile-nav');
+        const mobileBottomNav = document.getElementById('mobile-bottom-nav');
         const mainContent = document.getElementById('main-content');
         const body = document.body;
 
@@ -2232,6 +2238,7 @@
                 roleBanner.style.display = 'none';
             }
             if (mobileNav) mobileNav.style.display = 'none';
+            if (mobileBottomNav) mobileBottomNav.style.display = 'none';
             if (body) {
                 body.classList.remove('bg-slate-50');
                 body.classList.add('bg-[#0b1021]');
@@ -2249,15 +2256,17 @@
         if (header) header.style.display = '';
         if (roleBanner) roleBanner.style.display = '';
         if (mobileNav) mobileNav.style.display = '';
+        if (mobileBottomNav) mobileBottomNav.style.display = '';
         if (body) {
             body.classList.remove('bg-[#0b1021]');
             body.classList.add('bg-slate-50');
         }
         if (mainContent) {
-            mainContent.className = 'flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50';
+            mainContent.className = 'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50';
         }
 
         renderAuthHeader();
+        renderMobileBottomNav();
 
         // Sidebar role badge
         const badge = document.getElementById('sidebar-role-badge');
@@ -2370,6 +2379,80 @@
         }
     }
 
+    /********************************************************************
+     * MOBILE BOTTOM NAVIGATION (Android App-Style 5-6 Buttons)
+     ********************************************************************/
+    function renderMobileBottomNav() {
+        const nav = document.getElementById('mobile-bottom-nav');
+        if (!nav) return;
+        if (!state.isAuthenticated) {
+            nav.style.display = 'none';
+            return;
+        }
+        nav.style.display = '';
+
+        let items = [];
+        if (state.currentRole === 'developer') {
+            items = [
+                { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
+                { id: 'batches', label: 'Batches', icon: 'fa-users-rectangle' },
+                { id: 'fees', label: 'Fees', icon: 'fa-indian-rupee-sign' },
+                { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
+                { id: 'settings', label: 'Settings', icon: 'fa-gear' },
+                { id: '_menu', label: 'Menu', icon: 'fa-bars', isMenu: true }
+            ];
+        } else if (state.currentRole === 'admin') {
+            items = [
+                { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
+                { id: 'batches', label: 'Batches', icon: 'fa-users-rectangle' },
+                { id: 'fees', label: 'Fees', icon: 'fa-indian-rupee-sign' },
+                { id: 'materials', label: 'DPPs', icon: 'fa-file-pdf' },
+                { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
+                { id: '_menu', label: 'Menu', icon: 'fa-bars', isMenu: true }
+            ];
+        } else if (state.currentRole === 'teacher') {
+            items = [
+                { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
+                { id: 'batches', label: 'Batches', icon: 'fa-users-rectangle' },
+                { id: 'materials', label: 'DPPs', icon: 'fa-file-pdf' },
+                { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
+                { id: 'feedback', label: 'Feedback', icon: 'fa-comments' },
+                { id: '_menu', label: 'Menu', icon: 'fa-bars', isMenu: true }
+            ];
+        } else {
+            // Student
+            items = [
+                { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
+                { id: 'batches', label: 'Batch', icon: 'fa-users-rectangle' },
+                { id: 'materials', label: 'DPPs', icon: 'fa-file-pdf' },
+                { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
+                { id: 'feedback', label: 'Feedback', icon: 'fa-comments' },
+                { id: '_menu', label: 'Menu', icon: 'fa-bars', isMenu: true }
+            ];
+        }
+
+        nav.innerHTML = items.map(it => {
+            if (it.isMenu) {
+                return `
+                    <button type="button" onclick="toggleMobileSidebar()" class="flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 text-slate-400 hover:text-white transition active:scale-95 cursor-pointer" aria-label="Open sidebar menu">
+                        <i class="fa-solid ${it.icon} text-base mb-1"></i>
+                        <span class="text-[10px] font-semibold leading-none">Menu</span>
+                    </button>
+                `;
+            }
+            const isActive = state.activeTab === it.id;
+            return `
+                <button type="button" onclick="navigateTo('${it.id}')" class="flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 transition active:scale-95 cursor-pointer ${isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'}" aria-label="${it.label}">
+                    <div class="relative flex items-center justify-center">
+                        <i class="fa-solid ${it.icon} text-base mb-1 ${isActive ? 'text-indigo-400 scale-110' : ''}"></i>
+                        ${isActive ? '<span class="absolute -top-1 w-1.5 h-1.5 rounded-full bg-indigo-400"></span>' : ''}
+                    </div>
+                    <span class="text-[10px] ${isActive ? 'font-bold text-white' : 'font-medium'} leading-none">${it.label}</span>
+                </button>
+            `;
+        }).join('');
+    }
+
     function toggleMobileSidebar() {
         const sb = document.getElementById('sidebar');
         const bd = document.getElementById('sidebar-backdrop');
@@ -2380,6 +2463,7 @@
     function renderSidebar() {
         const sidebar = document.getElementById('sidebar');
         const navContainer = document.getElementById('nav-links');
+        renderMobileBottomNav();
         if (!state.isAuthenticated) {
             if (sidebar) sidebar.style.display = 'none';
             if (navContainer) navContainer.innerHTML = '';
