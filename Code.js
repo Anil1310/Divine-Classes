@@ -2166,9 +2166,10 @@ function onOpen(e) {
 
 function debugShareAdminDrive() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    Logger.log('All script properties keys: ' + JSON.stringify(props.getKeys()));
-    const res = apiShareMaterialsDriveWithAdmin('mis@doctorsoap.com', '');
+    const data = apiGetInitialData();
+    const targetEmail = (data.settings && data.settings.adminEmail) || Session.getActiveUser().getEmail() || '';
+    Logger.log('Running test share with target email: ' + targetEmail);
+    const res = apiShareMaterialsDriveWithAdmin(targetEmail, '');
     Logger.log('apiShareMaterialsDriveWithAdmin result: ' + JSON.stringify(res));
     return res;
   } catch (e) {

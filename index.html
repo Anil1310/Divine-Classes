@@ -4672,7 +4672,7 @@
         }
 
         function openShareDriveWithAdminModal() {
-            const adminEmail = (state.settings && state.settings.adminEmail) || 'contact@divineclasses.in';
+            const adminEmail = (state.settings && state.settings.adminEmail) || '';
             const driveFolderUrl = (state.settings && state.settings.adminDriveFolderUrl) || '';
 
             const modalHtml = `
@@ -4681,7 +4681,7 @@
                         <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base"><i class="fa-brands fa-google-drive"></i></span>
                         <div>
                             <h3 class="text-sm font-bold text-slate-900 font-heading">Authorize Admin Google Drive & Send Access Mail</h3>
-                            <p class="text-[11px] text-slate-500">Grants Editor access to Admin and sends an official 1-click authorization email.</p>
+                            <p class="text-[11px] text-slate-500">Grants Editor access to any email ID and dispatches an official 1-click access email.</p>
                         </div>
                     </div>
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -4701,9 +4701,9 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Admin Google Account / Gmail ID *</label>
-                        <input type="email" id="share-admin-email" required value="${escapeAttr(adminEmail)}" placeholder="e.g. rajeshchahar@gmail.com" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium">
-                        <p class="text-[10px] text-slate-400 mt-1">An invitation email with a direct authorization button will be sent to this email address.</p>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Enter Any Email ID to Authorize *</label>
+                        <input type="email" id="share-admin-email" required value="${escapeAttr(adminEmail)}" placeholder="e.g. director@gmail.com, any-admin@yourdomain.com" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium">
+                        <p class="text-[10px] text-slate-400 mt-1">Type ANY email address here. The invitation email and Google Drive Editor access will be delivered directly to this mailbox.</p>
                     </div>
 
                     <div>
@@ -4766,7 +4766,7 @@
                     .apiShareMaterialsDriveWithAdmin(email, customFolder);
             } else {
                 // Standalone / GitHub Pages / Android APK mode: Call live Google Apps Script web app
-                const gasUrl = 'https://script.google.com/macros/s/AKfycbzd3FjBBOOOkj3lqKGRQmHaxHPg24D0lkRiWXDMSVmY5us6StQIXvufUBdyPAiKRYcw/exec';
+                const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
                 const callbackId = 'gas_share_cb_' + Date.now();
                 let timedOut = false;
 
