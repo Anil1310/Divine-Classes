@@ -1065,8 +1065,8 @@ function getDefaultSeedData() {
 
 function isDummyRecord_(rec) {
   if (!rec) return false;
-  // Gallery banners and external study links are PERMANENT institute assets — NEVER dummy!
-  if (rec.id && (String(rec.id).startsWith('g') || String(rec.id).startsWith('l'))) return false;
+  // External links (l1..l5) are PERMANENT institute assets — NEVER dummy!
+  if (rec.id && String(rec.id).startsWith('l')) return false;
   if (rec.isDummy === true) return true;
   if (typeof DUMMY_SEED_ID_SET !== 'undefined' && DUMMY_SEED_ID_SET && DUMMY_SEED_ID_SET[rec.id] === true) return true;
   var fallbackIds = {
@@ -1075,13 +1075,14 @@ function isDummyRecord_(rec) {
     'm1': true, 'm2': true, 'm3': true, 'm4': true, 'm5': true,
     't1': true, 't2': true, 't3': true, 't4': true, 't5': true,
     'tr1': true, 'tr2': true, 'tr3': true, 'tr4': true, 'tr5': true,
+    'g1': true, 'g2': true, 'g3': true, 'g4': true, 'g5': true,
     'f1': true, 'f2': true, 'f3': true, 'f4': true, 'f5': true
   };
   return fallbackIds[rec.id] === true;
 }
 
 // Removes seed/demo records from the data RETURNED to clients (DB untouched).
-// externalLinks and gallery banners are ALWAYS kept — never stripped.
+// externalLinks are ALWAYS kept — never stripped.
 function isDummyForSheetEnabled_(settings, sheetKey) {
   if (!settings) return true;
   if (settings.showDummyData === false) return false;
@@ -1092,7 +1093,7 @@ function isDummyForSheetEnabled_(settings, sheetKey) {
 }
 
 // Removes seed/demo records per sheet or globally (DB untouched).
-// externalLinks (External_Links_Hub) and gallery (Gallery_Banners) are ALWAYS kept — never stripped or deleted!
+// All tabs except External_Links_Hub & Settings_Config have dummy records stripped!
 function stripDummyData_(appData, targetTable) {
   if (!appData || !appData.settings) return appData;
   const dummyStudentIds = {};
@@ -1100,7 +1101,7 @@ function stripDummyData_(appData, targetTable) {
     if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
   });
 
-  const tbls = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'feedbacks'];
+  const tbls = targetTable ? [targetTable] : ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'];
   tbls.forEach(function (tbl) {
     if (!isDummyForSheetEnabled_(appData.settings, tbl) || targetTable) {
       appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
@@ -1122,13 +1123,21 @@ function stripDummyData_(appData, targetTable) {
   return appData;
 }
 
-// USER RULE: Once dev has disabled demo data (showDummyData === false),
-// demo records must NEVER be recreated, restored, or re-injected!
+// When demo data is enabled: ensure rows 2 to 6 (5 records) are filled in all 7 tabs.
+// When demo data is disabled: ensure all dummy records are completely stripped!
 function restoreDummyData_(incoming) {
   if (!incoming) return incoming;
-  const isDemoDisabled = (incoming.settings && incoming.settings.showDummyData === false) ||
+  const isExplicitlyEnabled = incoming.settings && incoming.settings.showDummyData === true;
+  if (isExplicitlyEnabled) {
+    try {
+      PropertiesService.getScriptProperties().deleteProperty('DUMMY_DATA_DISABLED');
+    } catch (e) { }
+  }
+  const isDemoDisabled = !isExplicitlyEnabled && (
+    (incoming.settings && incoming.settings.showDummyData === false) ||
     (incoming.settings && incoming.settings.demoDataPermanentlyDisabled === true) ||
-    PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+    PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
+  );
   if (isDemoDisabled) {
     if (incoming.settings) {
       incoming.settings.showDummyData = false;
@@ -1137,6 +1146,21 @@ function restoreDummyData_(incoming) {
     stripDummyData_(incoming);
     return incoming;
   }
+
+  // When demo is enabled: restore exactly 5 dummy records (rows 2 to 6) in all 7 tabs
+  const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
+  const tables = ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'];
+  tables.forEach(function (tbl) {
+    if (!Array.isArray(incoming[tbl])) incoming[tbl] = [];
+    const have = {};
+    incoming[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
+    (seed[tbl] || []).forEach(function (r) {
+      if (r && r.id && !have[r.id]) {
+        incoming[tbl].push(JSON.parse(JSON.stringify(r)));
+      }
+    });
+  });
+
   return incoming;
 }
 
@@ -1987,20 +2011,11 @@ function mergeGalleryFromSheet_(appData) {
     if (!appData.gallery) appData.gallery = [];
 
     const ss = getDbSpreadsheet();
-    if (!ss) {
-      if (appData.gallery.length === 0) appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
-      return appData;
-    }
+    if (!ss) return appData;
     const sheet = ss.getSheetByName('Gallery_Banners');
-    if (!sheet) {
-      if (appData.gallery.length === 0) appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
-      return appData;
-    }
+    if (!sheet) return appData;
     const values = sheet.getDataRange().getValues();
-    if (!values || values.length <= 1) {
-      if (appData.gallery.length === 0) appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
-      return appData;
-    }
+    if (!values || values.length <= 1) return appData;
 
     const tz = Session.getScriptTimeZone();
 
@@ -2050,16 +2065,8 @@ function mergeGalleryFromSheet_(appData) {
         });
       }
     }
-
-    // Never leave gallery empty
-    if (appData.gallery.length === 0) {
-      appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
-    }
   } catch (e) {
     Logger.log('mergeGalleryFromSheet_ error: ' + e.toString());
-    if (!appData.gallery || appData.gallery.length === 0) {
-      appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
-    }
   }
   return appData;
 }
@@ -2214,13 +2221,16 @@ function apiGetInitialData() {
       }
     }
 
-    const isDemoDisabled = (appData && appData.settings && appData.settings.showDummyData === false) ||
+    const isExplicitlyEnabled = appData && appData.settings && appData.settings.showDummyData === true;
+    const isDemoDisabled = !isExplicitlyEnabled && (
+      (appData && appData.settings && appData.settings.showDummyData === false) ||
       (appData && appData.settings && appData.settings.demoDataPermanentlyDisabled === true) ||
-      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
+    );
 
     if (!appData) {
       if (isDemoDisabled) {
-        appData = { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: OFFICIAL_GALLERY_BANNERS.slice(), externalLinks: OFFICIAL_EXTERNAL_LINKS.slice(), feedbacks: [], settings: { showDummyData: false, demoDataPermanentlyDisabled: true } };
+        appData = { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: [], externalLinks: OFFICIAL_EXTERNAL_LINKS.slice(), feedbacks: [], settings: { showDummyData: false, demoDataPermanentlyDisabled: true } };
       } else {
         appData = getDefaultSeedData();
       }
@@ -2237,11 +2247,11 @@ function apiGetInitialData() {
     appData = mergeLinksFromSheet_(appData);
     appData = mergeSettingsFromSheet_(appData);
 
-    // Safety: curated study portals & gallery banners are permanent — re-seed if list ended up empty
+    // Safety: curated study portals are permanent — re-seed if list ended up empty
     if (!appData.externalLinks || appData.externalLinks.length === 0) {
       appData.externalLinks = OFFICIAL_EXTERNAL_LINKS.slice();
     }
-    if (!appData.gallery || appData.gallery.length === 0) {
+    if (!isDemoDisabled && (!appData.gallery || appData.gallery.length === 0)) {
       appData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
     }
 
@@ -2371,13 +2381,19 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
   const tables = (target === 'all' || !target) ? allTables : [target];
 
   if (enabled) {
+    try {
+      PropertiesService.getScriptProperties().deleteProperty('DUMMY_DATA_DISABLED');
+    } catch (e) { }
+
     // 1. Enable in config
     if (target === 'all' || !target) {
       appData.settings.showDummyData = true;
+      appData.settings.demoDataPermanentlyDisabled = false;
       allTables.forEach(function (tbl) { appData.settings.dummyDataConfig[tbl] = true; });
     } else {
       appData.settings.dummyDataConfig[target] = true;
       appData.settings.showDummyData = true;
+      appData.settings.demoDataPermanentlyDisabled = false;
     }
 
     // 2. CRITICAL: Inject the seed dummy records for the enabled table(s) into appData
@@ -2421,21 +2437,42 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
       });
     }
   } else {
+    try {
+      PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true');
+    } catch (e) { }
+
     // 1. Disable in config
     if (target === 'all' || !target) {
       appData.settings.showDummyData = false;
+      appData.settings.demoDataPermanentlyDisabled = true;
       allTables.forEach(function (tbl) { appData.settings.dummyDataConfig[tbl] = false; });
     } else {
       appData.settings.dummyDataConfig[target] = false;
       const anyOn = allTables.some(function (tbl) { return appData.settings.dummyDataConfig[tbl] === true; });
       appData.settings.showDummyData = anyOn;
+      if (!anyOn) appData.settings.demoDataPermanentlyDisabled = true;
     }
 
-    // 2. CRITICAL: Delete all dummy records for the disabled table(s) from appData
-    // so they are completely removed from the Google Sheet tabs!
+    // 2. CRITICAL USER RULE: ONLY delete dummy records (b1..b5, s1..s5, etc.).
+    // ANY client records created while demo was on are 100% PRESERVED and shift to Row 2!
     tables.forEach(function (tbl) {
       appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
     });
+
+    // If clientState was passed, ensure client's newly created non-dummy records are preserved
+    if (clientState && typeof clientState === 'object') {
+      tables.forEach(function (tbl) {
+        if (Array.isArray(clientState[tbl])) {
+          const existingIds = {};
+          (appData[tbl] || []).forEach(function (r) { if (r && r.id) existingIds[r.id] = true; });
+          clientState[tbl].forEach(function (cr) {
+            if (cr && cr.id && !isDummyRecord_(cr) && !existingIds[cr.id]) {
+              appData[tbl].push(JSON.parse(JSON.stringify(cr)));
+            }
+          });
+        }
+      });
+    }
 
     if (tables.indexOf('students') !== -1) {
       const dummyStudentIds = {};
@@ -2501,8 +2538,12 @@ function apiRestructureAllSheets() {
     let appData = dbLoadAll();
     if (!appData) appData = getDefaultSeedData();
 
-    const isDemoDisabled = (appData.settings && appData.settings.showDummyData === false) ||
-      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+    const isExplicitlyEnabled = appData && appData.settings && appData.settings.showDummyData === true;
+    const isDemoDisabled = !isExplicitlyEnabled && (
+      (appData.settings && appData.settings.showDummyData === false) ||
+      (appData.settings && appData.settings.demoDataPermanentlyDisabled === true) ||
+      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
+    );
 
     if (!isDemoDisabled) {
       const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
@@ -2591,9 +2632,17 @@ function apiRestructureAllSheets() {
  */
 function apiSyncAllData(fullData) {
   try {
-    const isDemoDisabled = (fullData && fullData.settings && fullData.settings.showDummyData === false) ||
+    const isExplicitlyEnabled = fullData && fullData.settings && fullData.settings.showDummyData === true;
+    if (isExplicitlyEnabled) {
+      try {
+        PropertiesService.getScriptProperties().deleteProperty('DUMMY_DATA_DISABLED');
+      } catch (e) { }
+    }
+    const isDemoDisabled = !isExplicitlyEnabled && (
+      (fullData && fullData.settings && fullData.settings.showDummyData === false) ||
       (fullData && fullData.settings && fullData.settings.demoDataPermanentlyDisabled === true) ||
-      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
+      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
+    );
 
     if (isDemoDisabled) {
       if (!fullData.settings) fullData.settings = {};
@@ -2604,6 +2653,9 @@ function apiSyncAllData(fullData) {
       } catch (pErr) { }
       stripDummyData_(fullData);
     } else {
+      if (!fullData.settings) fullData.settings = {};
+      fullData.settings.showDummyData = true;
+      fullData.settings.demoDataPermanentlyDisabled = false;
       try { restoreDummyData_(fullData); } catch (dummyErr) {
         Logger.log('restoreDummyData_ notice: ' + dummyErr.toString());
       }
@@ -2618,7 +2670,7 @@ function apiSyncAllData(fullData) {
     try {
       fullData = mergeGalleryFromSheet_(fullData);
       fullData = mergeLinksFromSheet_(fullData);
-      if (!Array.isArray(fullData.gallery) || fullData.gallery.length === 0) {
+      if (!isDemoDisabled && (!Array.isArray(fullData.gallery) || fullData.gallery.length === 0)) {
         fullData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
       }
       if (!Array.isArray(fullData.externalLinks) || fullData.externalLinks.length === 0) {
@@ -3007,63 +3059,13 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(matSheet, mHeaders.length, mRows.length, '#2563eb', '#2563eb');
     }
 
-    // G. Sync Gallery Banners Sheet (Gallery_Banners) - All Records (PERMANENT - NEVER WIPED)
+    // G. Sync Gallery Banners Sheet (Gallery_Banners)
     {
       let galSheet = getOrCreateSheet(ss, 'Gallery_Banners', ['Gallery', 'Gallery Banners']);
-      let existingSheetRows = [];
-      try {
-        const vals = galSheet.getDataRange().getValues();
-        if (vals && vals.length > 1) {
-          const tz = Session.getScriptTimeZone();
-          for (let vi = 1; vi < vals.length; vi++) {
-            const vRow = vals[vi];
-            const vId = String(vRow[0] || '').trim();
-            const vTitle = String(vRow[1] || '').trim();
-            if (vId || vTitle) {
-              let vDate = vRow[3];
-              if (vDate instanceof Date && !isNaN(vDate)) {
-                vDate = Utilities.formatDate(vDate, tz, 'dd MMM yyyy');
-              } else {
-                vDate = String(vDate || '').trim();
-              }
-              existingSheetRows.push({
-                id: vId,
-                title: vTitle,
-                category: String(vRow[2] || '').trim(),
-                date: vDate,
-                caption: String(vRow[4] || '').trim(),
-                badge: String(vRow[5] || '').trim(),
-                imageUrl: String(vRow[6] || '').trim()
-              });
-            }
-          }
-        }
-      } catch (readErr) {
-        Logger.log('Reading existing Gallery_Banners notice: ' + readErr);
-      }
-
-      let galList = getAllRecords_('gallery');
-      if (!Array.isArray(galList)) galList = [];
-
-      // Merge sheet rows into galList if not already present
-      existingSheetRows.forEach(function (er) {
-        const found = galList.some(function (g) {
-          return (er.id && String(g.id || '').trim() === er.id) ||
-                 (er.title && String(g.title || '').trim().toLowerCase() === er.title.toLowerCase());
-        });
-        if (!found) {
-          galList.push(er);
-        }
-      });
-
-      // If still empty, fall back to official banners so sheet is never left empty
-      if (galList.length === 0) {
-        galList = OFFICIAL_GALLERY_BANNERS.slice();
-      }
-
       galSheet.clear();
       const gHeaders = ['Banner ID', 'Title', 'Category', 'Date', 'Caption', 'Badge / AIR Rank', 'Image URL'];
       const gRows = [gHeaders];
+      const galList = getAllRecords_('gallery');
       galList.forEach(function (g) {
         let bannerUrl = g.imageUrl || '';
         if (bannerUrl && bannerUrl.startsWith('data:image/')) {
