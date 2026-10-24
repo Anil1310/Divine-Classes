@@ -4422,40 +4422,43 @@
             reader.onload = function (evt) {
                 const dataUrl = evt.target.result;
 
+                const applyUploadedMaterial = function (mat) {
+                    state.materials = (state.materials || []).filter(m => m.id !== mat.id);
+                    state.materials.unshift(mat);
+
+                    if (!state.notifications) state.notifications = [];
+                    state.notifications = state.notifications.filter(n => n.id !== 'notif_mat_' + mat.id);
+                    state.notifications.unshift({
+                        id: 'notif_mat_' + mat.id,
+                        title: 'New ' + mat.category + ' Uploaded',
+                        message: '"' + mat.title + '" (' + (mat.fileSize || '') + ') uploaded by ' + (mat.uploadedBy || 'Faculty') + ' is ready for download.',
+                        time: 'Just now',
+                        timestamp: Date.now(),
+                        read: false,
+                        adminSeen: false,
+                        type: 'info',
+                        icon: 'fa-file-arrow-up',
+                        iconColor: 'text-indigo-500',
+                        bgColor: 'bg-indigo-100 dark:bg-indigo-950/40',
+                        actionTab: 'materials',
+                        targetRole: 'all',
+                        materialId: mat.id
+                    });
+
+                    saveStateLocally();
+                    closeModal();
+                    renderMainContent();
+                    updateNotificationBadge();
+                    checkNewNotificationSound();
+                    showToast(`"${mat.title}" uploaded to Google Drive & Google Sheet ✓ Download link active!`, 'success');
+                };
+
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     // Real upload: file → Google Drive, URL → Cloud DB + Google Sheet
                     google.script.run
                         .withSuccessHandler(function (res) {
                             if (res && res.success && res.material) {
-                                state.materials = state.materials.filter(m => m.id !== res.material.id);
-                                state.materials.unshift(res.material);
-
-                                // Instant in-app notification (server also persists one for other devices)
-                                if (!state.notifications) state.notifications = [];
-                                state.notifications = state.notifications.filter(n => n.id !== 'notif_mat_' + res.material.id);
-                                state.notifications.unshift({
-                                    id: 'notif_mat_' + res.material.id,
-                                    title: 'New ' + res.material.category + ' Uploaded',
-                                    message: '"' + res.material.title + '" (' + res.material.fileSize + ') uploaded by ' + res.material.uploadedBy + ' is ready for download.',
-                                    time: 'Just now',
-                                    timestamp: Date.now(),
-                                    read: false,
-                                    adminSeen: false,
-                                    type: 'info',
-                                    icon: 'fa-file-arrow-up',
-                                    iconColor: 'text-indigo-500',
-                                    bgColor: 'bg-indigo-100 dark:bg-indigo-950/40',
-                                    actionTab: 'materials',
-                                    targetRole: 'all',
-                                    materialId: res.material.id
-                                });
-
-                                saveStateLocally();
-                                closeModal();
-                                renderMainContent();
-                                updateNotificationBadge();
-                                checkNewNotificationSound();
-                                showToast(`"${res.material.title}" published by ${res.material.uploadedBy} ✓ Download link active!`, 'success');
+                                applyUploadedMaterial(res.material);
                             } else {
                                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1"></i> Publish Material'; }
                                 showToast('Upload failed: ' + ((res && res.error) || 'unknown server error'), 'error');
@@ -4467,50 +4470,51 @@
                         })
                         .apiUploadMaterialToDrive(dataUrl, file.name, metadata);
                 } else {
-                    // Local / Vercel browser mode: generate working download link immediately
-                    const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'pdf').toLowerCase();
-                    const newMat = {
-                        id: 'm' + Date.now(),
-                        batchId: metadata.batchId,
-                        category: metadata.category,
-                        uploadedBy: metadata.uploadedBy,
-                        title: metadata.title,
-                        description: metadata.description,
+                    // Standalone / GitHub Pages / Android APK mode: upload to live Google Apps Script web app
+                    const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
+                    const payload = {
+                        action: 'uploadMaterial',
+                        fileData: dataUrl,
                         fileName: file.name,
-                        fileType: ext,
-                        uploadDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                        fileSize: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
-                        downloadUrl: dataUrl,
-                        driveUrl: dataUrl,
-                        downloads: 0
+                        metadata: metadata
                     };
-                    state.materials = state.materials || [];
-                    state.materials.unshift(newMat);
 
-                    if (!state.notifications) state.notifications = [];
-                    state.notifications.unshift({
-                        id: 'notif_mat_' + newMat.id,
-                        title: 'New ' + newMat.category + ' Uploaded',
-                        message: '"' + newMat.title + '" (' + newMat.fileSize + ') uploaded by ' + newMat.uploadedBy + ' is ready for download.',
-                        time: 'Just now',
-                        timestamp: Date.now(),
-                        read: false,
-                        adminSeen: false,
-                        type: 'info',
-                        icon: 'fa-file-arrow-up',
-                        iconColor: 'text-indigo-500',
-                        bgColor: 'bg-indigo-100 dark:bg-indigo-950/40',
-                        actionTab: 'materials',
-                        targetRole: 'all',
-                        materialId: newMat.id
+                    fetch(gasUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (res) {
+                        if (res && res.success && res.material) {
+                            applyUploadedMaterial(res.material);
+                        } else {
+                            throw new Error((res && res.error) || 'Upload failed');
+                        }
+                    })
+                    .catch(function (err) {
+                        console.warn('Live Google Apps Script upload failed, generating local fallback:', err);
+                        const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'pdf').toLowerCase();
+                        const localMat = {
+                            id: 'm' + Date.now(),
+                            batchId: metadata.batchId,
+                            category: metadata.category,
+                            uploadedBy: metadata.uploadedBy,
+                            title: metadata.title,
+                            description: metadata.description,
+                            fileName: file.name,
+                            fileType: ext,
+                            uploadDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                            fileSize: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
+                            downloadUrl: dataUrl,
+                            driveUrl: dataUrl,
+                            downloads: 0
+                        };
+                        applyUploadedMaterial(localMat);
+                        showToast('Saved locally. Note: To sync with Google Drive, ensure Apps Script permissions are authorized.', 'warning');
                     });
-
-                    saveStateLocally();
-                    closeModal();
-                    renderMainContent();
-                    updateNotificationBadge();
-                    checkNewNotificationSound();
-                    showToast(`"${newMat.title}" uploaded by ${newMat.uploadedBy} ✓ Download link ready for students!`, 'success');
                 }
             };
             reader.onerror = function () {
@@ -4767,40 +4771,65 @@
             } else {
                 // Standalone / GitHub Pages / Android APK mode: Call live Google Apps Script web app
                 const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
-                const callbackId = 'gas_share_cb_' + Date.now();
-                let timedOut = false;
+                
+                // Try direct POST first
+                fetch(gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'shareAdminDrive', email: email, folderUrl: customFolder })
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (res) {
+                    if (res && res.success) {
+                        onDone(res);
+                    } else {
+                        onError((res && res.error) || 'Failed to authorize Drive');
+                    }
+                })
+                .catch(function () {
+                    // Fallback to JSONP
+                    const callbackId = 'gas_share_cb_' + Date.now();
+                    let timedOut = false;
 
-                const timer = setTimeout(function () {
-                    timedOut = true;
-                    fetch(gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder), { mode: 'no-cors' })
-                        .then(function () {
-                            onDone({ success: true, emailSent: true, adminEmail: email, folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials' });
-                        })
-                        .catch(onError);
-                }, 7000);
+                    const timer = setTimeout(function () {
+                        timedOut = true;
+                        onDone({
+                            success: true,
+                            emailSent: false,
+                            adminEmail: email,
+                            folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials',
+                            mailError: 'Server request queued. Please ensure Google Apps Script project has been authorized once by the project owner.'
+                        });
+                    }, 8000);
 
-                window[callbackId] = function (res) {
-                    if (timedOut) return;
-                    clearTimeout(timer);
-                    delete window[callbackId];
-                    const el = document.getElementById(callbackId);
-                    if (el && el.parentNode) el.parentNode.removeChild(el);
-                    onDone(res);
-                };
+                    window[callbackId] = function (res) {
+                        if (timedOut) return;
+                        clearTimeout(timer);
+                        delete window[callbackId];
+                        const el = document.getElementById(callbackId);
+                        if (el && el.parentNode) el.parentNode.removeChild(el);
+                        onDone(res);
+                    };
 
-                const script = document.createElement('script');
-                script.id = callbackId;
-                script.src = gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder) + '&callback=' + callbackId;
-                script.onerror = function () {
-                    if (timedOut) return;
-                    clearTimeout(timer);
-                    fetch(gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder), { mode: 'no-cors' })
-                        .then(function () {
-                            onDone({ success: true, emailSent: true, adminEmail: email, folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials' });
-                        })
-                        .catch(onError);
-                };
-                document.body.appendChild(script);
+                    const script = document.createElement('script');
+                    script.id = callbackId;
+                    script.src = gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder) + '&callback=' + callbackId;
+                    script.onerror = function () {
+                        if (timedOut) return;
+                        clearTimeout(timer);
+                        delete window[callbackId];
+                        const el = document.getElementById(callbackId);
+                        if (el && el.parentNode) el.parentNode.removeChild(el);
+                        onDone({
+                            success: true,
+                            emailSent: false,
+                            adminEmail: email,
+                            folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials',
+                            mailError: 'To enable automated email dispatch, the Apps Script owner must authorize project permissions in the Apps Script editor.'
+                        });
+                    };
+                    document.body.appendChild(script);
+                });
             }
         }
 

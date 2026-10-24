@@ -13,19 +13,7 @@ const SPREADSHEET_ID = '1v7RZX0R8AmVDv02BCr3D_t28B8i3I8PO_qpjqMzFeKM';
  */
 function doGet(e) {
   try {
-    // Automatically recreate and audit all Google Sheet tabs (6 rows each: 1 header + 5 records)
-    try {
-      apiRestructureAllSheets();
-    } catch (autoRestructErr) {
-      Logger.log('Auto restructure on doGet: ' + autoRestructErr.toString());
-    }
-
-    if (e && e.parameter && (e.parameter.action === 'restructure' || e.parameter.action === 'recreate')) {
-      const res = apiRestructureAllSheets();
-      return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // External API invocation for Admin Google Drive authorization and email dispatch
+    // 1. External API invocation for Admin Google Drive authorization and email dispatch
     if (e && e.parameter && (e.parameter.action === 'shareAdminDrive' || e.parameter.action === 'authorizeAdmin')) {
       const email = (e.parameter.email || '').trim();
       const folderLink = (e.parameter.folderUrl || e.parameter.folderLink || '').trim();
@@ -39,6 +27,13 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 2. Explicit Sheet Recreate/Restructure API
+    if (e && e.parameter && (e.parameter.action === 'restructure' || e.parameter.action === 'recreate')) {
+      const res = apiRestructureAllSheets();
+      return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. Regular Web App Page rendering
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
     let title = 'Divine Classes - Institute Management System';
@@ -66,6 +61,59 @@ function doGet(e) {
     } catch (innerErr) {
       return HtmlService.createHtmlOutput('<h3>Error loading application: ' + err.toString() + '</h3>');
     }
+  }
+}
+
+/**
+ * Web App Entrypoint (doPost)
+ * Handles external file uploads and administrative actions from Vercel / GitHub Pages / Android APK
+ */
+function doPost(e) {
+  try {
+    let payload = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch (jsonErr) {
+        payload = e.parameter || {};
+      }
+    } else if (e && e.parameter) {
+      payload = e.parameter;
+    }
+
+    const action = (payload.action || (e && e.parameter && e.parameter.action) || '').trim();
+
+    // 1. Upload Assignment / Material to Google Drive and sync to Google Sheet
+    if (action === 'uploadMaterial') {
+      const fileData = payload.fileData || payload.fileBase64 || payload.dataUrl;
+      const fileName = payload.fileName || payload.name;
+      const metadata = payload.metadata || {
+        batchId: payload.batchId,
+        category: payload.category,
+        uploadedBy: payload.uploadedBy,
+        title: payload.title,
+        description: payload.description
+      };
+      const result = apiUploadMaterialToDrive(fileData, fileName, metadata);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. Authorize Admin Email & Send Invitation Email
+    if (action === 'shareAdminDrive' || action === 'authorizeAdmin') {
+      const email = (payload.email || (e && e.parameter && e.parameter.email) || '').trim();
+      const folderLink = (payload.folderUrl || payload.folderLink || (e && e.parameter && e.parameter.folderUrl) || '').trim();
+      const result = apiShareMaterialsDriveWithAdmin(email, folderLink);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Unknown action: ' + action }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log('doPost error: ' + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -272,7 +320,41 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
     }
 
     const fileName = originalFileName || ('Material_' + Date.now() + '.' + ext);
-    const folder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
+    
+    // Resolve target folder (use authorized admin folder if configured)
+    let folder;
+    const currentSettings = dbGetTable('settings') || {};
+    if (currentSettings.adminDriveFolderId) {
+      try {
+        folder = DriveApp.getFolderById(currentSettings.adminDriveFolderId);
+      } catch (e) {
+        Logger.log('Admin drive folder by ID failed: ' + e.toString());
+      }
+    }
+    if (!folder && currentSettings.adminDriveFolderUrl) {
+      const customId = extractDriveFolderId(currentSettings.adminDriveFolderUrl);
+      if (customId) {
+        try {
+          folder = DriveApp.getFolderById(customId);
+        } catch (e) {
+          Logger.log('Admin drive folder by URL failed: ' + e.toString());
+        }
+      }
+    }
+    if (!folder) {
+      folder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
+    }
+
+    // Ensure authorized email has Editor access to this folder
+    try {
+      const targetAdmin = (currentSettings.adminEmail || '').trim();
+      if (targetAdmin && targetAdmin.indexOf('@') !== -1) {
+        folder.addEditor(targetAdmin);
+      }
+    } catch (adminShareErr) {
+      Logger.log('Auto-grant admin folder editor skipped: ' + adminShareErr.toString());
+    }
+
     const decodedBytes = Utilities.base64Decode(base64String);
     const blob = Utilities.newBlob(decodedBytes, mimeType, fileName);
 
@@ -308,16 +390,6 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       driveFileId: fileId,
       fileName: fileName
     };
-
-    // Ensure Admin has access to the folder in their Google Drive
-    try {
-      const currentSettings = dbGetTable('settings') || {};
-      if (currentSettings.adminEmail && currentSettings.adminEmail.indexOf('@') !== -1) {
-        folder.addEditor(currentSettings.adminEmail);
-      }
-    } catch (adminShareErr) {
-      Logger.log('Auto-grant admin folder editor skipped: ' + adminShareErr.toString());
-    }
 
     // Persist to Cloud Database + Google Sheet (URL included in Materials_Repository)
     const data = apiGetInitialData();
@@ -1908,7 +1980,7 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(fbSheet, fbHeaders.length, fbRows.length, '#7c3aed', '#7c3aed');
     }
 
-    // F. Sync Materials Sheet (Materials_Repository) - Exactly 5 Records (6 Rows Total)
+    // F. Sync Materials Sheet (Materials_Repository) - Auto-synced with all uploads
     {
       let matSheet = getOrCreateSheet(ss, 'Materials_Repository', ['Materials', 'Study Materials']);
       matSheet.clear();
@@ -1916,7 +1988,18 @@ function syncReadableSheets(ss, data) {
       const mRows = [mHeaders];
       const batchMap = {};
       (data.batches || []).forEach(function(b) { batchMap[b.id] = b.name; });
-      const matList = getFiveRecords_('materials');
+      
+      // Preserve all real uploads, pad with seed materials up to 5 if fewer
+      let matList = Array.isArray(data.materials) ? data.materials.slice() : [];
+      if (matList.length < 5 && seed && Array.isArray(seed.materials)) {
+        const have = {};
+        matList.forEach(function(item) { if (item.id) have[item.id] = true; });
+        seed.materials.forEach(function(item) {
+          if ((!item.id || !have[item.id]) && matList.length < 5) {
+            matList.push(JSON.parse(JSON.stringify(item)));
+          }
+        });
+      }
       matList.forEach(function(m) {
         mRows.push([
           m.id || '',
