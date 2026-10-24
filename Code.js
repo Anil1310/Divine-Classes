@@ -27,8 +27,8 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 2. Explicit Sheet Recreate/Restructure API
-    if (e && e.parameter && (e.parameter.action === 'restructure' || e.parameter.action === 'recreate')) {
+    // 2. Explicit Sheet Recreate/Restructure/Sync API
+    if (e && e.parameter && (e.parameter.action === 'restructure' || e.parameter.action === 'recreate' || e.parameter.action === 'syncSheets')) {
       const res = apiRestructureAllSheets();
       return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
@@ -354,6 +354,19 @@ function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name) {
   } catch (err) {
     Logger.log('uploadPhotoToDeveloperDrive_ error: ' + err.toString());
     return str;
+  }
+}
+
+/**
+ * Generates a vibrant, professional random avatar URL for a student or faculty member
+ * when no custom photo has been uploaded.
+ */
+function getRandomAvatarUrl_(seed, role) {
+  const cleanSeed = (seed || 'User').toString().trim().replace(/[^a-zA-Z0-9 ]/g, '') || 'User';
+  if (role === 'teacher') {
+    return 'https://api.dicebear.com/7.x/lorelei/svg?seed=' + encodeURIComponent(cleanSeed) + '&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf';
+  } else {
+    return 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + encodeURIComponent(cleanSeed) + '&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf';
   }
 }
 
@@ -2190,32 +2203,35 @@ function apiRestructureAllSheets() {
 
     let appData = dbLoadAll();
     if (!appData) appData = getDefaultSeedData();
-    const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
 
-    if (!appData.settings) appData.settings = {};
-    appData.settings.showDummyData = true;
-    if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
-      appData.settings.dummyDataConfig = {};
-    }
-    ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function (tbl) {
-      appData.settings.dummyDataConfig[tbl] = true;
-    });
+    const isDemoDisabled = (appData.settings && appData.settings.showDummyData === false) ||
+      PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true';
 
-    // Populate each table with exactly 5 records (so each sheet tab has 1 header + 5 records = 6 rows)
-    ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-      if (!Array.isArray(appData[tbl])) appData[tbl] = [];
-      const have = {};
-      appData[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
-      (seed[tbl] || []).slice(0, 5).forEach(function (r) {
-        if (r && r.id && !have[r.id]) {
-          appData[tbl].push(JSON.parse(JSON.stringify(r)));
-        }
-      });
-      // Filter down to the 5 records if more were present
-      if (appData[tbl].length > 5) {
-        appData[tbl] = appData[tbl].slice(0, 5);
+    if (!isDemoDisabled) {
+      const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
+      if (!appData.settings) appData.settings = {};
+      appData.settings.showDummyData = true;
+      if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
+        appData.settings.dummyDataConfig = {};
       }
-    });
+      ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function (tbl) {
+        appData.settings.dummyDataConfig[tbl] = true;
+      });
+
+      // Populate each table with records
+      ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
+        if (!Array.isArray(appData[tbl])) appData[tbl] = [];
+        const have = {};
+        appData[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
+        (seed[tbl] || []).slice(0, 5).forEach(function (r) {
+          if (r && r.id && !have[r.id]) {
+            appData[tbl].push(JSON.parse(JSON.stringify(r)));
+          }
+        });
+      });
+    } else {
+      stripDummyData_(appData);
+    }
 
     // Ensure externalLinks has exactly all 5 permanent links
     if (!Array.isArray(appData.externalLinks) || appData.externalLinks.length === 0) {
@@ -2443,6 +2459,9 @@ function syncReadableSheets(ss, data) {
             Logger.log('Drive photo upload error for student: ' + e.toString());
           }
         }
+        if (!pUrl) {
+          pUrl = getRandomAvatarUrl_(s.name || s.roll, 'student');
+        }
         rows.push([
           s.roll || 'DC-101',
           s.name || 'Student Name',
@@ -2490,6 +2509,9 @@ function syncReadableSheets(ss, data) {
           } catch (e) {
             Logger.log('Drive photo upload error for teacher: ' + e.toString());
           }
+        }
+        if (!pUrl) {
+          pUrl = getRandomAvatarUrl_(tr.name || tr.id, 'teacher');
         }
         trRows.push([
           tr.id || '',

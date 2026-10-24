@@ -1245,27 +1245,74 @@
         return true;
     }
 
-    function formatPhotoUrl(url) {
-        if (!url || typeof url !== 'string') return '';
-        const trimmed = url.trim();
-        if (!trimmed) return '';
-        if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+    function getRandomAvatarUrl(seed, role) {
+        const cleanSeed = (seed || 'User').toString().trim().replace(/[^a-zA-Z0-9 ]/g, '') || 'User';
+        if (role === 'teacher') {
+            return `https://api.dicebear.com/7.x/lorelei/svg?seed=${encodeURIComponent(cleanSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+        }
+        return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(cleanSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+    }
 
-        let fileId = '';
-        let m = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (m) fileId = m[1];
-        if (!fileId) {
-            m = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-            if (m) fileId = m[1];
+    function formatPhotoUrl(url, fallbackSeed, role) {
+        if (url && typeof url === 'string') {
+            const trimmed = url.trim();
+            if (trimmed) {
+                if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+
+                let fileId = '';
+                let m = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                if (m) fileId = m[1];
+                if (!fileId) {
+                    m = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+                    if (m) fileId = m[1];
+                }
+                if (!fileId) {
+                    m = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                    if (m) fileId = m[1];
+                }
+                if (fileId) {
+                    return `https://lh3.googleusercontent.com/d/${fileId}`;
+                }
+                return trimmed;
+            }
         }
-        if (!fileId) {
-            m = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            if (m) fileId = m[1];
-        }
-        if (fileId) {
-            return `https://lh3.googleusercontent.com/d/${fileId}`;
-        }
-        return trimmed;
+        return getRandomAvatarUrl(fallbackSeed, role);
+    }
+
+    function getInlineAvatarSvg(name, role) {
+        const cleanName = (name || 'User').toString().trim();
+        const initials = cleanName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
+        const bgColors = [
+            ['#4f46e5', '#7c3aed'],
+            ['#0284c7', '#2563eb'],
+            ['#059669', '#10b981'],
+            ['#d97706', '#f59e0b'],
+            ['#e11d48', '#f43f5e'],
+            ['#7c2d12', '#ea580c'],
+            ['#0891b2', '#06b6d4'],
+            ['#6366f1', '#4f46e5']
+        ];
+        let hash = 0;
+        for (let i = 0; i < cleanName.length; i++) hash = (hash << 5) - hash + cleanName.charCodeAt(i);
+        const pair = bgColors[Math.abs(hash) % bgColors.length];
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><defs><linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${pair[0]}" /><stop offset="100%" stop-color="${pair[1]}" /></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g_${Math.abs(hash)})" /><text x="50" y="56" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="36" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${initials}</text></svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function renderUserAvatar(photo, name, role, sizeClass) {
+        const sz = sizeClass || 'w-10 h-10';
+        const cleanName = escapeAttr(name || 'User');
+        const fallbackInline = getInlineAvatarSvg(name, role);
+        const initialUrl = formatPhotoUrl(photo, name, role);
+
+        return `
+            <div class="${sz} rounded-xl overflow-hidden border border-indigo-200/80 dark:border-indigo-800/80 bg-white dark:bg-slate-800 shrink-0 shadow-2xs relative flex items-center justify-center">
+                <img src="${initialUrl}" 
+                     alt="${cleanName}" 
+                     class="w-full h-full object-cover" 
+                     onerror="this.onerror=null; this.src='${fallbackInline}';">
+            </div>
+        `;
     }
 
     let autoSyncTimer = null;
@@ -1344,16 +1391,16 @@
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'syncData', data: state })
                 })
-                .then(function (res) { return res.json(); })
-                .then(function (res) {
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
-                })
-                .catch(function (err) {
-                    console.warn('Remote sync notice:', err);
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                });
+                    .then(function (res) { return res.json(); })
+                    .then(function (res) {
+                        state.lastSyncTime = new Date().toLocaleTimeString();
+                        updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                    })
+                    .catch(function (err) {
+                        console.warn('Remote sync notice:', err);
+                        state.lastSyncTime = new Date().toLocaleTimeString();
+                        updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
+                    });
             }
         }, delay);
     }
@@ -1448,29 +1495,29 @@
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'syncData', data: state })
             })
-            .then(function (r) { return r.json(); })
-            .then(function () {
-                return fetch(GAS_WEBAPP_URL + '?action=getData');
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (remoteData) {
-                if (remoteData && remoteData.students) {
-                    mergeRemoteData(remoteData);
-                }
-                if (icon) icon.classList.remove('fa-spin');
-                if (btn) btn.disabled = false;
-                state.lastSyncTime = new Date().toLocaleTimeString();
-                updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
-                showToast('2-Way Google Sheet sync complete! All tabs updated.', 'success');
-                renderMainContent();
-            })
-            .catch(function (err) {
-                if (icon) icon.classList.remove('fa-spin');
-                if (btn) btn.disabled = false;
-                state.lastSyncTime = new Date().toLocaleTimeString();
-                updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                showToast('State saved locally. Remote sync queued.', 'info');
-            });
+                .then(function (r) { return r.json(); })
+                .then(function () {
+                    return fetch(GAS_WEBAPP_URL + '?action=getData');
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (remoteData) {
+                    if (remoteData && remoteData.students) {
+                        mergeRemoteData(remoteData);
+                    }
+                    if (icon) icon.classList.remove('fa-spin');
+                    if (btn) btn.disabled = false;
+                    state.lastSyncTime = new Date().toLocaleTimeString();
+                    updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                    showToast('2-Way Google Sheet sync complete! All tabs updated.', 'success');
+                    renderMainContent();
+                })
+                .catch(function (err) {
+                    if (icon) icon.classList.remove('fa-spin');
+                    if (btn) btn.disabled = false;
+                    state.lastSyncTime = new Date().toLocaleTimeString();
+                    updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
+                    showToast('State saved locally. Remote sync queued.', 'info');
+                });
         }
     }
     const syncWithGoogleSheet = syncWithDatabase;
@@ -2342,13 +2389,7 @@
                                                     ${enrolledStudents.map(stu => `
                                                         <div class="px-3.5 py-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition">
                                                             <div class="flex items-center gap-3">
-                                                                ${stu.photo ? `
-                                                                    <img src="${stu.photo}" alt="${escapeHtml(stu.name)}" class="w-8 h-8 rounded-full object-cover border border-indigo-300 shrink-0">
-                                                                ` : `
-                                                                    <div class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-bold text-xs flex items-center justify-center shrink-0">
-                                                                        ${stu.name.split(' ').map(n => n[0]).join('')}
-                                                                    </div>
-                                                                `}
+                                                                <img src="${formatPhotoUrl(stu.photo, stu.name || stu.roll, 'student')}" alt="${escapeHtml(stu.name)}" class="w-8 h-8 rounded-full object-cover border border-indigo-300 shrink-0">
                                                                 <div>
                                                                     <div class="flex items-center gap-1.5">
                                                                         <p class="text-xs font-semibold text-slate-800">${stu.name}</p>
@@ -2944,11 +2985,7 @@
                     <!-- Student Photo Upload Card -->
                     <div class="flex items-center gap-3.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
                         <div id="edit-stu-photo-preview" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-200 bg-white flex items-center justify-center shrink-0 shadow-2xs">
-                            ${stu.photo ? `
-                                <img src="${formatPhotoUrl(stu.photo)}" class="w-full h-full object-cover">
-                            ` : `
-                                <span class="text-indigo-600 font-bold text-lg">${stu.name.split(' ').map(n => n[0]).join('')}</span>
-                            `}
+                            <img src="${formatPhotoUrl(stu.photo, stu.name || stu.roll, 'student')}" class="w-full h-full object-cover">
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Student Passport Photo</p>
@@ -2962,9 +2999,6 @@
                                 <button type="button" onclick="handleEditStudentPhotoRemove()" class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
                                     Remove
                                 </button>
-                            </div>
-                            <div class="mt-2">
-                                <input type="text" id="edit-stu-photo-url-input" placeholder="Or paste Google Drive Photo link..." value="${escapeAttr(stu.photo && !stu.photo.startsWith('data:') ? stu.photo : '')}" oninput="handleEditStudentPhotoUrlChange(this.value)" class="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-mono text-[11px] bg-white">
                             </div>
                             <input type="hidden" id="edit-stu-photo-val" value="${escapeAttr(stu.photo || '')}">
                         </div>
@@ -3132,13 +3166,7 @@
                     <!-- Faculty Photo Card -->
                     <div class="flex items-center gap-3.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
                         <div id="edit-tch-photo-preview" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-200 bg-white flex items-center justify-center shrink-0 shadow-2xs">
-                            ${tch.photo ? `
-                                <img src="${formatPhotoUrl(tch.photo)}" class="w-full h-full object-cover">
-                            ` : `
-                                <div class="w-full h-full bg-gradient-to-tr ${tch.avatarColor || 'from-indigo-600 to-blue-600'} text-white flex items-center justify-center font-bold text-base">
-                                    ${escapeHtml(tch.initials || tch.name.slice(0, 2))}
-                                </div>
-                            `}
+                            <img src="${formatPhotoUrl(tch.photo, tch.name, 'teacher')}" class="w-full h-full object-cover">
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Faculty Member Photo</p>
@@ -3152,9 +3180,6 @@
                                 <button type="button" onclick="handleEditTeacherPhotoRemove()" class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
                                     Remove
                                 </button>
-                            </div>
-                            <div class="mt-2">
-                                <input type="text" id="edit-tch-photo-url-input" placeholder="Or paste Google Drive Photo link..." value="${escapeAttr(tch.photo && !tch.photo.startsWith('data:') ? tch.photo : '')}" oninput="handleEditTeacherPhotoUrlChange(this.value)" class="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-mono text-[11px] bg-white">
                             </div>
                             <input type="hidden" id="edit-tch-photo-val" value="${escapeAttr(tch.photo || '')}">
                         </div>
@@ -3371,13 +3396,7 @@
                                             <tr class="hover:bg-slate-50/80 transition">
                                                 <td class="py-3.5 px-4">
                                                     <div class="flex items-center gap-2.5">
-                                                        ${stu.photo ? `
-                                                            <img src="${formatPhotoUrl(stu.photo)}" alt="${escapeHtml(stu.name)}" class="w-8 h-8 rounded-full object-cover border border-indigo-200 shrink-0">
-                                                        ` : `
-                                                            <div class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-bold text-xs flex items-center justify-center shrink-0">
-                                                                ${stu.name.split(' ').map(n => n[0]).join('')}
-                                                            </div>
-                                                        `}
+                                                        <img src="${formatPhotoUrl(stu.photo, stu.name || stu.roll, 'student')}" alt="${escapeHtml(stu.name)}" class="w-8 h-8 rounded-full object-cover border border-indigo-200 shrink-0">
                                                         <div>
                                                             <p class="font-bold text-slate-900">${stu.name}</p>
                                                             <p class="text-[11px] text-slate-400">${stu.roll}</p>
@@ -3799,15 +3818,9 @@
                             <h3 class="text-lg font-black tracking-tight font-heading leading-tight">Divine Classes</h3>
                         <p class="text-[10px] text-indigo-100 tracking-wide font-semibold">Student Identity Card</p>
                     </div>
-                    <!-- Student Photo or Initials Avatar -->
+                    <!-- Student Photo or Random Avatar -->
                     <div class="relative w-24 h-24 mx-auto mb-3">
-                        ${stu.photo ? `
-                            <img src="${stu.photo}" alt="${escapeHtml(stu.name)}" class="w-24 h-24 rounded-2xl object-cover border-2 border-indigo-500 shadow-md">
-                        ` : `
-                            <div class="w-24 h-24 rounded-2xl bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center text-indigo-600 font-bold text-3xl shadow-inner">
-                                ${stu.name.split(' ').map(n => n[0]).join('')}
-                            </div>
-                        `}
+                        <img src="${formatPhotoUrl(stu.photo, stu.name || stu.roll, 'student')}" alt="${escapeHtml(stu.name)}" class="w-24 h-24 rounded-2xl object-cover border-2 border-indigo-500 shadow-md">
                     </div>
 
                     <h4 class="text-base font-bold text-slate-900 font-heading">${stu.name}</h4>
@@ -3995,9 +4008,9 @@
                     <div class="flex justify-center pt-2 ${filteredMaterials.length === 6 ? 'md:hidden' : ''}">
                         <button onclick="toggleShowAllMaterials()" class="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-2 shadow-xs transition hover:border-indigo-300">
                             ${state.showAllMaterials
-                                ? '<i class="fa-solid fa-compress text-indigo-600"></i> Show Standard (5 on Mobile / 6 on Laptop)'
-                                : `<i class="fa-solid fa-layer-group text-indigo-600"></i> View All ${filteredMaterials.length} Uploads`
-                            }
+                    ? '<i class="fa-solid fa-compress text-indigo-600"></i> Show Standard (5 on Mobile / 6 on Laptop)'
+                    : `<i class="fa-solid fa-layer-group text-indigo-600"></i> View All ${filteredMaterials.length} Uploads`
+                }
                         </button>
                     </div>
                     ` : ''}
@@ -5099,13 +5112,7 @@
                         ${visibleTeachers.map(t => `
                             <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition flex flex-col justify-between">
                                 <div class="flex items-start gap-4">
-                                    ${t.photo ? `
-                                        <img src="${formatPhotoUrl(t.photo)}" alt="${escapeHtml(t.name)}" class="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shrink-0 shadow-md">
-                                    ` : `
-                                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br ${t.avatarColor || 'from-indigo-600 to-blue-600'} text-white font-bold text-xl flex items-center justify-center shrink-0 shadow-md">
-                                            ${escapeHtml(t.initials || t.name.slice(0, 2))}
-                                        </div>
-                                    `}
+                                    <img src="${formatPhotoUrl(t.photo, t.name, 'teacher')}" alt="${escapeHtml(t.name)}" class="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shrink-0 shadow-md">
                                     <div class="flex-1">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <h3 class="text-base font-bold text-slate-900 font-heading">${t.name}</h3>
@@ -5211,9 +5218,6 @@
                                 <button type="button" onclick="handleAddTeacherPhotoRemove()" class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
                                     Remove
                                 </button>
-                            </div>
-                            <div class="mt-2">
-                                <input type="text" id="add-tch-photo-url-input" placeholder="Or paste Google Drive Photo link..." oninput="handleAddTeacherPhotoUrlChange(this.value)" class="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-mono text-[11px] bg-white">
                             </div>
                             <input type="hidden" id="tr-photo-val" value="">
                         </div>
@@ -5935,13 +5939,7 @@
                                             <tr class="hover:bg-slate-50/60 transition ${isBlocked ? 'bg-rose-50/20' : isInactive ? 'bg-slate-50/60 opacity-80' : ''}">
                                                 <td class="py-3 px-4">
                                                     <div class="flex items-center gap-3">
-                                                        ${s.photo ? `
-                                                            <img src="${s.photo}" alt="${escapeHtml(s.name)}" class="w-9 h-9 rounded-xl object-cover border border-indigo-200 shrink-0">
-                                                        ` : `
-                                                            <div class="w-9 h-9 rounded-xl ${isBlocked ? 'bg-rose-100 text-rose-700' : isInactive ? 'bg-slate-100 text-slate-500' : 'bg-indigo-100 text-indigo-700'} font-bold text-xs flex items-center justify-center shrink-0">
-                                                                ${s.name.split(' ').map(n => n[0]).join('')}
-                                                            </div>
-                                                        `}
+                                                        ${renderUserAvatar(s.photo, s.name, 'student', 'w-10 h-10')}
                                                         <div>
                                                             <div class="font-bold text-slate-900">${s.name}</div>
                                                             <div class="text-[11px] text-slate-500">Roll: <span class="font-mono font-semibold text-indigo-600">${s.roll}</span> • Parent: ${s.parentName}</div>
@@ -6042,13 +6040,7 @@
                                             <tr class="hover:bg-slate-50/60 transition ${isBlocked ? 'bg-rose-50/20' : ''}">
                                                 <td class="py-3 px-4">
                                                     <div class="flex items-center gap-3">
-                                                        ${tr.photo ? `
-                                                            <img src="${formatPhotoUrl(tr.photo)}" alt="${escapeHtml(tr.name)}" class="w-9 h-9 rounded-xl object-cover border border-indigo-200 shrink-0">
-                                                        ` : `
-                                                            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${tr.avatarColor || 'from-indigo-600 to-blue-600'} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                                                                ${escapeHtml(tr.initials || tr.name.split(' ').map(n => n[0]).join(''))}
-                                                            </div>
-                                                        `}
+                                                        ${renderUserAvatar(tr.photo, tr.name, 'teacher', 'w-10 h-10')}
                                                         <div>
                                                             <div class="font-bold text-slate-900">${tr.name}</div>
                                                             <div class="text-[11px] text-slate-500">${tr.subject}</div>
@@ -6846,16 +6838,16 @@
                     <!-- Category Tab Switcher (Responsive, horizontal scroll on mobile) -->
                     <div class="flex items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
                         ${tabs.map(t => {
-                            const isSel = activeTab === t.id;
-                            return `
+            const isSel = activeTab === t.id;
+            return `
                                 <button type="button" onclick="switchSettingsTab('${t.id}')" class="px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap flex items-center gap-2 cursor-pointer shrink-0 ${isSel
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold'
-                                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'}">
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'}">
                                     <i class="fa-solid ${t.icon}"></i>
                                     <span>${t.label}</span>
                                 </button>
                             `;
-                        }).join('')}
+        }).join('')}
                     </div>
 
                     <!-- Settings Form -->
@@ -7000,9 +6992,8 @@
                                         </div>
                                     </div>
 
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="grid grid-cols-1 gap-4">
                                         ${inputField('adminDriveEmail', 'Admin Google / Gmail ID', s.adminEmail || '', 'email', 'admin@divineclasses.in')}
-                                        ${inputField('adminDriveFolderUrl', 'Admin Drive Folder Link (Optional)', s.adminDriveFolderUrl || '', 'url', 'https://drive.google.com/drive/folders/...')}
                                     </div>
 
                                     <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -7015,10 +7006,6 @@
                                         </button>
                                     </div>
 
-                                    <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
-                                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">Coaching Owner's Direct Drive Link (Optional):</label>
-                                        ${inputField('driveFolderUrl', "Owner's Drive Folder Link (paste here)", s.driveFolderUrl, 'text', 'https://drive.google.com/drive/folders/...')}
-                                    </div>
                                 </div>
                             `)}
 
@@ -7196,7 +7183,7 @@
                 <div class="w-full min-h-[92vh] flex flex-col items-center justify-center py-6 sm:py-10 px-4">
                     ${renderLoginCardHtml(false)}
                     <footer class="mt-8 text-center text-[11px] text-slate-500">
-                        <p>© 2026 Divine Classes • ${getShortAddress()} • Contact: ${state.settings.contactDisplay || '9555-6787-53'}</p>
+                        <p>© 2026 Divine Classes • ${getShortAddress()} • Contact: ${state.settings.contactDisplay || '9555678753'}</p>
                     </footer>
                 </div>
             `;
@@ -7869,7 +7856,7 @@
                             renderMainContent();
                         }
                     })
-                    .catch(function () {});
+                    .catch(function () { });
             }
         });
     };
