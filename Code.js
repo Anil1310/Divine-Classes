@@ -1,5 +1,5 @@
 /**
- * MIA - INSTITUTE MANAGEMENT SYSTEM
+ * Divine Classes - INSTITUTE MANAGEMENT SYSTEM
  * Google Apps Script Backend
  * 
  * Script ID: 1H8yxx2UFoy7Rw6qwF6S4LT7wzSR1762YbX_cFrvPyHwz933AcL4Mx9To
@@ -41,14 +41,14 @@ function doGet(e) {
 
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
-    let title = 'MIA - Institute Management System';
+    let title = 'Divine Classes - Institute Management System';
 
     if (page === 'login') {
       templateName = 'login';
-      title = 'Sign In - MIA Portal';
+      title = 'Sign In - Divine Classes Portal';
     } else if (page === 'logout') {
       templateName = 'logout';
-      title = 'Signed Out - MIA Portal';
+      title = 'Signed Out - Divine Classes Portal';
     }
 
     const template = HtmlService.createTemplateFromFile(templateName);
@@ -60,7 +60,7 @@ function doGet(e) {
     try {
       const fallback = HtmlService.createTemplateFromFile('index');
       return fallback.evaluate()
-        .setTitle('MIA - Institute Management System')
+        .setTitle('Divine Classes - Institute Management System')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     } catch (innerErr) {
@@ -106,7 +106,7 @@ function apiGetSpreadsheetUrl() {
  * the Materials_Repository Google Sheet tab so students can download it.
  */
 
-const DRIVE_ROOT_FOLDER_NAME = 'MIA Portal Uploads';
+const DRIVE_ROOT_FOLDER_NAME = 'Divine Classes Portal Uploads';
 const DRIVE_MATERIALS_FOLDER = 'Study Materials & Documents';
 const DRIVE_FOLDERS = {
   PHOTOS: 'Student Photographs',
@@ -153,7 +153,7 @@ function getDriveRootFolder() {
       if (cachedSubRoot) {
         try { return DriveApp.getFolderById(cachedSubRoot); } catch (e) { Logger.log('Cached owner subroot gone: ' + e.toString()); }
       }
-      // Create/reuse "MIA Portal Uploads" inside the OWNER's folder
+      // Create/reuse "Divine Classes Portal Uploads" inside the OWNER's folder
       const subs = ownerFolder.getFoldersByName(DRIVE_ROOT_FOLDER_NAME);
       let subRoot;
       if (subs.hasNext()) {
@@ -181,7 +181,7 @@ function getDriveRootFolder() {
     root = folders.next();
   } else {
     root = DriveApp.createFolder(DRIVE_ROOT_FOLDER_NAME);
-    root.setDescription('Official storage folder for MIA Portal uploads, photographs, materials, and external links.');
+    root.setDescription('Official storage folder for Divine Classes Portal uploads, photographs, materials, and external links.');
     try {
       root.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     } catch (e) {
@@ -409,7 +409,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       emailToUse = String(data.settings.adminEmail).trim();
     }
     if (!emailToUse) {
-      emailToUse = 'contact@mia.in';
+      emailToUse = 'contact@divineclasses.in';
     }
 
     // Resolve target folder
@@ -451,7 +451,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
     }
 
     // Compose official authorization email to Admin
-    const instituteName = data.settings.instituteName || 'Mia';
+    const instituteName = data.settings.instituteName || 'Divine Classes';
     const adminName = data.settings.adminName || 'Admin';
     const subject = 'Action Required: ' + instituteName + ' Study Materials & Assignment Drive Access';
     
@@ -459,7 +459,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       'Google Drive Editor access has been granted to your email (' + emailToUse + ') for the official ' + instituteName + ' Study Materials & Assignments Folder.\n\n' +
       'Click this link to authorize and open the folder in your Google Drive:\n' +
       folderUrl + '\n\n' +
-      '• Folder: MIA Portal Uploads > ' + DRIVE_MATERIALS_FOLDER + '\n' +
+      '• Folder: Divine Classes Portal Uploads > ' + DRIVE_MATERIALS_FOLDER + '\n' +
       '• Master apps script and storage are hosted in Developer Google account.\n' +
       '• All assignments, test files, and worksheets uploaded by you or faculty are automatically linked in your Google Sheet (Materials_Repository tab) for student downloads.\n\n' +
       'Regards,\n' + instituteName + ' System';
@@ -473,7 +473,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
         '<div style="display: inline-block; padding: 4px 12px; background-color: #e0e7ff; color: #4338ca; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Admin Authorization Required</div>' +
         '<h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Authorize Google Drive Access for Assignments & Materials</h2>' +
         '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>' + adminName + '</strong>,</p>' +
-        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">You have been designated as an authorized administrator for the <strong>MIA Assignment & Study Material Cloud Repository</strong>. Your Google account (<strong>' + emailToUse + '</strong>) now has full Editor access to the folder.</p>' +
+        '<p style="font-size: 14px; line-height: 1.6; color: #334155;">You have been designated as an authorized administrator for the <strong>Divine Classes Assignment & Study Material Cloud Repository</strong>. Your Google account (<strong>' + emailToUse + '</strong>) now has full Editor access to the folder.</p>' +
         '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">' +
           '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📂 Shared Folder:</strong> ' + DRIVE_MATERIALS_FOLDER + '</p>' +
           '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📧 Authorized Email:</strong> ' + emailToUse + '</p>' +
@@ -492,7 +492,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       '</div>' +
       '<div style="border-top: 1px solid #f1f5f9; padding-top: 18px; font-size: 11px; color: #94a3b8; text-align: center;">' +
         '<p style="margin: 0;">Main Apps Script code & system database hosted in Developer Google account. Client Admin authorized via email.</p>' +
-        '<p style="margin: 4px 0 0 0;">MIA Paschimpuri New Delhi • Official Portal System</p>' +
+        '<p style="margin: 4px 0 0 0;">Divine Classes Paschimpuri New Delhi • Official Portal System</p>' +
       '</div>' +
     '</div>';
 
@@ -538,7 +538,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       title: 'Official Google Drive — Assignments & Study Materials Folder',
       category: 'Drive Repository',
       url: folderUrl,
-      description: 'Shared Google Drive folder for MIA assignments, test papers, and worksheets. Authorized for ' + emailToUse,
+      description: 'Shared Google Drive folder for Divine Classes assignments, test papers, and worksheets. Authorized for ' + emailToUse,
       clicks: 0
     };
     if (linkIndex >= 0) {
@@ -604,7 +604,7 @@ function apiGetNotifications() {
 }
 
 /**
- * Seed dataset for MIA (modularized via DummyData.js)
+ * Seed dataset for Divine Classes (modularized via DummyData.js)
  */
 function getDefaultSeedData() {
   if (typeof getDummySeedData === 'function') {
@@ -662,13 +662,13 @@ function getDefaultSeedData() {
       }
     ];
     data.settings = {
-      instituteName: 'Mia',
+      instituteName: 'Divine Classes',
       tagline: 'Empowering Aspirants for JEE, NEET & Board Excellence',
       phone: '+91 95556 78753',
       contactDisplay: '9555-6787-53',
-      email: 'contact@mia.in',
+      email: 'contact@divineclasses.in',
       address: '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063',
-      upiId: 'mia@upi',
+      upiId: 'divineclasses@upi',
       facebookUrl: 'https://facebook.com',
       instagramUrl: 'https://instagram.com',
       youtubeUrl: 'https://www.youtube.com/@chem_crush9',
@@ -1993,11 +1993,12 @@ function syncReadableSheets(ss, data) {
       const sHeaders = ['Setting Parameter', 'Configured Value', 'Description'];
       const sRows = [sHeaders];
       const s = data.settings;
-      sRows.push(['Institute Name', s.instituteName || 'Mia', 'Official Coaching Name']);
+      const sInstName = (s.instituteName && s.instituteName !== 'Mia' && s.instituteName !== 'MIA') ? s.instituteName : 'Divine Classes';
+      sRows.push(['Institute Name', sInstName, 'Official Coaching Name']);
       sRows.push(['Tagline', s.tagline || '', 'Coaching Slogan & Mission']);
       sRows.push(['Helpline Phone', s.phone || '', 'Official Contact Number']);
       sRows.push(['Display Contact', s.contactDisplay || '9555-6787-53', 'Formatted Helpline']);
-      sRows.push(['Official Email', s.email || 'contact@mia.in', 'Inquiry Email']);
+      sRows.push(['Official Email', s.email || 'contact@divineclasses.in', 'Inquiry Email']);
       sRows.push(['Address', s.address || '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063', 'Center Location']);
       sRows.push(['YouTube Channel', s.youtubeUrl || 'https://www.youtube.com/@chem_crush9', 'Official Video Channel']);
       sRows.push(['Admin Name', s.adminName || 'Er. Rajesh Chahar', 'Display Name of Institute Admin']);
@@ -2005,7 +2006,7 @@ function syncReadableSheets(ss, data) {
       sRows.push(['Admin Email ID', s.adminEmail || '', 'Official Admin Contact / Login Email']);
       sRows.push(['Admin Google Drive Folder Link', s.adminDriveFolderUrl || '', 'Official Shared Assignments & Materials Google Drive Folder']);
       sRows.push(['Admin Drive Access Status', s.adminDriveShared ? ('Authorized (' + (s.adminEmail || 'Admin') + ')') : 'Pending Authorization Mail', 'Google Drive Permission Status']);
-      sRows.push(['UPI Payment ID', s.upiId || 'mia@upi', 'Fee Collection UPI']);
+      sRows.push(['UPI Payment ID', s.upiId || 'divineclasses@upi', 'Fee Collection UPI']);
       sRows.push(['Facebook Page', s.facebookUrl || 'https://facebook.com', 'Social Channel']);
       sRows.push(['Instagram Profile', s.instagramUrl || 'https://instagram.com', 'Social Channel']);
       sRows.push(['Show Requirement Labels', (s.showRequirementLabels === false) ? 'Off' : 'On', 'Page header "Requirement #N" tags (toggle in Settings)']);
@@ -2148,7 +2149,7 @@ function apiUpdateAdminPassword(newPassword) {
 function onOpen(e) {
   try {
     SpreadsheetApp.getUi()
-      .createMenu('🌟 MIA')
+      .createMenu('🌟 Divine Classes')
       .addItem('⚡ Recreate & Populate 6-Row Demo Data (All Sheets)', 'apiRestructureAllSheets')
       .addItem('🔄 Sync All Sheets to Web App', 'apiRestructureAllSheets')
       .addToUi();
