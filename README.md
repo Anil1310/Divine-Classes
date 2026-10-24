@@ -395,6 +395,14 @@ The receipt modal features an official authentication badge:
 
 Table headers and data cells for **Status / Due Date** enforce `whitespace-nowrap` so dates like `Due: 2026-10-25` and `Last reminded: 2 days ago` never break awkwardly onto new lines.
 
+### 8.5 WhatsApp PDF Assignment & DPP Dispatch (`sendMaterialWhatsApp`)
+
+In the **Batch Assignments, DPPs & Test Papers** module, faculty and administrators can instantly dispatch PDF study material links directly to students or parents on WhatsApp with one click:
+
+- **WhatsApp Action Trigger:** A vibrant emerald WhatsApp button alongside every material item (`<i class="fa-brands fa-whatsapp text-emerald-400"></i>`).
+- **Real Red PDF Icon:** Dedicated red PDF indicator (`<i class="fa-solid fa-file-pdf text-rose-500"></i>`) paired with clean "Download" action link for direct Google Drive access.
+- **Smart Recipient Selector:** Prompts to send either to a specific enrolled student or parent, with pre-formatted batch name, title, upload date, and direct download URL.
+
 ---
 
 ## 9. Operational Core Modules Implementation
@@ -466,6 +474,24 @@ On mobile screens, `#notification-dropdown` expands to the full screen width:
 - Respects system preferences (`prefers-color-scheme: dark`) and manual toggle.
 - Persisted in `localStorage.getItem('theme')`.
 - Styled using Tailwind's `dark:` variant classes across all modals, cards, inputs, and tables.
+
+### 11.5 Android-App-Style Mobile Bottom Navigation Bar
+
+For mobile devices and phone viewports (`< 1024px`), the portal features a native Android-app-style bottom navigation bar docked firmly at the bottom of the screen (`lg:hidden shrink-0`):
+
+- **6 Quick-Access Action Buttons:**
+  - **Developer Mode:** `Home`, `Batches`, `Fees`, `Marks`, `Settings`, `Menu`
+  - **Admin Mode:** `Home`, `Batches`, `Fees`, `DPPs`, `Marks`, `Menu`
+  - **Teacher / Student Mode:** `Home`, `Batches`, `DPPs`, `Marks`, `Feedback`, `Menu`
+- **Active Tab Micro-Indicator:** Vibrant indigo active state (`text-indigo-400 font-bold`) with a glowing top indicator dot (`bg-indigo-400`) and tactile active scale animation (`active:scale-95`).
+- **Sidebar Drawer Integration:** Tapping the **Menu** button triggers the slide-out sidebar drawer with an animated backdrop, providing access to all remaining secondary views without cluttering the screen.
+
+### 11.6 Dual-Viewport Layout Lock (Fixed Sidebar & Independent Workspace Scroll)
+
+Prevents outer body window scrolling across all pages, ensuring complex modules like the multi-form Institute Settings console remain fluid:
+- **`html, body` Constraint:** `height: 100%; overflow: hidden; margin: 0; padding: 0;` locks viewport boundaries.
+- **Desktop Sidebar:** `<aside id="sidebar">` styled with `lg:static lg:h-full lg:shrink-0` to guarantee the left sidebar remains 100% fixed on the left while only the central workspace (`#main-content`) scrolls.
+- **Flexbox Min-Height Resolution:** `#main-content` and its wrapper container enforce `min-h-0 min-w-0`, resolving CSS Flexbox expansion bugs where tall forms would otherwise stretch the root window.
 
 ---
 
