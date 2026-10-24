@@ -474,15 +474,13 @@ function apiDeleteMaterial(materialId) {
 function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
   try {
     let emailToUse = String(adminEmail || '').trim();
+    if (!emailToUse || emailToUse.indexOf('@') === -1) {
+      return { success: false, error: 'Please enter a valid email address to authorize Google Drive.' };
+    }
+
     const data = apiGetInitialData();
     if (!data.settings) data.settings = {};
-
-    if (!emailToUse && data.settings.adminEmail) {
-      emailToUse = String(data.settings.adminEmail).trim();
-    }
-    if (!emailToUse) {
-      emailToUse = 'contact@divineclasses.in';
-    }
+    data.settings.instituteName = 'Divine Classes';
 
     // Resolve target folder
     let folder;
@@ -513,32 +511,30 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
 
     // Grant Editor access to Admin's email so it appears in Admin's Drive & Sheets
     let editorAdded = false;
-    if (emailToUse && emailToUse.indexOf('@') !== -1) {
-      try {
-        folder.addEditor(emailToUse);
-        editorAdded = true;
-      } catch (addEditorErr) {
-        Logger.log('folder.addEditor error: ' + addEditorErr.toString());
-      }
+    try {
+      folder.addEditor(emailToUse);
+      editorAdded = true;
+    } catch (addEditorErr) {
+      Logger.log('folder.addEditor error: ' + addEditorErr.toString());
     }
 
     // Compose official authorization email to Admin
-    const instituteName = data.settings.instituteName || 'Divine Classes';
+    const instituteName = 'Divine Classes';
     const adminName = data.settings.adminName || 'Admin';
-    const subject = 'Action Required: ' + instituteName + ' Study Materials & Assignment Drive Access';
+    const subject = 'Action Required: Divine Classes Study Materials & Assignment Drive Access';
     
     const textBody = 'Dear ' + adminName + ',\n\n' +
-      'Google Drive Editor access has been granted to your email (' + emailToUse + ') for the official ' + instituteName + ' Study Materials & Assignments Folder.\n\n' +
+      'Google Drive Editor access has been granted to your email (' + emailToUse + ') for the official Divine Classes Study Materials & Assignments Folder.\n\n' +
       'Click this link to authorize and open the folder in your Google Drive:\n' +
       folderUrl + '\n\n' +
       '• Folder: Divine Classes Portal Uploads > ' + DRIVE_MATERIALS_FOLDER + '\n' +
       '• Master apps script and storage are hosted in Developer Google account.\n' +
       '• All assignments, test files, and worksheets uploaded by you or faculty are automatically linked in your Google Sheet (Materials_Repository tab) for student downloads.\n\n' +
-      'Regards,\n' + instituteName + ' System';
+      'Regards,\nDivine Classes System';
 
     const htmlBody = '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">' +
       '<div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #4f46e5;">' +
-        '<h1 style="color: #1e1b4b; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">' + instituteName.toUpperCase() + '</h1>' +
+        '<h1 style="color: #1e1b4b; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">DIVINE CLASSES</h1>' +
         '<p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0; font-weight: 500;">Premier Coaching for JEE Advanced, NEET & Foundations</p>' +
       '</div>' +
       '<div style="padding: 24px 0;">' +
@@ -1350,6 +1346,13 @@ function apiGetInitialData() {
         /Paschimpuri Pocket 2, Club Road New Delhi/i.test(appData.settings.address)) {
       appData.settings.address = appData.settings.address
         .replace(/Club Road/i, 'Club Rd');
+    }
+
+    // Institute name normalization: ensure Divine Classes is always used instead of Mia/MIA
+    if (appData.settings) {
+      if (!appData.settings.instituteName || /^mia$/i.test(String(appData.settings.instituteName).trim())) {
+        appData.settings.instituteName = 'Divine Classes';
+      }
     }
 
     // Persist verified state in the Cloud Database
@@ -2250,11 +2253,15 @@ function onOpen(e) {
 function debugShareAdminDrive() {
   try {
     const data = apiGetInitialData();
-    const targetEmail = (data.settings && data.settings.adminEmail) || Session.getActiveUser().getEmail() || '';
-    Logger.log('Running test share with target email: ' + targetEmail);
-    const res = apiShareMaterialsDriveWithAdmin(targetEmail, '');
-    Logger.log('apiShareMaterialsDriveWithAdmin result: ' + JSON.stringify(res));
-    return res;
+    const instName = (data.settings && data.settings.instituteName) || 'Divine Classes';
+    const driveFolder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
+    Logger.log('System verified: ' + instName + ' | Drive folder: ' + driveFolder.getUrl());
+    return {
+      success: true,
+      instituteName: 'Divine Classes',
+      driveFolderUrl: driveFolder.getUrl(),
+      message: 'Drive and database verified. Authorization emails are triggered directly from the UI when a user enters an email address.'
+    };
   } catch (e) {
     Logger.log('debugShareAdminDrive error: ' + e.toString() + ' Stack: ' + e.stack);
     return { success: false, error: e.toString(), stack: e.stack };

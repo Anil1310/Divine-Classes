@@ -1188,22 +1188,22 @@
         if (!state.settings.instituteName || state.settings.instituteName === 'Mia' || state.settings.instituteName === 'MIA') {
             state.settings.instituteName = 'Divine Classes';
         }
-    // Strict enforcement: Retain genuine fee notices & material alerts, never wipe on refresh.
-    if (!state.notifications || !Array.isArray(state.notifications)) {
-        state.notifications = [];
-    } else {
-        state.notifications = state.notifications.filter(n => n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_')));
-    }
-
-    // Auto-heal materials: Ensure EVERY material card has a working download link!
-    if (state.materials && Array.isArray(state.materials)) {
-        state.materials.forEach(function (mat) {
-            if (!mat.downloadUrl && !mat.driveUrl) {
-                ensureMaterialDownloadUrl(mat);
-            }
-        });
-    }
+        // Strict enforcement: Retain genuine fee notices & material alerts, never wipe on refresh.
+        if (!state.notifications || !Array.isArray(state.notifications)) {
+            state.notifications = [];
+        } else {
+            state.notifications = state.notifications.filter(n => n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_')));
         }
+
+        // Auto-heal materials: Ensure EVERY material card has a working download link!
+        if (state.materials && Array.isArray(state.materials)) {
+            state.materials.forEach(function (mat) {
+                if (!mat.downloadUrl && !mat.driveUrl) {
+                    ensureMaterialDownloadUrl(mat);
+                }
+            });
+        }
+    }
 
     function escapeHtml(str) {
         if (str === null || str === undefined) return '';
@@ -4062,37 +4062,37 @@
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 })
-                .then(function (response) {
-                    return response.json();
-                })
-                .then(function (res) {
-                    if (res && res.success && res.material) {
-                        applyUploadedMaterial(res.material);
-                    } else {
-                        throw new Error((res && res.error) || 'Upload failed');
-                    }
-                })
-                .catch(function (err) {
-                    console.warn('Live Google Apps Script upload failed, generating local fallback:', err);
-                    const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'pdf').toLowerCase();
-                    const localMat = {
-                        id: 'm' + Date.now(),
-                        batchId: metadata.batchId,
-                        category: metadata.category,
-                        uploadedBy: metadata.uploadedBy,
-                        title: metadata.title,
-                        description: metadata.description,
-                        fileName: file.name,
-                        fileType: ext,
-                        uploadDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                        fileSize: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
-                        downloadUrl: dataUrl,
-                        driveUrl: dataUrl,
-                        downloads: 0
-                    };
-                    applyUploadedMaterial(localMat);
-                    showToast('Saved locally. Note: To sync with Google Drive, ensure Apps Script permissions are authorized.', 'warning');
-                });
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (res) {
+                        if (res && res.success && res.material) {
+                            applyUploadedMaterial(res.material);
+                        } else {
+                            throw new Error((res && res.error) || 'Upload failed');
+                        }
+                    })
+                    .catch(function (err) {
+                        console.warn('Live Google Apps Script upload failed, generating local fallback:', err);
+                        const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'pdf').toLowerCase();
+                        const localMat = {
+                            id: 'm' + Date.now(),
+                            batchId: metadata.batchId,
+                            category: metadata.category,
+                            uploadedBy: metadata.uploadedBy,
+                            title: metadata.title,
+                            description: metadata.description,
+                            fileName: file.name,
+                            fileType: ext,
+                            uploadDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                            fileSize: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
+                            downloadUrl: dataUrl,
+                            driveUrl: dataUrl,
+                            downloads: 0
+                        };
+                        applyUploadedMaterial(localMat);
+                        showToast('Saved locally. Note: To sync with Google Drive, ensure Apps Script permissions are authorized.', 'warning');
+                    });
             }
         };
         reader.onerror = function () {
@@ -4349,66 +4349,66 @@
         } else {
             // Standalone / GitHub Pages / Android APK mode: Call live Google Apps Script web app
             const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
-            
+
             // Try direct POST first
             fetch(gasUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'shareAdminDrive', email: email, folderUrl: customFolder })
             })
-            .then(function (res) { return res.json(); })
-            .then(function (res) {
-                if (res && res.success) {
-                    onDone(res);
-                } else {
-                    onError((res && res.error) || 'Failed to authorize Drive');
-                }
-            })
-            .catch(function () {
-                // Fallback to JSONP
-                const callbackId = 'gas_share_cb_' + Date.now();
-                let timedOut = false;
+                .then(function (res) { return res.json(); })
+                .then(function (res) {
+                    if (res && res.success) {
+                        onDone(res);
+                    } else {
+                        onError((res && res.error) || 'Failed to authorize Drive');
+                    }
+                })
+                .catch(function () {
+                    // Fallback to JSONP
+                    const callbackId = 'gas_share_cb_' + Date.now();
+                    let timedOut = false;
 
-                const timer = setTimeout(function () {
-                    timedOut = true;
-                    // Provide a clear explanation if Apps Script authorization is pending
-                    onDone({
-                        success: true,
-                        emailSent: false,
-                        adminEmail: email,
-                        folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials',
-                        mailError: 'Server request queued. Please ensure Google Apps Script project has been authorized once by the project owner.'
-                    });
-                }, 8000);
+                    const timer = setTimeout(function () {
+                        timedOut = true;
+                        // Provide a clear explanation if Apps Script authorization is pending
+                        onDone({
+                            success: true,
+                            emailSent: false,
+                            adminEmail: email,
+                            folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials',
+                            mailError: 'Server request queued. Please ensure Google Apps Script project has been authorized once by the project owner.'
+                        });
+                    }, 8000);
 
-                window[callbackId] = function (res) {
-                    if (timedOut) return;
-                    clearTimeout(timer);
-                    delete window[callbackId];
-                    const el = document.getElementById(callbackId);
-                    if (el && el.parentNode) el.parentNode.removeChild(el);
-                    onDone(res);
-                };
+                    window[callbackId] = function (res) {
+                        if (timedOut) return;
+                        clearTimeout(timer);
+                        delete window[callbackId];
+                        const el = document.getElementById(callbackId);
+                        if (el && el.parentNode) el.parentNode.removeChild(el);
+                        onDone(res);
+                    };
 
-                const script = document.createElement('script');
-                script.id = callbackId;
-                script.src = gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder) + '&callback=' + callbackId;
-                script.onerror = function () {
-                    if (timedOut) return;
-                    clearTimeout(timer);
-                    delete window[callbackId];
-                    const el = document.getElementById(callbackId);
-                    if (el && el.parentNode) el.parentNode.removeChild(el);
-                    onDone({
-                        success: true,
-                        emailSent: false,
-                        adminEmail: email,
-                        folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials',
-                        mailError: 'To enable automated email dispatch, the Apps Script owner must authorize project permissions in the Apps Script editor.'
-                    });
-                };
-                document.body.appendChild(script);
-            });
+                    const script = document.createElement('script');
+                    script.id = callbackId;
+                    script.src = gasUrl + '?action=shareAdminDrive&email=' + encodeURIComponent(email) + '&folderUrl=' + encodeURIComponent(customFolder) + '&callback=' + callbackId;
+                    script.onerror = function () {
+                        if (timedOut) return;
+                        clearTimeout(timer);
+                        delete window[callbackId];
+                        const el = document.getElementById(callbackId);
+                        if (el && el.parentNode) el.parentNode.removeChild(el);
+                        onDone({
+                            success: true,
+                            emailSent: false,
+                            adminEmail: email,
+                            folderUrl: customFolder || 'https://drive.google.com/drive/folders/divine-classes-materials',
+                            mailError: 'To enable automated email dispatch, the Apps Script owner must authorize project permissions in the Apps Script editor.'
+                        });
+                    };
+                    document.body.appendChild(script);
+                });
         }
     }
 
@@ -6619,6 +6619,9 @@
         });
         if (state.settings.adminDriveEmail) {
             state.settings.adminEmail = state.settings.adminDriveEmail;
+        }
+        if (!state.settings.instituteName || /^mia$/i.test(String(state.settings.instituteName).trim())) {
+            state.settings.instituteName = 'Divine Classes';
         }
         saveStateLocally();
         showToast('All institute settings saved and synced to Cloud Database + Google Sheet!', 'success');

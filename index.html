@@ -7045,6 +7045,9 @@
             if (state.settings.adminDriveEmail) {
                 state.settings.adminEmail = state.settings.adminDriveEmail;
             }
+            if (!state.settings.instituteName || /^mia$/i.test(String(state.settings.instituteName).trim())) {
+                state.settings.instituteName = 'Divine Classes';
+            }
             saveStateLocally();
             showToast('All institute settings saved and synced to Cloud Database + GSheet!', 'success');
             // Force an immediate server sync (saveStateLocally's auto-sync is debounced),
