@@ -1601,6 +1601,20 @@
                 state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
             });
         }
+        if (state.batches && state.batches.length > 0 && state.students && Array.isArray(state.students)) {
+            const defaultBatch = state.batches[0];
+            if (!defaultBatch.studentIds) defaultBatch.studentIds = [];
+            const otherBatches = state.batches.slice(1);
+            state.students.forEach(function (s) {
+                if (s && s.status !== 'Inactive') {
+                    const inOther = otherBatches.some(function (ob) { return isStudentInBatch(ob, s); });
+                    if (!inOther && !isStudentInBatch(defaultBatch, s)) {
+                        defaultBatch.studentIds.push(s.id);
+                        defaultBatch.studentIds.push(s.roll);
+                    }
+                }
+            });
+        }
         if (state.students && Array.isArray(state.students)) {
             state.students.forEach(function (s) {
                 if (!s.admissionDate) s.admissionDate = '2026-10-10';
@@ -2681,6 +2695,39 @@
     /********************************************************************
      * REQUIREMENT 1: BATCH CREATION, ADD & REMOVE STUDENTS
      ********************************************************************/
+    function isStudentInBatch(batch, stu) {
+        if (!batch || !stu) return false;
+        const ids = batch.studentIds || [];
+        const sId = String(stu.id || '').trim().toLowerCase();
+        const sRoll = String(stu.roll || '').trim().toLowerCase();
+        const sNum = String(stu.roll || '').replace(/\D/g, '');
+        return ids.some(function (id) {
+            const clean = String(id || '').trim().toLowerCase();
+            if (clean === sId || clean === sRoll) return true;
+            if (sNum && clean.replace(/\D/g, '') === sNum) return true;
+            return false;
+        });
+    }
+
+    function getBatchStudents(batch) {
+        if (!batch) return (state.students || []).filter(function (s) { return s && s.status !== 'Inactive'; });
+        let list = (state.students || []).filter(function (s) { return s && s.status !== 'Inactive' && isStudentInBatch(batch, s); });
+        // If this is the primary batch (state.batches[0]), also include any active student not in any other batch
+        // so no student from Google Sheets or enrollment is ever hidden!
+        if (state.batches && state.batches.length > 0 && batch.id === state.batches[0].id) {
+            const otherBatches = state.batches.slice(1);
+            (state.students || []).forEach(function (s) {
+                if (s && s.status !== 'Inactive') {
+                    const inOther = otherBatches.some(function (ob) { return isStudentInBatch(ob, s); });
+                    if (!inOther && !list.some(function (item) { return item.roll === s.roll || item.id === s.id; })) {
+                        list.push(s);
+                    }
+                }
+            });
+        }
+        return list;
+    }
+
     function renderBatchesView() {
         const canEdit = state.currentRole === 'admin' || state.currentRole === 'teacher';
 
@@ -2704,7 +2751,7 @@
                     <!-- Batch Cards Grid -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         ${state.batches.map(batch => {
-            const enrolledStudents = (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(s => s && s.status !== 'Inactive');
+            const enrolledStudents = getBatchStudents(batch);
             return `
                                 <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
                                     <!-- Batch Header -->
@@ -2850,7 +2897,7 @@
 
     function openAddStudentToBatchModal(batchId) {
         const batch = state.batches.find(b => b.id === batchId);
-        const availableStudents = state.students.filter(s => s.status !== 'Inactive' && !(batch.studentIds || []).includes(s.id));
+        const availableStudents = (state.students || []).filter(s => s && s.status !== 'Inactive' && !isStudentInBatch(batch, s));
 
         const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -2955,18 +3002,19 @@
         e.preventDefault();
         const stuId = document.getElementById('existing-student-id').value;
         const batch = state.batches.find(b => b.id === batchId);
-        const stu = state.students.find(s => s.id === stuId);
-        if (batch && !(batch.studentIds || []).includes(stuId)) {
+        const stu = (state.students || []).find(s => s && (s.id === stuId || s.roll === stuId));
+        if (batch && stu) {
             if (!batch.studentIds) batch.studentIds = [];
-            batch.studentIds.push(stuId);
+            if (!batch.studentIds.includes(stu.id)) batch.studentIds.push(stu.id);
+            if (!batch.studentIds.includes(stu.roll)) batch.studentIds.push(stu.roll);
             saveStateLocally();
         }
         closeModal();
         renderMainContent();
-        showToast(`${stu.name} added to ${batch.name}`, 'success');
+        showToast(`${stu ? stu.name : 'Student'} added to ${batch ? batch.name : 'Batch'}`, 'success');
     }
 
-    function handleAddNewStudentToBatch(e, batchId) {
+        function handleAddNewStudentToBatch(e, batchId) {
         e.preventDefault();
         if (window.isEnrollingStudent) return;
         
@@ -2980,7 +3028,7 @@
         const nextDueDate = calculateNextFeeReminder(admissionDate, 1);
 
         // Check if a student with the exact same name already exists in state
-        const existingStu = (state.students || []).find(s => s.name && s.name.trim().toLowerCase() === name.toLowerCase());
+        const existingStu = (state.students || []).find(s => s && s.name && s.name.trim().toLowerCase() === name.toLowerCase());
         if (existingStu) {
             showToast(`Student "${name}" already enrolled (${existingStu.roll})!`, 'warning');
             return;
@@ -2995,62 +3043,85 @@
         // Find true maximum numeric roll number across all students to prevent roll collisions
         let maxRollNum = 100;
         (state.students || []).forEach(s => {
-            const m = String(s.roll || '').match(/\d+/);
+            const m = String((s && s.roll) || '').match(/\d+/);
             if (m) {
                 const num = parseInt(m[0], 10);
                 if (num > maxRollNum) maxRollNum = num;
             }
         });
         const nextRoll = 'DC-' + (maxRollNum + 1);
+        const stuId = 'stu_' + (maxRollNum + 1);
 
         const newStu = {
-            id: 's' + Date.now(),
+            id: stuId,
             roll: nextRoll,
-            name,
-            parentName,
-            phone,
-            admissionDate,
-            monthlyFee,
+            name: name,
+            parentName: parentName,
+            phone: phone,
+            admissionDate: admissionDate,
+            monthlyFee: monthlyFee,
             totalFee: monthlyFee,
             paidFee: initialPaid,
             dueDate: nextDueDate,
             lastReminder: 'Never',
             photo: window.newStudentPhotoData || '',
+            photoUrl: window.newStudentPhotoData || '',
             password: 'password123',
             status: 'Active'
         };
         window.newStudentPhotoData = '';
 
         state.students.push(newStu);
-        const batch = state.batches.find(b => b.id === batchId);
+        const batch = (state.batches || []).find(b => b.id === batchId) || (state.batches && state.batches[0]);
         if (batch) {
             if (!batch.studentIds) batch.studentIds = [];
             if (!batch.studentIds.includes(newStu.id)) batch.studentIds.push(newStu.id);
+            if (!batch.studentIds.includes(newStu.roll)) batch.studentIds.push(newStu.roll);
+        }
+        if (state.batches && state.batches[0] && state.batches[0] !== batch) {
+            if (!state.batches[0].studentIds) state.batches[0].studentIds = [];
+            if (!state.batches[0].studentIds.includes(newStu.id)) state.batches[0].studentIds.push(newStu.id);
+            if (!state.batches[0].studentIds.includes(newStu.roll)) state.batches[0].studentIds.push(newStu.roll);
         }
 
-        // Save locally without firing racing apiSyncAllData, allowing apiAppendStudent to be authoritative
         saveStateLocally(true);
         closeModal();
         renderMainContent();
         showToast(`New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}! Syncing to Google Sheet...`, 'info');
 
-        // Immediately append to Students_Master in Google Sheet (Two-Way Sync)
+        function onAppendSuccess(res) {
+            window.isEnrollingStudent = false;
+            if (res && res.success) {
+                if (res.student) {
+                    const idx = state.students.findIndex(s => (s && s.roll === res.student.roll) || (s && s.id === newStu.id));
+                    if (idx !== -1) {
+                        state.students[idx] = Object.assign({}, state.students[idx], res.student);
+                    } else {
+                        state.students.push(res.student);
+                    }
+                }
+                if (res.batches && Array.isArray(res.batches) && res.batches.length > 0) {
+                    state.batches = res.batches;
+                }
+                saveStateLocally(true);
+                renderMainContent();
+                showToast(`✓ ${name} (${res.student ? res.student.roll : newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
+                updateSyncBadge('✓ Sheet Synced', 'success');
+            } else {
+                console.warn('apiAppendStudent response:', res);
+            }
+        }
+
+        function onAppendError(err) {
+            window.isEnrollingStudent = false;
+            console.error('apiAppendStudent error:', err);
+            showToast('Google Sheet append notice: ' + err, 'warning');
+        }
+
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function (res) {
-                    window.isEnrollingStudent = false;
-                    if (res && res.success) {
-                        showToast(`✓ ${name} (${newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
-                        updateSyncBadge('✓ Sheet Synced', 'success');
-                    } else {
-                        console.warn('apiAppendStudent response:', res);
-                    }
-                })
-                .withFailureHandler(function (err) {
-                    window.isEnrollingStudent = false;
-                    console.error('apiAppendStudent error:', err);
-                    showToast('Google Sheet append notice: ' + err, 'warning');
-                })
+                .withSuccessHandler(onAppendSuccess)
+                .withFailureHandler(onAppendError)
                 .apiAppendStudent(newStu, batchId);
         } else {
             fetch(GAS_WEBAPP_URL, {
@@ -3059,16 +3130,8 @@
                 body: JSON.stringify({ action: 'appendStudent', studentData: newStu, batchId: batchId })
             })
                 .then(function (res) { return res.json(); })
-                .then(function (res) {
-                    window.isEnrollingStudent = false;
-                    if (res && res.success) {
-                        showToast(`✓ ${name} (${newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
-                    }
-                })
-                .catch(function (e) {
-                    window.isEnrollingStudent = false;
-                    console.warn('Fetch appendStudent notice:', e);
-                });
+                .then(onAppendSuccess)
+                .catch(onAppendError);
         }
     }
 
@@ -3081,7 +3144,7 @@
             showToast('Only Admin can remove students. Teachers may add students, but removal is admin-only.', 'error');
             return;
         }
-        const stu = state.students.find(s => s.id === studentId);
+        const stu = state.students.find(s => s && (s.id === studentId || s.roll === studentId));
         if (!stu) return;
         const batch = batchId ? state.batches.find(b => b.id === batchId) : null;
 
@@ -3169,9 +3232,11 @@
             return;
         }
         const batch = state.batches.find(b => b.id === batchId);
-        const stu = state.students.find(s => s.id === studentId);
+        const stu = state.students.find(s => s && (s.id === studentId || s.roll === studentId));
         if (batch) {
-            batch.studentIds = (batch.studentIds || []).filter(id => id !== studentId);
+            const sid = stu ? stu.id : studentId;
+            const sroll = stu ? stu.roll : null;
+            batch.studentIds = (batch.studentIds || []).filter(id => id !== sid && id !== sroll && id !== studentId);
         }
         saveStateLocally();
         closeModal();
@@ -3398,7 +3463,7 @@
             showToast('Student record not found.', 'error');
             return;
         }
-        const curBatch = (state.batches || []).find(b => (b.studentIds || []).includes(studentId));
+        const curBatch = (state.batches || []).find(b => isStudentInBatch(b, stu));
         const curBatchId = curBatch ? curBatch.id : '';
 
         const modalHtml = `
@@ -4419,7 +4484,7 @@
     function sendStudentIdCardOnWhatsApp(studentId) {
         const stu = state.students.find(s => s.id === studentId);
         if (!stu) return;
-        const batch = state.batches.find(b => (b.studentIds || []).includes(stu.id)) || state.batches.find(b => b.id === stu.batchId) || state.batches[0];
+        const batch = state.batches.find(b => isStudentInBatch(b, stu)) || state.batches[0];
         const batchName = batch ? batch.name : 'Divine Classes General Batch';
         const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
         const studentRoll = stu.roll || stu.id || 'DC-101';
@@ -5484,7 +5549,7 @@
                 `;
         }
         const batch = state.batches.find(b => b.id === selectedTest.batchId);
-        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(Boolean).filter(s => s.status !== 'Inactive') : [];
+        const batchStudents = batch ? getBatchStudents(batch) : [];
 
         // Stats for selected test
         const scores = batchStudents.map(s => (selectedTest.marks[s.id]?.score || 0));
@@ -5897,7 +5962,7 @@
             return;
         }
         const batch = (state.batches || []).find(b => b.id === test.batchId);
-        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(Boolean) : state.students;
+        const batchStudents = batch ? getBatchStudents(batch) : (state.students || []).filter(s => s.status !== 'Inactive');
 
         if (!test.marks) test.marks = {};
         let savedCount = 0;
@@ -6080,7 +6145,7 @@
         const test = (state.offlineTests || []).find(t => t.id === testId);
         if (!test) return;
         const batch = (state.batches || []).find(b => b.id === test.batchId);
-        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(Boolean) : state.students;
+        const batchStudents = batch ? getBatchStudents(batch) : (state.students || []).filter(s => s.status !== 'Inactive');
         const scores = batchStudents.map(s => (test.marks && test.marks[s.id]) ? Number(test.marks[s.id].score) || 0 : 0);
         const evaluatedCount = batchStudents.filter(s => test.marks && test.marks[s.id] && test.marks[s.id].score > 0).length;
         const highest = scores.length ? Math.max(...scores) : 0;
@@ -7398,7 +7463,7 @@
         if (window.accessBatchFilter && window.accessBatchFilter !== 'all') {
             const batch = state.batches.find(b => b.id === window.accessBatchFilter);
             if (batch) {
-                list = list.filter(s => (batch.studentIds || []).includes(s.id));
+                list = list.filter(s => isStudentInBatch(batch, s));
             }
         }
         const activeStudentsCount = (state.students || []).filter(s => s.status !== 'Inactive').length;
@@ -7695,7 +7760,7 @@
      * AUTHENTICATION & ACCESS CONTROL ACTION HANDLERS
      ********************************************************************/
     function toggleStudentStatus(stuId) {
-        const stu = state.students.find(s => s.id === stuId);
+        const stu = state.students.find(s => s && (s.id === stuId || s.roll === stuId));
         if (!stu) return;
         const newStatus = stu.status === 'Blocked' ? 'Active' : 'Blocked';
         stu.status = newStatus;
@@ -7858,7 +7923,7 @@
         let phone = '';
 
         if (type === 'student') {
-            const s = state.students.find(x => x.id === id);
+            const s = state.students.find(x => x && (x.id === id || x.roll === id));
             if (!s) return;
             target = s;
             phone = (s.phone || '').trim();

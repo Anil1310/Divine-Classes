@@ -1431,13 +1431,11 @@ function mergeStudentsFromSheet_(appData) {
       if (!roll && !name) continue;
 
       const rollKey = roll ? roll.toLowerCase() : "";
-      const nameKey = name ? name.toLowerCase() : "";
-      const dupKey = rollKey || nameKey;
-      if (dupKey && seenRollsInSheet[dupKey]) {
+      if (rollKey && seenRollsInSheet[rollKey]) {
         duplicateRowsToDelete.push(i + 1); // 1-indexed row number in sheet
         continue;
       }
-      if (dupKey) seenRollsInSheet[dupKey] = true;
+      if (rollKey) seenRollsInSheet[rollKey] = true;
 
       let admissionDate = cAdmission !== -1 ? row[cAdmission] : '';
       if (admissionDate instanceof Date && !isNaN(admissionDate)) {
@@ -1502,10 +1500,11 @@ function mergeStudentsFromSheet_(appData) {
         }
         updated++;
       } else {
-        const slug = roll ? roll.toLowerCase().replace(/[^a-z0-9]/g, '') : Date.now().toString(36);
+        const cleanRoll = roll || ('DC-' + (100 + appData.students.length + 1));
+        const stuId = 'stu_' + cleanRoll.replace(/\D/g, '');
         appData.students.push({
-          id: 's_' + slug + '_' + i,
-          roll: roll || ('DC-' + (100 + appData.students.length + 1)),
+          id: stuId,
+          roll: cleanRoll,
           name: name || 'Unnamed Student',
           admissionDate: admissionDate || '2026-10-10',
           password: password,
@@ -3566,24 +3565,51 @@ function apiAppendStudent(studentData, batchId) {
     if (!data.students) data.students = [];
     if (!data.batches) data.batches = [];
 
-    // Ensure unique roll number
+    // Find the absolute highest numeric roll number across BOTH sheet AND data.students
+    const sheetVals = stuSheet.getDataRange().getValues();
+    let maxRollNum = 100;
+    
+    for (let r = 1; r < sheetVals.length; r++) {
+      const valStr = String(sheetVals[r][0] || '');
+      const m = valStr.match(/\d+/);
+      if (m) {
+        const n = parseInt(m[0], 10);
+        if (n > maxRollNum) maxRollNum = n;
+      }
+    }
+    data.students.forEach(function(s) {
+      const valStr = String((s && s.roll) || '');
+      const m = valStr.match(/\d+/);
+      if (m) {
+        const n = parseInt(m[0], 10);
+        if (n > maxRollNum) maxRollNum = n;
+      }
+    });
+
+    // Check if the provided roll already exists in the sheet or data
     let roll = studentData.roll;
-    if (!roll) {
-      let maxNum = 100;
-      data.students.forEach(function(s) {
-        const m = String(s.roll || '').match(/\d+/);
-        if (m) {
-          const n = parseInt(m[0], 10);
-          if (n > maxNum) maxNum = n;
+    let rollAlreadyExists = false;
+    if (roll) {
+      const checkRoll = String(roll).trim().toUpperCase();
+      for (let r = 1; r < sheetVals.length; r++) {
+        if (String(sheetVals[r][0] || '').trim().toUpperCase() === checkRoll) {
+          rollAlreadyExists = true;
+          break;
         }
-      });
-      roll = 'DC-' + (maxNum + 1);
+      }
+      if (!rollAlreadyExists) {
+        rollAlreadyExists = data.students.some(function(s) {
+          return String((s && s.roll) || '').trim().toUpperCase() === checkRoll;
+        });
+      }
+    }
+
+    // If roll wasn't given, or is already taken, ALWAYS assign the next highest roll!
+    if (!roll || rollAlreadyExists) {
+      roll = 'DC-' + (maxRollNum + 1);
     }
     
-    // Check if student with this roll or id already exists
-    let existingIndex = data.students.findIndex(function(s) { 
-      return s.id === studentData.id || (roll && s.roll === roll); 
-    });
+    const stuId = 'stu_' + roll.replace(/\D/g, '');
 
     // Handle photo upload to drive if base64
     let pUrl = studentData.photoUrl || studentData.photo || '';
@@ -3598,7 +3624,7 @@ function apiAppendStudent(studentData, batchId) {
       pUrl = getRandomAvatarUrl_(studentData.name || roll, 'student');
     }
 
-    const monthly = Number(studentData.monthlyFee || studentData.totalFee) || 0;
+    const monthly = Number(studentData.monthlyFee || studentData.totalFee) || 2500;
     const paid = Number(studentData.paidFee) || 0;
     const balance = Math.max(0, monthly - paid);
     const isPaid = balance <= 0;
@@ -3611,7 +3637,7 @@ function apiAppendStudent(studentData, batchId) {
     const lastReminder = studentData.lastReminder || 'Never';
 
     const newStudentObj = {
-      id: studentData.id || ('s' + Date.now()),
+      id: stuId,
       roll: roll,
       name: studentData.name,
       parentName: parentName,
@@ -3628,21 +3654,22 @@ function apiAppendStudent(studentData, batchId) {
       status: status
     };
 
-    if (existingIndex >= 0) {
-      data.students[existingIndex] = newStudentObj;
-    } else {
-      data.students.push(newStudentObj);
-    }
+    // Push new student object
+    data.students.push(newStudentObj);
 
     // Assign to batch
-    if (batchId) {
-      const b = data.batches.find(function(batch) { return batch.id === batchId; });
-      if (b) {
-        if (!b.studentIds) b.studentIds = [];
-        if (b.studentIds.indexOf(newStudentObj.id) === -1) {
-          b.studentIds.push(newStudentObj.id);
-        }
-      }
+    const targetBatchId = batchId || (data.batches[0] ? data.batches[0].id : 'b1');
+    const b = data.batches.find(function(batch) { return batch.id === targetBatchId; }) || data.batches[0];
+    if (b) {
+      if (!b.studentIds) b.studentIds = [];
+      if (b.studentIds.indexOf(stuId) === -1) b.studentIds.push(stuId);
+      if (b.studentIds.indexOf(roll) === -1) b.studentIds.push(roll);
+    }
+    // Also ensure primary batch has this student
+    if (data.batches[0] && data.batches[0] !== b) {
+      if (!data.batches[0].studentIds) data.batches[0].studentIds = [];
+      if (data.batches[0].studentIds.indexOf(stuId) === -1) data.batches[0].studentIds.push(stuId);
+      if (data.batches[0].studentIds.indexOf(roll) === -1) data.batches[0].studentIds.push(roll);
     }
 
     // Clear any tombstone for this roll
@@ -3651,7 +3678,7 @@ function apiAppendStudent(studentData, batchId) {
     // Save to Database Properties
     dbSaveAll(data);
 
-    // Append or update in Students_Master in Google Sheet
+    // Always APPEND a new row to Students_Master in Google Sheet (never replace existing student row)
     const newRow = [
       roll,
       newStudentObj.name,
@@ -3669,26 +3696,23 @@ function apiAppendStudent(studentData, batchId) {
       pUrl
     ];
 
-    // Always APPEND new student record to Google Sheet (never replace existing student row)
     stuSheet.appendRow(newRow);
     const targetRow = stuSheet.getLastRow();
     SpreadsheetApp.flush();
     
-    // Style the row
+    // Style the new row
     stuSheet.getRange(targetRow, 1, 1, 14).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
-    // Access status cell (Col 5)
     stuSheet.getRange(targetRow, 5)
       .setBackground(status === 'Active' ? '#dcfce7' : (status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
       .setFontColor(status === 'Active' ? '#166534' : (status === 'Blocked' ? '#991b1b' : '#64748b'))
       .setFontWeight('bold');
-    // Fee status cell (Col 11)
     stuSheet.getRange(targetRow, 11)
       .setBackground(isPaid ? '#dcfce7' : '#fee2e2')
       .setFontColor(isPaid ? '#166534' : '#991b1b')
       .setFontWeight('bold');
 
-    Logger.log('Successfully saved student ' + newStudentObj.name + ' (' + roll + ') to Students_Master sheet row ' + targetRow);
-    return { success: true, student: newStudentObj, row: targetRow };
+    Logger.log('Successfully appended student ' + newStudentObj.name + ' (' + roll + ') to Students_Master row ' + targetRow);
+    return { success: true, student: newStudentObj, batches: data.batches, row: targetRow };
   } catch (err) {
     Logger.log('apiAppendStudent error: ' + err.toString());
     return { success: false, message: err.toString() };
