@@ -1257,6 +1257,15 @@ function dbLoadAll() {
 
 function dbSaveAll(fullData) {
   if (!fullData) return false;
+  if (Array.isArray(fullData.students)) {
+    const seenRolls = {};
+    fullData.students = fullData.students.filter(function (s) {
+      const k = String(s.roll || s.id || "").trim().toLowerCase();
+      if (!k || seenRolls[k]) return false;
+      seenRolls[k] = true;
+      return true;
+    });
+  }
   DB_TABLES.forEach(function (tbl) {
     if (fullData[tbl] !== undefined) {
       dbSetTable(tbl, fullData[tbl]);
@@ -1413,11 +1422,22 @@ function mergeStudentsFromSheet_(appData) {
     const cLastReminder = getCol(['last reminder sent', 'last reminder'], cFeeStatus !== -1 ? 12 : 11);
     const cPhoto = getCol(['photo url', 'photo'], cFeeStatus !== -1 ? 13 : 12);
 
+    const duplicateRowsToDelete = [];
+    const seenRollsInSheet = {};
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
       const roll = String(row[cRoll] || '').trim();
       const name = String(row[cName] || '').trim();
       if (!roll && !name) continue;
+
+      const rollKey = roll ? roll.toLowerCase() : "";
+      const nameKey = name ? name.toLowerCase() : "";
+      const dupKey = rollKey || nameKey;
+      if (dupKey && seenRollsInSheet[dupKey]) {
+        duplicateRowsToDelete.push(i + 1); // 1-indexed row number in sheet
+        continue;
+      }
+      if (dupKey) seenRollsInSheet[dupKey] = true;
 
       let admissionDate = cAdmission !== -1 ? row[cAdmission] : '';
       if (admissionDate instanceof Date && !isNaN(admissionDate)) {
@@ -1504,49 +1524,30 @@ function mergeStudentsFromSheet_(appData) {
       }
     }
 
-    // Two-Way Sync: If students exist in the app but are not yet in Students_Master,
-    // append them to Students_Master so the Google Sheet stays 100% in sync with web app!
-    try {
-      const sheetRollsMap = {};
-      for (let i = 1; i < values.length; i++) {
-        const r = String(values[i][cRoll !== -1 ? cRoll : 0] || '').trim();
-        if (r) sheetRollsMap[r] = true;
+    // Automatically delete any duplicate rows found in Students_Master sheet (bottom to top)
+    if (duplicateRowsToDelete.length > 0) {
+      Logger.log("Deleting " + duplicateRowsToDelete.length + " duplicate student row(s) from Students_Master sheet.");
+      for (let d = duplicateRowsToDelete.length - 1; d >= 0; d--) {
+        try {
+          sheet.deleteRow(duplicateRowsToDelete[d]);
+        } catch (delErr) {
+          Logger.log("deleteRow error in Students_Master: " + delErr.toString());
+        }
       }
-      const unappendedStudents = (appData.students || []).filter(function (s) {
-        const roll = String(s.roll || '').trim();
-        return roll && !sheetRollsMap[roll] && s.status !== 'Inactive';
-      });
-      if (unappendedStudents.length > 0) {
-        unappendedStudents.forEach(function (s) {
-          const monthly = Number(s.monthlyFee || s.totalFee) || 0;
-          const paid = Number(s.paidFee) || 0;
-          const balance = Math.max(0, monthly - paid);
-          const isPaid = balance <= 0;
-          const adm = s.admissionDate || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-          const due = s.dueDate || calculateNextFeeReminder_(adm, 1);
-          const pUrl = s.photoUrl || s.photo || getRandomAvatarUrl_(s.name || s.roll, 'student');
-          sheet.appendRow([
-            s.roll,
-            s.name || 'Student Name',
-            adm,
-            s.password || 'password123',
-            s.status || 'Active',
-            s.parentName || 'Parent Name',
-            s.phone || '',
-            monthly,
-            paid,
-            balance,
-            isPaid ? 'Paid' : 'Pending',
-            due,
-            s.lastReminder || 'Never',
-            pUrl
-          ]);
-        });
-        Logger.log('Two-Way Sync: Appended ' + unappendedStudents.length + ' app student(s) to Students_Master in Google Sheet.');
-      }
-    } catch (syncAppendErr) {
-      Logger.log('Two-way sync append notice: ' + syncAppendErr.toString());
+      SpreadsheetApp.flush();
     }
+
+    // Ensure appData.students contains unique rolls only
+    const uniqueStudents = [];
+    const seenRollsInApp = {};
+    (appData.students || []).forEach(function (s) {
+      const k = String(s.roll || s.id || "").trim().toLowerCase();
+      if (k && !seenRollsInApp[k]) {
+        seenRollsInApp[k] = true;
+        uniqueStudents.push(s);
+      }
+    });
+    appData.students = uniqueStudents;
 
     if (added || updated) {
       Logger.log('Students_Master sheet merge: ' + added + ' added, ' + updated + ' updated');
@@ -2967,7 +2968,11 @@ function syncReadableSheets(ss, data) {
       const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
       const rows = [headers];
       const stuList = getAllRecords_('students');
+      const seenRollsInSync = {};
       stuList.forEach(function(s) {
+        const rollKey = String(s.roll || s.id || '').trim().toLowerCase();
+        if (rollKey && seenRollsInSync[rollKey]) return; // Skip duplicate!
+        if (rollKey) seenRollsInSync[rollKey] = true;
         const monthly = Number(s.monthlyFee || s.totalFee) || 0;
         const paid = Number(s.paidFee) || 0;
         const balance = Math.max(0, monthly - paid);
@@ -3532,11 +3537,19 @@ function debugShareAdminDrive() {
  * to the Google Sheet in an appended manner and saved in backend database.
  */
 function apiAppendStudent(studentData, batchId) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (lockErr) {
+    Logger.log("Lock wait notice in apiAppendStudent: " + lockErr.toString());
+  }
+
   try {
     const ss = getDbSpreadsheet();
     if (!ss) return { success: false, message: 'Spreadsheet not found' };
     const stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
     
+    SpreadsheetApp.flush();
     const data = apiGetInitialData();
     if (!data.students) data.students = [];
     if (!data.batches) data.batches = [];
@@ -3644,10 +3657,14 @@ function apiAppendStudent(studentData, batchId) {
       pUrl
     ];
 
+    SpreadsheetApp.flush();
     const stuVals = stuSheet.getDataRange().getValues();
     let targetRow = -1;
     for (let r = 1; r < stuVals.length; r++) {
-      if (String(stuVals[r][0] || '').trim() === roll) {
+      const rRoll = String(stuVals[r][0] || '').trim().toLowerCase();
+      const rName = String(stuVals[r][1] || '').trim().toLowerCase();
+      if ((roll && rRoll === roll.toLowerCase()) || 
+          (studentData.name && rName === studentData.name.trim().toLowerCase())) {
         targetRow = r + 1;
         break;
       }
@@ -3659,6 +3676,7 @@ function apiAppendStudent(studentData, batchId) {
       stuSheet.appendRow(newRow);
       targetRow = stuSheet.getLastRow();
     }
+    SpreadsheetApp.flush();
     
     // Style the row
     stuSheet.getRange(targetRow, 1, 1, 14).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
@@ -3678,6 +3696,8 @@ function apiAppendStudent(studentData, batchId) {
   } catch (err) {
     Logger.log('apiAppendStudent error: ' + err.toString());
     return { success: false, message: err.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) { }
   }
 }
 

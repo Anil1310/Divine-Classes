@@ -1741,6 +1741,13 @@
                         }
                     }
                     if (state.students && Array.isArray(state.students)) {
+            const seenRolls = new Set();
+            state.students = state.students.filter(function (s) {
+                const r = String(s.roll || s.id || "").trim().toLowerCase();
+                if (!r || seenRolls.has(r)) return false;
+                seenRolls.add(r);
+                return true;
+            });
                         state.students.forEach(function (s) {
                             if (!s.admissionDate) s.admissionDate = '2026-10-10';
                             if (!s.monthlyFee) {
@@ -3344,6 +3351,7 @@
                     </form>
                 </div>
             `;
+        window.isEnrollingStudent = false;
         window.newStudentPhotoData = '';
         openModal(modal);
     }
@@ -3382,6 +3390,9 @@
 
     function handleAddNewStudentToBatch(e, batchId) {
         e.preventDefault();
+        if (window.isEnrollingStudent) return;
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
         const name = document.getElementById('new-stu-name').value.trim();
         const parentName = document.getElementById('new-stu-parent').value.trim();
         const phone = document.getElementById('new-stu-phone').value.trim();
@@ -3389,6 +3400,19 @@
         const monthlyFee = parseInt(document.getElementById('new-stu-monthlyfee').value, 10) || 2500;
         const initialPaid = monthlyFee; // Admitted with first month deposit
         const nextDueDate = calculateNextFeeReminder(admissionDate, 1);
+
+        // Check if a student with the exact same name already exists in state
+        const existingStu = (state.students || []).find(s => s.name && s.name.trim().toLowerCase() === name.toLowerCase());
+        if (existingStu) {
+            showToast(`Student "${name}" already enrolled (${existingStu.roll})!`, 'warning');
+            return;
+        }
+
+        window.isEnrollingStudent = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Enrolling...';
+        }
 
         // Find true maximum numeric roll number across all students to prevent roll collisions
         let maxRollNum = 100;
@@ -3426,7 +3450,8 @@
             if (!batch.studentIds.includes(newStu.id)) batch.studentIds.push(newStu.id);
         }
 
-        saveStateLocally();
+        // Save locally without firing racing apiSyncAllData, allowing apiAppendStudent to be authoritative
+        saveStateLocally(true);
         closeModal();
         renderMainContent();
         showToast(`New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}! Syncing to Google Sheet...`, 'info');
@@ -3435,6 +3460,7 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (res) {
+                    window.isEnrollingStudent = false;
                     if (res && res.success) {
                         showToast(`✓ ${name} (${newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
                         updateSyncBadge('✓ Sheet Synced', 'success');
@@ -3443,6 +3469,7 @@
                     }
                 })
                 .withFailureHandler(function (err) {
+                    window.isEnrollingStudent = false;
                     console.error('apiAppendStudent error:', err);
                     showToast('Google Sheet append notice: ' + err, 'warning');
                 })
@@ -3455,11 +3482,15 @@
             })
                 .then(function (res) { return res.json(); })
                 .then(function (res) {
+                    window.isEnrollingStudent = false;
                     if (res && res.success) {
                         showToast(`✓ ${name} (${newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
                     }
                 })
-                .catch(function (e) { console.warn('Fetch appendStudent notice:', e); });
+                .catch(function (e) {
+                    window.isEnrollingStudent = false;
+                    console.warn('Fetch appendStudent notice:', e);
+                });
         }
     }
 
@@ -9196,6 +9227,7 @@
     }
 
     function closeModal() {
+        window.isEnrollingStudent = false;
         if (pendingConfirmResolver) {
             const resolve = pendingConfirmResolver;
             pendingConfirmResolver = null;
