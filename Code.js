@@ -1549,6 +1549,24 @@ function mergeStudentsFromSheet_(appData) {
     });
     appData.students = uniqueStudents;
 
+    // Ensure all sheet students are assigned to at least one batch so they always show on web app
+    if (appData.batches && appData.batches.length > 0) {
+      const allBatchStudentIds = {};
+      appData.batches.forEach(function (b) {
+        (b.studentIds || []).forEach(function (id) { allBatchStudentIds[id] = true; });
+      });
+      const firstBatch = appData.batches[0];
+      if (!firstBatch.studentIds) firstBatch.studentIds = [];
+      appData.students.forEach(function (s) {
+        if (!allBatchStudentIds[s.id] && !allBatchStudentIds[s.roll]) {
+          firstBatch.studentIds.push(s.id);
+          firstBatch.studentIds.push(s.roll);
+          allBatchStudentIds[s.id] = true;
+          allBatchStudentIds[s.roll] = true;
+        }
+      });
+    }
+
     if (added || updated) {
       Logger.log('Students_Master sheet merge: ' + added + ' added, ' + updated + ' updated');
     }
@@ -2961,75 +2979,69 @@ function syncReadableSheets(ss, data) {
       return list;
     }
 
-    // A. Sync Students Sheet (Students_Master) - Unified Student & Fee Master Table
+    // A. Sync Students Sheet (Students_Master) - Unified Student & Fee Master Table (APPEND ONLY, NEVER CLEAR)
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
-      stuSheet.clear();
       const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
-      const rows = [headers];
+      
+      SpreadsheetApp.flush();
+      let curVals = stuSheet.getDataRange().getValues();
+      if (!curVals || curVals.length === 0 || curVals[0].length < headers.length) {
+        stuSheet.clear();
+        stuSheet.appendRow(headers);
+        curVals = [headers];
+      }
+      
+      const sheetRollRowMap = {};
+      for (let r = 1; r < curVals.length; r++) {
+        const rRoll = String(curVals[r][0] || '').trim().toUpperCase();
+        if (rRoll) sheetRollRowMap[rRoll] = r + 1; // 1-indexed row number
+      }
+
       const stuList = getAllRecords_('students');
       const seenRollsInSync = {};
       stuList.forEach(function(s) {
-        const rollKey = String(s.roll || s.id || '').trim().toLowerCase();
-        if (rollKey && seenRollsInSync[rollKey]) return; // Skip duplicate!
-        if (rollKey) seenRollsInSync[rollKey] = true;
+        const rollStr = String(s.roll || '').trim();
+        const rollKey = rollStr.toUpperCase();
+        if (!rollKey || seenRollsInSync[rollKey]) return;
+        seenRollsInSync[rollKey] = true;
+
         const monthly = Number(s.monthlyFee || s.totalFee) || 0;
         const paid = Number(s.paidFee) || 0;
         const balance = Math.max(0, monthly - paid);
         const isPaid = balance <= 0;
         let pUrl = s.photoUrl || s.photo || '';
-        if (pUrl && pUrl.startsWith('data:image')) {
-          try {
-            pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'student_' + (s.roll || s.id), s.name);
-            s.photo = pUrl;
-            s.photoUrl = pUrl;
-          } catch (e) {
-            Logger.log('Drive photo upload error for student: ' + e.toString());
-          }
-        }
         if (!pUrl) {
           pUrl = getRandomAvatarUrl_(s.name || s.roll, 'student');
         }
-        rows.push([
-          s.roll || 'DC-101',
+        const rowData = [
+          rollStr,
           s.name || 'Student Name',
           s.admissionDate || '2026-10-10',
           s.password || 'password123',
           s.status || 'Active',
           s.parentName || 'Parent Name',
-          s.phone || '+91 98765 43210',
+          s.phone || '',
           monthly,
           paid,
           balance,
           isPaid ? 'Paid' : 'Pending',
           s.dueDate || calculateNextFeeReminder_(s.admissionDate || '2026-10-10', 1),
           s.lastReminder || 'Never',
-          pUrl || ''
-        ]);
-      });
-      ensureSheetDimensions_(stuSheet, rows.length, headers.length);
-      stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
-      stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
-      for (let i = 1; i < rows.length; i++) {
-        // Access Status cell (Col 5)
-        const statusCell = stuSheet.getRange(i + 1, 5);
-        if (rows[i][4] === 'Blocked') {
-          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
-        } else if (rows[i][4] === 'Inactive') {
-          statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
-        } else {
-          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
-        }
+          pUrl
+        ];
 
-        // Fee Payment Status cell (Col 11)
-        const feeStatusCell = stuSheet.getRange(i + 1, 11);
-        if (rows[i][10] === 'Paid') {
-          feeStatusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+        if (sheetRollRowMap[rollKey]) {
+          // Update existing row in place (preserve position)
+          const targetRow = sheetRollRowMap[rollKey];
+          stuSheet.getRange(targetRow, 1, 1, headers.length).setValues([rowData]);
         } else {
-          feeStatusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+          // APPEND NEW RECORD (never replace)
+          stuSheet.appendRow(rowData);
+          sheetRollRowMap[rollKey] = stuSheet.getLastRow();
         }
-      }
-      formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
+      });
+      SpreadsheetApp.flush();
     }
 
     // B. Delete Deprecated Student_Fees_Ledger Tab (Fee records fully unified inside Students_Master)
@@ -3657,25 +3669,9 @@ function apiAppendStudent(studentData, batchId) {
       pUrl
     ];
 
-    SpreadsheetApp.flush();
-    const stuVals = stuSheet.getDataRange().getValues();
-    let targetRow = -1;
-    for (let r = 1; r < stuVals.length; r++) {
-      const rRoll = String(stuVals[r][0] || '').trim().toLowerCase();
-      const rName = String(stuVals[r][1] || '').trim().toLowerCase();
-      if ((roll && rRoll === roll.toLowerCase()) || 
-          (studentData.name && rName === studentData.name.trim().toLowerCase())) {
-        targetRow = r + 1;
-        break;
-      }
-    }
-
-    if (targetRow > 0) {
-      stuSheet.getRange(targetRow, 1, 1, 14).setValues([newRow]);
-    } else {
-      stuSheet.appendRow(newRow);
-      targetRow = stuSheet.getLastRow();
-    }
+    // Always APPEND new student record to Google Sheet (never replace existing student row)
+    stuSheet.appendRow(newRow);
+    const targetRow = stuSheet.getLastRow();
     SpreadsheetApp.flush();
     
     // Style the row

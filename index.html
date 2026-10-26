@@ -1748,6 +1748,21 @@
                 seenRolls.add(r);
                 return true;
             });
+            // Ensure all active students are assigned to at least one batch so they appear in all web app views
+            if (state.batches && state.batches.length > 0) {
+                const allBatchStuIds = new Set();
+                state.batches.forEach(b => (b.studentIds || []).forEach(id => allBatchStuIds.add(id)));
+                const defaultBatch = state.batches[0];
+                if (!defaultBatch.studentIds) defaultBatch.studentIds = [];
+                state.students.forEach(s => {
+                    if (s.status !== "Inactive" && !allBatchStuIds.has(s.id) && !allBatchStuIds.has(s.roll)) {
+                        defaultBatch.studentIds.push(s.id);
+                        defaultBatch.studentIds.push(s.roll);
+                        allBatchStuIds.add(s.id);
+                        allBatchStuIds.add(s.roll);
+                    }
+                });
+            }
                         state.students.forEach(function (s) {
                             if (!s.admissionDate) s.admissionDate = '2026-10-10';
                             if (!s.monthlyFee) {
@@ -1762,6 +1777,20 @@
                                 // keep
                             } else if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) {
                                 s.dueDate = calculateNextFeeReminder(s.admissionDate, 1);
+                            }
+                        });
+                    }
+                    if (state.batches && state.batches.length > 0 && state.students && state.students.length > 0) {
+                        const allBatchStuIds = new Set();
+                        state.batches.forEach(b => (b.studentIds || []).forEach(id => allBatchStuIds.add(id)));
+                        const defaultBatch = state.batches[0];
+                        if (!defaultBatch.studentIds) defaultBatch.studentIds = [];
+                        state.students.forEach(s => {
+                            if (s.status !== "Inactive" && !allBatchStuIds.has(s.id) && !allBatchStuIds.has(s.roll)) {
+                                defaultBatch.studentIds.push(s.id);
+                                defaultBatch.studentIds.push(s.roll);
+                                allBatchStuIds.add(s.id);
+                                allBatchStuIds.add(s.roll);
                             }
                         });
                     }
@@ -3100,7 +3129,7 @@
                     <!-- Batch Cards Grid -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         ${state.batches.map(batch => {
-            const enrolledStudents = (batch.studentIds || []).map(id => state.students.find(s => s.id === id)).filter(s => s && s.status !== 'Inactive');
+            const enrolledStudents = (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(s => s && s.status !== 'Inactive');
             return `
                                 <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
                                     <!-- Batch Header -->
@@ -5914,7 +5943,7 @@
                 `;
         }
         const batch = state.batches.find(b => b.id === selectedTest.batchId);
-        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s.id === id)).filter(Boolean).filter(s => s.status !== 'Inactive') : [];
+        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(Boolean).filter(s => s.status !== 'Inactive') : [];
 
         // Stats for selected test
         const scores = batchStudents.map(s => (selectedTest.marks[s.id]?.score || 0));
@@ -6327,7 +6356,7 @@
             return;
         }
         const batch = (state.batches || []).find(b => b.id === test.batchId);
-        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s.id === id)).filter(Boolean) : state.students;
+        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(Boolean) : state.students;
 
         if (!test.marks) test.marks = {};
         let savedCount = 0;
@@ -6510,7 +6539,7 @@
         const test = (state.offlineTests || []).find(t => t.id === testId);
         if (!test) return;
         const batch = (state.batches || []).find(b => b.id === test.batchId);
-        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s.id === id)).filter(Boolean) : state.students;
+        const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => s && (s.id === id || s.roll === id))).filter(Boolean) : state.students;
         const scores = batchStudents.map(s => (test.marks && test.marks[s.id]) ? Number(test.marks[s.id].score) || 0 : 0);
         const evaluatedCount = batchStudents.filter(s => test.marks && test.marks[s.id] && test.marks[s.id].score > 0).length;
         const highest = scores.length ? Math.max(...scores) : 0;
