@@ -47,7 +47,7 @@ function getDummySeedData() {
         schedule: 'Mon - Fri • 08:00 AM - 12:30 PM',
         room: 'Lecture Hall 101 (Smart AC)',
         teacher: 'Er. Rajesh Chahar (Ex-IITian)',
-        studentIds: ['s1', 's2']
+        studentIds: ['s1', 's2', 's6', 'DC-106']
       },
       {
         id: 'b2',
@@ -95,7 +95,8 @@ function getDummySeedData() {
       { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', admissionDate: '2026-09-10', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-11', lastReminder: '-', password: 'password123', status: 'Active' },
       { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', admissionDate: '2026-10-05', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-11-06', lastReminder: 'Never', password: 'password123', status: 'Active' },
       { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', admissionDate: '2026-08-15', monthlyFee: 3000, totalFee: 3000, paidFee: 3000, dueDate: '2026-11-16', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
+      { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' },
+      { id: 's6', isDummy: false, roll: 'DC-106', name: 'Gia', phone: '8126390611', parentName: 'Anil Chahar', admissionDate: '2026-10-26', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-27', lastReminder: 'Never', password: 'password123', status: 'Active', photo: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Gia&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', photoUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Gia&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf' }
     ],
     materials: [
       {

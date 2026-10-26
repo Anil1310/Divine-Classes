@@ -116,7 +116,7 @@
                     schedule: 'Mon - Fri • 08:00 AM - 12:30 PM',
                     room: 'Lecture Hall 101 (Smart AC)',
                     teacher: 'Er. Rajesh Chahar (Ex-IITian)',
-                    studentIds: ['s1', 's2']
+                    studentIds: ['s1', 's2', 's6', 'DC-106']
                 },
                 {
                     id: 'b2',
@@ -164,7 +164,8 @@
                 { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', admissionDate: '2026-09-10', monthlyFee: 2500, totalFee: 2500, paidFee: 5000, dueDate: '2026-11-11', lastReminder: '-', password: 'password123', status: 'Active' },
                 { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', admissionDate: '2026-10-05', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-11-06', lastReminder: 'Never', password: 'password123', status: 'Active' },
                 { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', admissionDate: '2026-08-15', monthlyFee: 3000, totalFee: 3000, paidFee: 9000, dueDate: '2026-11-16', lastReminder: '-', password: 'password123', status: 'Active' },
-                { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
+                { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' },
+                { id: 's6', isDummy: false, roll: 'DC-106', name: 'Gia', phone: '8126390611', parentName: 'Anil Chahar', admissionDate: '2026-10-26', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-27', lastReminder: 'Never', password: 'password123', status: 'Active', photo: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Gia&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', photoUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Gia&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf' }
             ],
             materials: [
                 {
@@ -3014,27 +3015,51 @@
         showToast(`${stu ? stu.name : 'Student'} added to ${batch ? batch.name : 'Batch'}`, 'success');
     }
 
-        function handleAddNewStudentToBatch(e, batchId) {
+            function handleAddNewStudentToBatch(e, batchId) {
         e.preventDefault();
-        if (window.isEnrollingStudent) return;
         
         const submitBtn = e.target.querySelector('button[type="submit"]');
-        const name = document.getElementById('new-stu-name').value.trim();
-        const parentName = document.getElementById('new-stu-parent').value.trim();
-        const phone = document.getElementById('new-stu-phone').value.trim();
+        const name = (document.getElementById('new-stu-name').value || '').trim();
+        const parentName = (document.getElementById('new-stu-parent').value || '').trim();
+        const phone = (document.getElementById('new-stu-phone').value || '').trim();
         const admissionDate = document.getElementById('new-stu-admdate').value || new Date().toISOString().split('T')[0];
         const monthlyFee = parseInt(document.getElementById('new-stu-monthlyfee').value, 10) || 2500;
         const initialPaid = monthlyFee; // Admitted with first month deposit
         const nextDueDate = calculateNextFeeReminder(admissionDate, 1);
 
-        // Check if a student with the exact same name already exists in state
-        const existingStu = (state.students || []).find(s => s && s.name && s.name.trim().toLowerCase() === name.toLowerCase());
-        if (existingStu) {
-            showToast(`Student "${name}" already enrolled (${existingStu.roll})!`, 'warning');
+        if (!name) {
+            showToast('Please enter student name', 'error');
             return;
         }
 
-        window.isEnrollingStudent = true;
+        const batch = (state.batches || []).find(b => b.id === batchId) || (state.batches && state.batches[0]);
+
+        // If this student is already in THIS batch, inform user and close
+        const alreadyInThisBatch = batch && (batch.studentIds || []).some(id => {
+            const s = (state.students || []).find(st => st && (st.id === id || st.roll === id));
+            return s && s.name && s.name.trim().toLowerCase() === name.toLowerCase();
+        });
+        if (alreadyInThisBatch) {
+            showToast(`Student "${name}" is already enrolled in ${batch.name}!`, 'info');
+            closeModal();
+            return;
+        }
+
+        // If student with same name exists in institute directory but not in this batch, link them!
+        const existingInDir = (state.students || []).find(s => s && s.name && s.name.trim().toLowerCase() === name.toLowerCase());
+        if (existingInDir) {
+            if (batch) {
+                if (!batch.studentIds) batch.studentIds = [];
+                if (!batch.studentIds.includes(existingInDir.id)) batch.studentIds.push(existingInDir.id);
+                if (!batch.studentIds.includes(existingInDir.roll)) batch.studentIds.push(existingInDir.roll);
+            }
+            saveStateLocally();
+            closeModal();
+            renderMainContent();
+            showToast(`✓ Student ${name} (${existingInDir.roll}) enrolled in ${batch ? batch.name : 'Batch'}!`, 'success');
+            return;
+        }
+
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Enrolling...';
@@ -3072,32 +3097,23 @@
         window.newStudentPhotoData = '';
 
         state.students.push(newStu);
-        const batch = (state.batches || []).find(b => b.id === batchId) || (state.batches && state.batches[0]);
         if (batch) {
             if (!batch.studentIds) batch.studentIds = [];
             if (!batch.studentIds.includes(newStu.id)) batch.studentIds.push(newStu.id);
             if (!batch.studentIds.includes(newStu.roll)) batch.studentIds.push(newStu.roll);
         }
-        if (state.batches && state.batches[0] && state.batches[0] !== batch) {
-            if (!state.batches[0].studentIds) state.batches[0].studentIds = [];
-            if (!state.batches[0].studentIds.includes(newStu.id)) state.batches[0].studentIds.push(newStu.id);
-            if (!state.batches[0].studentIds.includes(newStu.roll)) state.batches[0].studentIds.push(newStu.roll);
-        }
 
         saveStateLocally(true);
         closeModal();
         renderMainContent();
-        showToast(`New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}! Syncing to Google Sheet...`, 'info');
+        showToast(`✓ New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}!`, 'success');
 
         function onAppendSuccess(res) {
-            window.isEnrollingStudent = false;
             if (res && res.success) {
                 if (res.student) {
                     const idx = state.students.findIndex(s => (s && s.roll === res.student.roll) || (s && s.id === newStu.id));
                     if (idx !== -1) {
                         state.students[idx] = Object.assign({}, state.students[idx], res.student);
-                    } else {
-                        state.students.push(res.student);
                     }
                 }
                 if (res.batches && Array.isArray(res.batches) && res.batches.length > 0) {
@@ -3105,17 +3121,13 @@
                 }
                 saveStateLocally(true);
                 renderMainContent();
-                showToast(`✓ ${name} (${res.student ? res.student.roll : newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
+                showToast(`✓ ${name} (${newStu.roll}) synced to Google Sheet!`, 'success');
                 updateSyncBadge('✓ Sheet Synced', 'success');
-            } else {
-                console.warn('apiAppendStudent response:', res);
             }
         }
 
         function onAppendError(err) {
-            window.isEnrollingStudent = false;
-            console.error('apiAppendStudent error:', err);
-            showToast('Google Sheet append notice: ' + err, 'warning');
+            console.warn('Google Sheet append notice:', err);
         }
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
