@@ -161,10 +161,10 @@
             ],
             students: [
                 { id: 's1', isDummy: true, roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', admissionDate: '2026-10-10', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-11', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
-                { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', admissionDate: '2026-09-10', monthlyFee: 2500, totalFee: 2500, paidFee: 5000, dueDate: '2026-11-11', lastReminder: '-', password: 'password123', status: 'Active' },
+                { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', admissionDate: '2026-09-10', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-11', lastReminder: '-', password: 'password123', status: 'Active' },
                 { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', admissionDate: '2026-10-05', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-11-06', lastReminder: 'Never', password: 'password123', status: 'Active' },
-                { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', admissionDate: '2026-08-15', monthlyFee: 3000, totalFee: 3000, paidFee: 9000, dueDate: '2026-11-16', lastReminder: '-', password: 'password123', status: 'Active' },
-                { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
+                { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', admissionDate: '2026-08-15', monthlyFee: 3000, totalFee: 3000, paidFee: 3000, dueDate: '2026-11-16', lastReminder: '-', password: 'password123', status: 'Active' },
+                { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
             ],
             materials: [
                 {
@@ -3774,18 +3774,18 @@
                                                 </td>
                                                 <td class="py-3.5 px-4 whitespace-nowrap">
                                                     ${isPaid ? `
-                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 whitespace-nowrap inline-flex items-center">
-                                                            <i class="fa-solid fa-circle-check mr-1"></i>Current Month Paid
+                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 whitespace-nowrap inline-flex items-center">
+                                                            <i class="fa-solid fa-circle-check mr-1"></i>Paid
                                                         </span>
                                                     ` : `
-                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 whitespace-nowrap inline-flex items-center">
-                                                            <i class="fa-solid fa-clock mr-1"></i>Payment Due
+                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 whitespace-nowrap inline-flex items-center">
+                                                            <i class="fa-solid fa-clock mr-1"></i>Pending
                                                         </span>
                                                     `}
                                                 </td>
                                                 <td class="py-3.5 px-4 whitespace-nowrap">
-                                                    <span class="font-mono font-semibold text-slate-800">${isPaid ? '-' : formatFeeDateDisplay(stu.dueDate)}</span>
-                                                    <p class="text-[10px] text-slate-400 mt-0.5">Last: ${stu.lastReminder || 'Never'}</p>
+                                                    <span class="font-mono font-semibold text-slate-800">${formatFeeDateDisplay(stu.dueDate || calculateNextFeeReminder(stu.admissionDate || '2026-10-10', 1))}</span>
+                                                    <p class="text-[10px] text-slate-400 mt-0.5">Last Reminder: ${stu.lastReminder || 'Never'}</p>
                                                 </td>
                                                 <td class="py-3.5 px-4 text-right">
                                                     <div class="flex items-center justify-end gap-1.5">
@@ -4211,8 +4211,8 @@
                 monthly,
                 paid,
                 balance,
-                `"${balance <= 0 ? 'Current Month Paid' : 'Payment Due'}"`,
-                `"${balance <= 0 ? '-' : (s.dueDate || '')}"`,
+                `"${balance <= 0 ? 'Paid' : 'Pending'}"`,
+                `"${s.dueDate || calculateNextFeeReminder(s.admissionDate || '2026-10-10', 1)}"`,
                 `"${s.lastReminder || 'Never'}"`
             ];
         });

@@ -3006,7 +3006,7 @@ function syncReadableSheets(ss, data) {
           monthly,
           paid,
           balance,
-          s.dueDate || '2026-11-11',
+          s.dueDate || calculateNextFeeReminder_(s.admissionDate || '2026-10-10', 1),
           s.lastReminder || 'Never',
           pUrl || ''
         ]);
@@ -3048,7 +3048,7 @@ function syncReadableSheets(ss, data) {
           monthly,
           paid,
           balance,
-          isPaid ? 'Current Month Paid' : 'Payment Due',
+          isPaid ? 'Paid' : 'Pending',
           s.dueDate || '2026-11-11',
           s.lastReminder || 'Never'
         ]);
@@ -3058,10 +3058,10 @@ function syncReadableSheets(ss, data) {
       feeSheet.getRange(1, 1, 1, feeHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
       for (let i = 1; i < feeRows.length; i++) {
         const statusCell = feeSheet.getRange(i + 1, 9);
-        if (feeRows[i][8] === 'Current Month Paid') {
+        if (feeRows[i][8] === 'Paid') {
           statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
         } else {
-          statusCell.setBackground('#fef3c7').setFontColor('#92400e').setFontWeight('bold');
+          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
         }
       }
       formatAndTrimSheet(feeSheet, feeHeaders.length, feeRows.length, '#0f766e', '#0f766e');
