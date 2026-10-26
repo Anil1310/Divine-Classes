@@ -3496,3 +3496,228 @@ function debugShareAdminDrive() {
     return { success: false, error: e.toString(), stack: e.stack };
   }
 }
+
+
+/**
+ * Dedicated API to append a new student to Students_Master in Google Sheet
+ * Ensures new students enrolled from the web app are directly appended
+ * to the Google Sheet in an appended manner and saved in backend database.
+ */
+function apiAppendStudent(studentData, batchId) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet not found' };
+    const stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
+    
+    const data = apiGetInitialData();
+    if (!data.students) data.students = [];
+    if (!data.batches) data.batches = [];
+
+    // Ensure unique roll number
+    let roll = studentData.roll;
+    if (!roll) {
+      roll = 'DC-' + (100 + data.students.length + 1);
+    }
+    
+    // Check if student with this roll or id already exists
+    let existingIndex = data.students.findIndex(function(s) { 
+      return s.id === studentData.id || (studentData.roll && s.roll === studentData.roll); 
+    });
+
+    // Handle photo upload to drive if base64
+    let pUrl = studentData.photoUrl || studentData.photo || '';
+    if (pUrl && pUrl.startsWith('data:image')) {
+      try {
+        pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'student_' + roll, studentData.name);
+      } catch (photoErr) {
+        Logger.log('Drive photo upload error: ' + photoErr.toString());
+      }
+    }
+    if (!pUrl) {
+      pUrl = getRandomAvatarUrl_(studentData.name || roll, 'student');
+    }
+
+    const monthly = Number(studentData.monthlyFee || studentData.totalFee) || 0;
+    const paid = Number(studentData.paidFee) || 0;
+    const balance = Math.max(0, monthly - paid);
+    const isPaid = balance <= 0;
+    const admDate = studentData.admissionDate || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const dueDate = studentData.dueDate || calculateNextFeeReminder_(admDate, 1);
+    const status = studentData.status || 'Active';
+    const pwd = studentData.password || 'password123';
+    const parentName = studentData.parentName || 'Parent Name';
+    const phone = studentData.phone || '';
+    const lastReminder = studentData.lastReminder || 'Never';
+
+    const newStudentObj = {
+      id: studentData.id || ('s' + Date.now()),
+      roll: roll,
+      name: studentData.name,
+      parentName: parentName,
+      phone: phone,
+      admissionDate: admDate,
+      monthlyFee: monthly,
+      totalFee: monthly,
+      paidFee: paid,
+      dueDate: dueDate,
+      lastReminder: lastReminder,
+      photo: pUrl,
+      photoUrl: pUrl,
+      password: pwd,
+      status: status
+    };
+
+    if (existingIndex >= 0) {
+      data.students[existingIndex] = newStudentObj;
+    } else {
+      data.students.push(newStudentObj);
+    }
+
+    // Assign to batch
+    if (batchId) {
+      const b = data.batches.find(function(batch) { return batch.id === batchId; });
+      if (b) {
+        if (!b.studentIds) b.studentIds = [];
+        if (b.studentIds.indexOf(newStudentObj.id) === -1) {
+          b.studentIds.push(newStudentObj.id);
+        }
+      }
+    }
+
+    // Clear any tombstone for this roll
+    clearTombstone_('rolls', roll);
+
+    // Save to Database Properties
+    saveAppDataToDb_(data);
+
+    // Append directly to Students_Master in Google Sheet
+    const newRow = [
+      roll,
+      newStudentObj.name,
+      admDate,
+      pwd,
+      status,
+      parentName,
+      phone,
+      monthly,
+      paid,
+      balance,
+      isPaid ? 'Paid' : 'Pending',
+      dueDate,
+      lastReminder,
+      pUrl
+    ];
+
+    stuSheet.appendRow(newRow);
+    const lastRow = stuSheet.getLastRow();
+    
+    // Style the appended row
+    stuSheet.getRange(lastRow, 1, 1, 14).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    // Access status cell (Col 5)
+    const stCell = stuSheet.getRange(lastRow, 5);
+    stCell.setBackground(status === 'Active' ? '#dcfce7' : (status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
+          .setFontColor(status === 'Active' ? '#166534' : (status === 'Blocked' ? '#991b1b' : '#64748b'))
+          .setFontWeight('bold');
+    // Fee status cell (Col 11)
+    const feeCell = stuSheet.getRange(lastRow, 11);
+    feeCell.setBackground(isPaid ? '#dcfce7' : '#fee2e2')
+           .setFontColor(isPaid ? '#166534' : '#991b1b')
+           .setFontWeight('bold');
+
+    Logger.log('Successfully appended student ' + newStudentObj.name + ' (' + roll + ') to Students_Master sheet row ' + lastRow);
+    return { success: true, student: newStudentObj, row: lastRow };
+  } catch (err) {
+    Logger.log('apiAppendStudent error: ' + err.toString());
+    return { success: false, message: err.toString() };
+  }
+}
+
+/**
+ * Dedicated API to append a new teacher to Teachers_Roster in Google Sheet
+ * Ensures new faculty added from the web app are directly appended
+ * to the Google Sheet in an appended manner and saved in backend database.
+ */
+function apiAppendTeacher(teacherData) {
+  try {
+    const ss = getDbSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet not found' };
+    const teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
+    
+    const data = apiGetInitialData();
+    if (!data.teachers) data.teachers = [];
+
+    const trId = teacherData.id || ('tr' + Date.now());
+    let pUrl = teacherData.photoUrl || teacherData.photo || '';
+    if (pUrl && pUrl.startsWith('data:image')) {
+      try {
+        pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'teacher_' + trId, teacherData.name);
+      } catch (photoErr) {
+        Logger.log('Drive photo upload error for faculty: ' + photoErr.toString());
+      }
+    }
+    if (!pUrl) {
+      pUrl = getRandomAvatarUrl_(teacherData.name || trId, 'teacher');
+    }
+
+    const initials = (teacherData.name || 'Faculty').split(' ').map(function(n) { return n[0]; }).join('').slice(0, 2).toUpperCase();
+    const newTeacherObj = {
+      id: trId,
+      name: teacherData.name,
+      subject: teacherData.subject || '',
+      qualification: teacherData.qualification || '',
+      experience: teacherData.experience || '',
+      specialization: teacherData.specialization || '',
+      bio: teacherData.bio || '',
+      email: teacherData.email || 'faculty@divineclasses.in',
+      avatarColor: teacherData.avatarColor || 'from-rose-500 to-orange-500',
+      initials: initials,
+      photo: pUrl,
+      photoUrl: pUrl,
+      password: teacherData.password || 'teacher123',
+      status: teacherData.status || 'Active',
+      phone: teacherData.phone || '+91 98765 43210'
+    };
+
+    let existingIndex = data.teachers.findIndex(function(t) { return t.id === trId; });
+    if (existingIndex >= 0) {
+      data.teachers[existingIndex] = newTeacherObj;
+    } else {
+      data.teachers.push(newTeacherObj);
+    }
+
+    // Save to Database Properties
+    saveAppDataToDb_(data);
+
+    // Append directly to Teachers_Roster in Google Sheet
+    // trHeaders: ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience', 'Photo URL']
+    const newTrRow = [
+      trId,
+      newTeacherObj.name,
+      newTeacherObj.subject,
+      newTeacherObj.email,
+      newTeacherObj.password,
+      newTeacherObj.status,
+      newTeacherObj.phone,
+      newTeacherObj.qualification,
+      newTeacherObj.experience,
+      pUrl
+    ];
+
+    teachSheet.appendRow(newTrRow);
+    const lastRow = teachSheet.getLastRow();
+
+    // Style the appended row
+    teachSheet.getRange(lastRow, 1, 1, 10).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    // Access status cell (Col 6)
+    const stCell = teachSheet.getRange(lastRow, 6);
+    stCell.setBackground(newTeacherObj.status === 'Active' ? '#dcfce7' : (newTeacherObj.status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
+          .setFontColor(newTeacherObj.status === 'Active' ? '#166534' : (newTeacherObj.status === 'Blocked' ? '#991b1b' : '#64748b'))
+          .setFontWeight('bold');
+
+    Logger.log('Successfully appended teacher ' + newTeacherObj.name + ' (' + trId + ') to Teachers_Roster sheet row ' + lastRow);
+    return { success: true, teacher: newTeacherObj, row: lastRow };
+  } catch (err) {
+    Logger.log('apiAppendTeacher error: ' + err.toString());
+    return { success: false, message: err.toString() };
+  }
+}
