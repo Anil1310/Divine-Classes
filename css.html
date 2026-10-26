@@ -120,21 +120,24 @@
     html.dark ::-webkit-scrollbar-thumb:hover {
         background: #475569;
     }
-    /* Print Styles for Report Card and Fee Receipts */
+    /* Print Styles for Report Card, Fee Receipts, and Student ID Card */
     @media print {
         body * {
             visibility: hidden;
         }
-        #printable-area, #printable-area * {
+        #printable-area, #printable-area *,
+        #student-id-card-render, #student-id-card-render * {
             visibility: visible;
         }
-        #printable-area {
+        #printable-area,
+        #student-id-card-render {
             position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 20px;
-            background: white;
+            left: 50%;
+            top: 20px;
+            transform: translateX(-50%);
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
         .no-print {
             display: none !important;

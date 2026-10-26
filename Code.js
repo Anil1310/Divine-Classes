@@ -1418,9 +1418,10 @@ function mergeStudentsFromSheet_(appData) {
     const cMonthlyFee = getCol(['monthly fee (inr)', 'monthly fee', 'monthly tuition fee', 'total fee (inr)', 'total fee'], 7);
     const cPaidFee = getCol(['paid fee (inr)', 'paid fee', 'fee deposited', 'fees deposited'], 8);
     const cPending = getCol(['pending dues (inr)', 'pending dues', 'balance'], 9);
-    const cDueDate = getCol(['next fee due date', 'fee due date', 'due date', 'fee reminder date'], 10);
-    const cLastReminder = getCol(['last reminder sent', 'last reminder'], 11);
-    const cPhoto = getCol(['photo url', 'photo'], 12);
+    const cFeeStatus = getCol(['fee payment status', 'fee status', 'payment status'], 10);
+    const cDueDate = getCol(['next fee due date', 'fee due date', 'due date', 'fee reminder date'], cFeeStatus !== -1 ? 11 : 10);
+    const cLastReminder = getCol(['last reminder sent', 'last reminder'], cFeeStatus !== -1 ? 12 : 11);
+    const cPhoto = getCol(['photo url', 'photo'], cFeeStatus !== -1 ? 13 : 12);
 
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
@@ -1564,57 +1565,18 @@ function mergeStudentsFromSheet_(appData) {
       Logger.log('Students_Master sheet merge: ' + added + ' added, ' + updated + ' updated');
     }
 
-    // Merge any direct edits from Student_Fees_Ledger tab
+    // All student fee data is now unified in Students_Master - clean up deprecated Student_Fees_Ledger tab if present
     try {
-      const feeSh = ss.getSheetByName('Student_Fees_Ledger') || ss.getSheetByName('Student_Fees') || ss.getSheetByName('Fees_Master');
-      if (feeSh) {
-        const feeVals = feeSh.getDataRange().getValues();
-        if (feeVals && feeVals.length > 1) {
-          const feeHeaders = feeVals[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
-          const fRoll = feeHeaders.indexOf('roll no') !== -1 ? feeHeaders.indexOf('roll no') : 0;
-          const fMonthly = feeHeaders.findIndex(function (h) { return h.includes('monthly'); });
-          const fPaid = feeHeaders.findIndex(function (h) { return h.includes('paid fee') || h === 'paid'; });
-          const fDueDate = feeHeaders.findIndex(function (h) { return h.includes('due date') || h.includes('next fee'); });
-          const fAdm = feeHeaders.findIndex(function (h) { return h.includes('admission'); });
-          for (let fi = 1; fi < feeVals.length; fi++) {
-            const fRow = feeVals[fi];
-            const rollKey = String(fRow[fRoll] || '').trim();
-            if (!rollKey) continue;
-            const stuObj = appData.students.find(function (s) { return s.roll === rollKey; });
-            if (stuObj) {
-              if (fMonthly !== -1 && fRow[fMonthly] !== '') {
-                stuObj.monthlyFee = Number(fRow[fMonthly]) || stuObj.monthlyFee;
-                if (stuObj.monthlyFee > 10000) stuObj.monthlyFee = Math.round(stuObj.monthlyFee / 12);
-                stuObj.totalFee = stuObj.monthlyFee;
-              }
-              if (fPaid !== -1 && fRow[fPaid] !== '') {
-                stuObj.paidFee = Number(fRow[fPaid]) || stuObj.paidFee;
-              }
-              if (fDueDate !== -1 && fRow[fDueDate]) {
-                let dVal = fRow[fDueDate];
-                if (dVal instanceof Date && !isNaN(dVal)) {
-                  dVal = Utilities.formatDate(dVal, tz, 'yyyy-MM-dd');
-                } else {
-                  dVal = String(dVal).trim();
-                }
-                if (/^\d{4}-\d{2}-\d{2}$/.test(dVal) || dVal === 'Paid') {
-                  stuObj.dueDate = dVal;
-                }
-              }
-              if (fAdm !== -1 && fRow[fAdm]) {
-                let admVal = fRow[fAdm];
-                if (admVal instanceof Date && !isNaN(admVal)) {
-                  admVal = Utilities.formatDate(admVal, tz, 'yyyy-MM-dd');
-                }
-                stuObj.admissionDate = String(admVal).trim() || stuObj.admissionDate;
-              }
-            }
-          }
+      ['Student_Fees_Ledger', 'Student_Fees', 'Fees_Master', 'Fees_Ledger', 'Fees'].forEach(function(shName) {
+        const feeSh = ss.getSheetByName(shName);
+        if (feeSh && ss.getSheets().length > 1) {
+          try {
+            ss.deleteSheet(feeSh);
+            Logger.log('Deleted deprecated sheet tab: ' + shName);
+          } catch (e) { }
         }
-      }
-    } catch (fErr) {
-      Logger.log('Student_Fees_Ledger merge error: ' + fErr.toString());
-    }
+      });
+    } catch (fErr) { }
   } catch (e) {
     Logger.log('mergeStudentsFromSheet_ error: ' + e.toString());
   }
@@ -2734,7 +2696,6 @@ function apiRestructureAllSheets() {
     // 2. Order tabs in standard intuitive sequence
     const tabOrder = [
       'Students_Master',
-      'Student_Fees_Ledger',
       'Teachers_Roster',
       'Batches_Roster',
       'Offline_Test_Marks',
@@ -2971,17 +2932,18 @@ function syncReadableSheets(ss, data) {
       return list;
     }
 
-    // A. Sync Students Sheet (Students_Master) - All Records
+    // A. Sync Students Sheet (Students_Master) - Unified Student & Fee Master Table
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       stuSheet.clear();
-      const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
+      const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
       const rows = [headers];
       const stuList = getAllRecords_('students');
       stuList.forEach(function(s) {
         const monthly = Number(s.monthlyFee || s.totalFee) || 0;
         const paid = Number(s.paidFee) || 0;
         const balance = Math.max(0, monthly - paid);
+        const isPaid = balance <= 0;
         let pUrl = s.photoUrl || s.photo || '';
         if (pUrl && pUrl.startsWith('data:image')) {
           try {
@@ -3006,6 +2968,7 @@ function syncReadableSheets(ss, data) {
           monthly,
           paid,
           balance,
+          isPaid ? 'Paid' : 'Pending',
           s.dueDate || calculateNextFeeReminder_(s.admissionDate || '2026-10-10', 1),
           s.lastReminder || 'Never',
           pUrl || ''
@@ -3015,6 +2978,7 @@ function syncReadableSheets(ss, data) {
       stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
       stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
       for (let i = 1; i < rows.length; i++) {
+        // Access Status cell (Col 5)
         const statusCell = stuSheet.getRange(i + 1, 5);
         if (rows[i][4] === 'Blocked') {
           statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
@@ -3023,48 +2987,32 @@ function syncReadableSheets(ss, data) {
         } else {
           statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
         }
+
+        // Fee Payment Status cell (Col 11)
+        const feeStatusCell = stuSheet.getRange(i + 1, 11);
+        if (rows[i][10] === 'Paid') {
+          feeStatusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+        } else {
+          feeStatusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+        }
       }
       formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
     }
 
-    // B. Sync Dedicated Student Fees Sheet (Student_Fees_Ledger)
+    // B. Delete Deprecated Student_Fees_Ledger Tab (Fee records fully unified inside Students_Master)
     {
-      let feeSheet = getOrCreateSheet(ss, 'Student_Fees_Ledger', ['Student_Fees', 'Fees_Master', 'Fees_Ledger', 'Fees']);
-      feeSheet.clear();
-      const feeHeaders = ['Roll No', 'Student Name', 'Admission Date', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent'];
-      const feeRows = [feeHeaders];
-      const stuList = getAllRecords_('students');
-      stuList.forEach(function(s) {
-        const monthly = Number(s.monthlyFee || s.totalFee) || 0;
-        const paid = Number(s.paidFee) || 0;
-        const balance = Math.max(0, monthly - paid);
-        const isPaid = balance <= 0;
-        feeRows.push([
-          s.roll || 'DC-101',
-          s.name || 'Student Name',
-          s.admissionDate || '2026-10-10',
-          s.parentName || 'Parent Name',
-          s.phone || '+91 98765 43210',
-          monthly,
-          paid,
-          balance,
-          isPaid ? 'Paid' : 'Pending',
-          s.dueDate || '2026-11-11',
-          s.lastReminder || 'Never'
-        ]);
-      });
-      ensureSheetDimensions_(feeSheet, feeRows.length, feeHeaders.length);
-      feeSheet.getRange(1, 1, feeRows.length, feeHeaders.length).setValues(feeRows);
-      feeSheet.getRange(1, 1, 1, feeHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
-      for (let i = 1; i < feeRows.length; i++) {
-        const statusCell = feeSheet.getRange(i + 1, 9);
-        if (feeRows[i][8] === 'Paid') {
-          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
-        } else {
-          statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
+      const deprecatedFeeTabs = ['Student_Fees_Ledger', 'Student_Fees', 'Fees_Master', 'Fees_Ledger', 'Fees'];
+      deprecatedFeeTabs.forEach(function(shName) {
+        const feeSh = ss.getSheetByName(shName);
+        if (feeSh && ss.getSheets().length > 1) {
+          try {
+            ss.deleteSheet(feeSh);
+            Logger.log('Successfully deleted deprecated sheet tab: ' + shName);
+          } catch (delErr) {
+            Logger.log('Notice: could not delete ' + shName + ': ' + delErr.toString());
+          }
         }
-      }
-      formatAndTrimSheet(feeSheet, feeHeaders.length, feeRows.length, '#0f766e', '#0f766e');
+      });
     }
 
     // C. Sync Teachers Sheet (Teachers_Roster) - All Records
