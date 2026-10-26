@@ -280,7 +280,7 @@
                 <!-- Populated dynamically via JS based on current role -->
             </nav>
 
-            <!-- Database & Sheets Connection Indicator -->
+            <!-- Database Connection Indicator -->
             <div
                 class="px-4 py-3 bg-slate-950/70 border-t border-slate-800 text-[11px] flex items-center justify-between">
                 <div class="flex items-center gap-2 text-slate-400">
@@ -288,7 +288,7 @@
                     <span class="truncate max-w-[130px]"
                         title="Cloud Database: PropertiesService Persistent Store">Cloud DB Active</span>
                 </div>
-                <!-- Developer Only: Google Drive & Google Sheet Quick Access (Hidden from Admin, Teacher & Student) -->
+                <!-- Developer Only: Google Drive & Cloud Database Quick Access (Hidden from Admin, Teacher & Student) -->
                 <div class="dev-only-link flex items-center gap-1.5" style="display:none;">
                     <a href="javascript:void(0)" onclick="openDriveFolder()"
                         title="Developer: Open Google Drive Storage"
@@ -296,9 +296,9 @@
                         <i class="fa-brands fa-google-drive text-xs"></i>
                     </a>
                     <a href="https://docs.google.com/spreadsheets/d/1v7RZX0R8AmVDv02BCr3D_t28B8i3I8PO_qpjqMzFeKM/edit"
-                        target="_blank" rel="noopener noreferrer" title="Developer: Open Google Sheet Database"
+                        target="_blank" rel="noopener noreferrer" title="Developer: Open Cloud Database Console"
                         class="text-indigo-400 hover:text-indigo-300 p-1">
-                        <i class="fa-solid fa-table-cells text-xs"></i>
+                        <i class="fa-solid fa-database text-xs"></i>
                     </a>
                 </div>
             </div>
@@ -307,21 +307,24 @@
             <div class="p-4 border-t border-slate-800 bg-slate-950">
                 <p class="text-[10px] font-bold tracking-wider text-slate-400 mb-2">Connect With Divine Classes</p>
                 <div class="grid grid-cols-3 gap-1.5">
-                    <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"
-                        onclick="showToast('Opening Divine Classes Facebook page...', 'info')"
-                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#1877F2] hover:text-white text-slate-300 transition group">
+                    <a href="https://m.facebook.com/edivineclasses/" target="_blank" rel="noopener noreferrer"
+                        onclick="openSocialExternalApp('facebook', event)"
+                        id="sidebar-link-fb"
+                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#1877F2] hover:text-white text-slate-300 transition group cursor-pointer" title="Official Facebook Page">
                         <i class="fa-brands fa-facebook-f text-sm mb-1 text-[#1877F2] group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">Facebook</span>
                     </a>
-                    <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"
-                        onclick="showToast('Opening Divine Classes Instagram profile...', 'info')"
-                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-600 hover:to-purple-600 hover:text-white text-slate-300 transition group">
+                    <a href="https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq" target="_blank" rel="noopener noreferrer"
+                        onclick="openSocialExternalApp('instagram', event)"
+                        id="sidebar-link-ig"
+                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-600 hover:to-purple-600 hover:text-white text-slate-300 transition group cursor-pointer" title="Official Instagram Profile">
                         <i class="fa-brands fa-instagram text-sm mb-1 text-pink-500 group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">Instagram</span>
                     </a>
-                    <a href="https://www.youtube.com/@chem_crush9" target="_blank" rel="noopener noreferrer"
-                        onclick="showToast('Opening Divine Classes YouTube lectures (@chem_crush9)...', 'info')"
-                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#FF0000] hover:text-white text-slate-300 transition group">
+                    <a href="https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8" target="_blank" rel="noopener noreferrer"
+                        onclick="openSocialExternalApp('youtube', event)"
+                        id="sidebar-link-yt"
+                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#FF0000] hover:text-white text-slate-300 transition group cursor-pointer" title="Official YouTube Channel">
                         <i class="fa-brands fa-youtube text-sm mb-1 text-[#FF0000] group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">YouTube</span>
                     </a>
@@ -390,7 +393,7 @@
                                 id="sync-icon"></i>
                         </button>
 
-                        <!-- Developer Only: Google Drive & Google Sheet Quick Access (Hidden from Admin, Teacher & Student) -->
+                        <!-- Developer Only: Google Drive & Cloud Database Quick Access (Hidden from Admin, Teacher & Student) -->
                         <div id="dev-quick-links" class="dev-only-link flex items-center gap-1.5 sm:gap-2"
                             style="display:none;">
                             <a href="javascript:void(0)" onclick="openDriveFolder()"
@@ -400,10 +403,10 @@
                                 <i class="fa-brands fa-google-drive text-sm text-emerald-600 dark:text-emerald-400"></i>
                             </a>
                             <a href="https://docs.google.com/spreadsheets/d/1v7RZX0R8AmVDv02BCr3D_t28B8i3I8PO_qpjqMzFeKM/edit"
-                                target="_blank" rel="noopener noreferrer" title="Developer: Open Google Sheets Database"
+                                target="_blank" rel="noopener noreferrer" title="Developer: Open Cloud Database Console"
                                 class="p-2 sm:px-2.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition shadow-2xs flex items-center justify-center cursor-pointer"
-                                aria-label="Google Sheets">
-                                <i class="fa-solid fa-table-cells text-sm text-indigo-600 dark:text-indigo-400"></i>
+                                aria-label="Cloud Database">
+                                <i class="fa-solid fa-database text-sm text-indigo-600 dark:text-indigo-400"></i>
                             </a>
                         </div>
 
@@ -434,6 +437,7 @@
     </div>
 
 
+
 <script>
     /********************************************************************
      * Divine Classes - STATE & DATABASE FOR ALL 10 REQUIREMENTS
@@ -461,8 +465,8 @@
      * External_Links_Hub has 5 permanent official study portals (never deleted).
      *
      * Controlled by Developer via Settings -> Show Dummy / Demo Data:
-     * - When ENABLED: Demo data appears in the Web App and is created in Google Sheets.
-     * - When DISABLED: Demo data is completely deleted from Google Sheets,
+     * - When ENABLED: Demo data appears in the Web App and is created in Databases.
+     * - When DISABLED: Demo data is completely deleted from Databases,
      *   showing only real production records (or clean header row).
      */
 
@@ -483,6 +487,62 @@
         if (rec.isDummy === true) return true;
         if (rec.id && DUMMY_SEED_ID_SET[rec.id] === true) return true;
         return false;
+    }
+
+    /**
+     * Monthly Fee & Reminder calculation rule:
+     * User Rule: If a student took admission on the 10th of October,
+     * their next fee reminder is on the 11th of November (1 month + 1 day).
+     * Subsequent monthly cycles advance by 1 month each.
+     */
+    function calculateNextFeeReminder(admissionDateStr, monthsCount) {
+        if (!admissionDateStr) return '';
+        if (monthsCount === undefined || monthsCount === null) monthsCount = 1;
+        const parts = String(admissionDateStr).split('-');
+        if (parts.length !== 3) return admissionDateStr;
+        let year = parseInt(parts[0], 10);
+        let month = parseInt(parts[1], 10); // 1-12
+        let day = parseInt(parts[2], 10);
+
+        let targetMonth = month + monthsCount;
+        let targetYear = year + Math.floor((targetMonth - 1) / 12);
+        targetMonth = ((targetMonth - 1) % 12) + 1;
+
+        let targetDay = day + 1;
+        const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+        if (targetDay > daysInMonth) {
+            targetDay = daysInMonth;
+        }
+
+        const yStr = String(targetYear);
+        const mStr = String(targetMonth).padStart(2, '0');
+        const dStr = String(targetDay).padStart(2, '0');
+        return `${yStr}-${mStr}-${dStr}`;
+    }
+
+    function formatFeeDateDisplay(dateStr) {
+        if (!dateStr || dateStr === 'Paid' || dateStr === 'Fully Paid') return dateStr || '-';
+        const parts = String(dateStr).split('-');
+        if (parts.length !== 3) return dateStr;
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const d = parseInt(parts[2], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parts[0];
+        return `${d} ${months[m] || ''} ${y}`;
+    }
+
+    function updateNewStudentReminderPreview(admissionDateVal) {
+        const previewEl = document.getElementById('new-stu-reminder-preview');
+        if (!previewEl) return;
+        const nextDate = calculateNextFeeReminder(admissionDateVal, 1);
+        previewEl.textContent = formatFeeDateDisplay(nextDate);
+    }
+
+    function handleEditAdmDateChange(admissionDateVal) {
+        const dueEl = document.getElementById('edit-stu-duedate');
+        if (dueEl) {
+            dueEl.value = calculateNextFeeReminder(admissionDateVal, 1);
+        }
     }
 
     function getDummySeedData() {
@@ -540,11 +600,11 @@
                 }
             ],
             students: [
-                { id: 's1', isDummy: true, roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', totalFee: 48000, paidFee: 32000, dueDate: '2026-10-25', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
-                { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-                { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', totalFee: 48000, paidFee: 16000, dueDate: '2026-10-18', lastReminder: 'Never', password: 'password123', status: 'Active' },
-                { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-                { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', totalFee: 52000, paidFee: 26000, dueDate: '2026-10-20', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
+                { id: 's1', isDummy: true, roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', admissionDate: '2026-10-10', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-11', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
+                { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', admissionDate: '2026-09-10', monthlyFee: 2500, totalFee: 2500, paidFee: 5000, dueDate: '2026-11-11', lastReminder: '-', password: 'password123', status: 'Active' },
+                { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', admissionDate: '2026-10-05', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-11-06', lastReminder: 'Never', password: 'password123', status: 'Active' },
+                { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', admissionDate: '2026-08-15', monthlyFee: 3000, totalFee: 3000, paidFee: 9000, dueDate: '2026-11-16', lastReminder: '-', password: 'password123', status: 'Active' },
+                { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
             ],
             materials: [
                 {
@@ -1058,9 +1118,9 @@
             contactDisplay: '9555-6787-53',
             email: 'contact@divineclasses.in',
             upiId: 'divineclasses@upi',
-            facebookUrl: 'https://facebook.com',
-            instagramUrl: 'https://instagram.com',
-            youtubeUrl: 'https://www.youtube.com/@chem_crush9',
+            facebookUrl: 'https://m.facebook.com/edivineclasses/',
+            instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
+            youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
             adminName: 'Er. Rajesh Chahar',
             adminPassword: 'admin123',
             adminEmail: '',
@@ -1089,12 +1149,12 @@
 
     /********************************************************************
      * DEVELOPER DEMO DATA TOGGLE CONTROLLER
-     * Toggles dummy data in the Web App and Cloud Database + Google Sheets
+     * Toggles dummy data in the Web App and Databases
      ********************************************************************/
     /********************************************************************
      * PER-SHEET & MASTER DUMMY DATA CONTROLLER
      * Enables Developer to create or delete dummy data for each sheet individually.
-     * When disabled, dummy data is completely deleted from the Google Sheet.
+     * When disabled, dummy data is completely deleted from the Database.
      * NOTE: External_Links_Hub is permanent and ALWAYS unchanged!
      ********************************************************************/
     const SHEET_METADATA_CONFIG = [
@@ -1136,7 +1196,7 @@
             (seed[sheetKey] || []).forEach(function (r) {
                 if (r && r.id && !have[r.id]) state[sheetKey].push(r);
             });
-            showToast('Demo data for ' + sheetKey + ' CREATED & synced to Google Sheets!', 'success');
+            showToast('Demo data for ' + sheetKey + ' CREATED & synced to Databases!', 'success');
         } else {
             state[sheetKey] = (state[sheetKey] || []).filter(function (r) { return !isDummyRecord(r); });
             if (sheetKey === 'students') {
@@ -1153,7 +1213,7 @@
                     }
                 });
             }
-            showToast('Demo data for ' + sheetKey + ' DELETED completely from Google Sheet!', 'info');
+            showToast('Demo data for ' + sheetKey + ' DELETED completely from Database!', 'info');
         }
 
         saveStateLocally();
@@ -1169,11 +1229,11 @@
 
         // Sync with Google Apps Script backend
         if (typeof google !== 'undefined' && google.script && google.script.run) {
-            updateSyncBadge('Updating Google Sheets...', 'syncing');
+            updateSyncBadge('Updating Database...', 'syncing');
             if (google.script.run.apiSetDummyDataStatus) {
                 google.script.run
                     .withSuccessHandler(function () {
-                        updateSyncBadge('✓ Google Sheets Synced', 'success');
+                        updateSyncBadge('✓ Database Synced', 'success');
                     })
                     .withFailureHandler(function (err) {
                         console.warn('apiSetDummyDataStatus error:', err);
@@ -1183,7 +1243,7 @@
             } else {
                 google.script.run
                     .withSuccessHandler(function () {
-                        updateSyncBadge('✓ Google Sheets Synced', 'success');
+                        updateSyncBadge('✓ Database Synced', 'success');
                     })
                     .apiSyncAllData(state);
             }
@@ -1195,7 +1255,7 @@
                 body: JSON.stringify({ action: 'setDummyData', target: sheetKey, enabled: willEnable, data: state })
             })
             .then(function (res) { return res.json(); })
-            .then(function () { updateSyncBadge('✓ Google Sheets Synced', 'success'); })
+            .then(function () { updateSyncBadge('✓ Database Synced', 'success'); })
             .catch(function (err) { console.warn('Remote sync error:', err); });
         }
     }
@@ -1225,7 +1285,7 @@
                     if (r && r.id && !have[r.id]) state[tbl].push(r);
                 });
             });
-            showToast('All Demo Data Enabled: Demo records restored and written 2 GSheet.', 'success');
+            showToast('All Demo Data Enabled: Demo records restored and synced to Database.', 'success');
         } else {
             state.settings.showDummyData = false;
             state.settings.demoDataPermanentlyDisabled = true;
@@ -1246,13 +1306,13 @@
             openDummyDataManagerModal();
         }
 
-        // Instant Google Sheets & Cloud Database Sync
+        // Instant Database & Cloud Database Sync
         if (typeof google !== 'undefined' && google.script && google.script.run) {
-            updateSyncBadge('Updating Google Sheets...', 'syncing');
+            updateSyncBadge('Updating Database...', 'syncing');
             if (google.script.run.apiSetDummyDataStatus) {
                 google.script.run
                     .withSuccessHandler(function () {
-                        updateSyncBadge('✓ Google Sheets & DB Synced', 'success');
+                        updateSyncBadge('✓ Database Synced', 'success');
                     })
                     .withFailureHandler(function (err) {
                         console.warn('apiSetDummyDataStatus error:', err);
@@ -1262,7 +1322,7 @@
             } else {
                 google.script.run
                     .withSuccessHandler(function () {
-                        updateSyncBadge('✓ Google Sheets & DB Synced', 'success');
+                        updateSyncBadge('✓ Database Synced', 'success');
                     })
                     .apiSyncAllData(state);
             }
@@ -1275,7 +1335,7 @@
             })
             .then(function (res) { return res.json(); })
             .then(function () {
-                updateSyncBadge('✓ Google Sheets & DB Synced', 'success');
+                updateSyncBadge('✓ Database Synced', 'success');
             })
             .catch(function (err) {
                 console.warn('Remote sync error:', err);
@@ -1285,17 +1345,17 @@
 
     function reStructureGoogleSheets() {
         if (state.currentRole !== 'developer' && state.currentRole !== 'admin') {
-            showToast('Access Denied: Admin or Developer privileges required to restructure Google Sheets.', 'error');
+            showToast('Access Denied: Admin or Developer privileges required to optimize Database.', 'error');
             return;
         }
         if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.apiRestructureAllSheets) {
-            updateSyncBadge('Restructuring Google Sheets...', 'syncing');
-            showToast('Auditing and restructuring Google Sheet tabs (Calibri 10, headers, tab colors, tab ordering)...', 'info');
+            updateSyncBadge('Optimizing Database...', 'syncing');
+            showToast('Auditing and restructuring Database tables (Calibri 10, headers, tab colors, tab ordering)...', 'info');
             google.script.run
                 .withSuccessHandler(function (res) {
                     if (res && res.success) {
-                        updateSyncBadge('✓ Sheets Restructured', 'success');
-                        showToast('Google Sheet successfully restructured! All tabs ordered cleanly. External_Links_Hub preserved.', 'success');
+                        updateSyncBadge('✓ Database Restructured', 'success');
+                        showToast('Database successfully restructured! All tabs ordered cleanly. External_Links_Hub preserved.', 'success');
                     } else {
                         showToast('Restructure notice: ' + (res && res.error || 'Completed'), 'info');
                     }
@@ -1333,17 +1393,17 @@
                                     <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100">${item.label}</h4>
                                     <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOn ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}">${isOn ? 'Demo Active' : 'Clean / Real Only'}</span>
                                 </div>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">Sheet Tab: <strong class="text-slate-700 dark:text-slate-300">${item.sheet}</strong> • Real: <strong>${realCount}</strong> | Demo: <strong>${dummyCount}</strong></p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">Database Table: <strong class="text-slate-700 dark:text-slate-300">${item.sheet}</strong> • Real: <strong>${realCount}</strong> | Demo: <strong>${dummyCount}</strong></p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
                             ${isOn ? `
-                                <button onclick="toggleSheetDummyData('${item.key}', false)" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition cursor-pointer flex items-center gap-1.5" title="Delete dummy data from this sheet">
+                                <button onclick="toggleSheetDummyData('${item.key}', false)" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition cursor-pointer flex items-center gap-1.5" title="Delete dummy data from this database table">
                                     <i class="fa-solid fa-trash-can text-rose-500"></i>
                                     <span>Delete Demo Data</span>
                                 </button>
                             ` : `
-                                <button onclick="toggleSheetDummyData('${item.key}', true)" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5" title="Generate seed dummy data for this sheet">
+                                <button onclick="toggleSheetDummyData('${item.key}', true)" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5" title="Generate seed dummy data for this database table">
                                     <i class="fa-solid fa-plus-circle"></i>
                                     <span>Create Demo Data</span>
                                 </button>
@@ -1365,7 +1425,7 @@
                                 <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">External Links Hub (Official Study Portals)</h4>
                                 <span class="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/80 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-700">🔒 PERMANENT (Protected)</span>
                             </div>
-                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Sheet Tab: <strong class="text-indigo-700 dark:text-indigo-300">External_Links_Hub</strong> • All curated links (NCERT, NDLI, Khan Academy, PhET, CBSE) are kept untouched and <strong>NEVER deleted on disable by dev</strong>.</p>
+                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Database Table: <strong class="text-indigo-700 dark:text-indigo-300">External_Links_Hub</strong> • All curated links (NCERT, NDLI, Khan Academy, PhET, CBSE) are kept untouched and <strong>NEVER deleted on disable by dev</strong>.</p>
                         </div>
                     </div>
                     <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shadow-2xs">
@@ -1382,8 +1442,8 @@
                                 <i class="fa-solid fa-table-cells text-lg"></i>
                             </div>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900 dark:text-slate-100">Google Sheets & Per-Sheet Dummy Data Manager</h3>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Create dummy data per sheet individually. When disabled, dummy data rows are <strong>completely deleted from the Google Sheet</strong>.</p>
+                                <h3 class="text-base font-bold text-slate-900 dark:text-slate-100">Database & Per-Table Demo Data Manager</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Create dummy data per database table individually. When disabled, dummy data rows are <strong>completely deleted from the Database</strong>.</p>
                             </div>
                         </div>
                         <button onclick="closeModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-center cursor-pointer">
@@ -1407,7 +1467,7 @@
                             </button>
                             <button onclick="reStructureGoogleSheets()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-100 dark:bg-slate-700 dark:hover:bg-slate-600 transition cursor-pointer flex items-center gap-1.5 shadow-xs">
                                 <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
-                                <span>⚡ Restructure Sheets</span>
+                                <span>⚡ Restructure Database</span>
                             </button>
                         </div>
                     </div>
@@ -1417,7 +1477,7 @@
                     </div>
 
                     <div class="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                        <span><i class="fa-solid fa-circle-info mr-1 text-sky-500"></i> Google Sheet ID: <strong class="font-mono text-slate-700 dark:text-slate-300">1v7RZX0R8Am...MzFeKM</strong></span>
+                        <span><i class="fa-solid fa-circle-info mr-1 text-sky-500"></i> Database ID: <strong class="font-mono text-slate-700 dark:text-slate-300">1v7RZX0R8Am...MzFeKM</strong></span>
                         <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg font-semibold transition cursor-pointer">
                             Close
                         </button>
@@ -1668,6 +1728,24 @@
                             state.gallery = getDummySeedData().gallery;
                         }
                     }
+                    if (state.students && Array.isArray(state.students)) {
+                        state.students.forEach(function (s) {
+                            if (!s.admissionDate) s.admissionDate = '2026-10-10';
+                            if (!s.monthlyFee) {
+                                if (s.totalFee && s.totalFee > 10000) {
+                                    s.monthlyFee = Math.round(s.totalFee / 12);
+                                } else {
+                                    s.monthlyFee = Number(s.totalFee) || 2500;
+                                }
+                            }
+                            s.totalFee = s.monthlyFee;
+                            if (!s.dueDate || s.dueDate === 'Paid' || s.dueDate === 'Fully Paid') {
+                                // keep
+                            } else if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) {
+                                s.dueDate = calculateNextFeeReminder(s.admissionDate, 1);
+                            }
+                        });
+                    }
                 }
             }
         } catch (e) {
@@ -1705,6 +1783,112 @@
     }
     function escapeAttr(str) {
         return escapeHtml(str);
+    }
+
+    function getSocialLink(platform) {
+        const s = (state && state.settings) || {};
+        let url = '';
+        if (platform === 'youtube') {
+            url = s.youtubeUrl || 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
+        } else if (platform === 'instagram') {
+            url = s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq';
+        } else if (platform === 'facebook') {
+            url = s.facebookUrl || 'https://m.facebook.com/edivineclasses/';
+        }
+        url = String(url || '').trim();
+        if (!url) {
+            if (platform === 'youtube') return 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
+            if (platform === 'instagram') return 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq';
+            return 'https://m.facebook.com/edivineclasses/';
+        }
+        if (!/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+        }
+        return url;
+    }
+
+    function openSocialExternalApp(platform, event) {
+        if (event && event.preventDefault) {
+            try { event.preventDefault(); } catch (err) {}
+        }
+
+        const s = (state && state.settings) || {};
+        let webUrl = getSocialLink(platform);
+        const ua = navigator.userAgent || '';
+        const isAndroid = /Android/i.test(ua);
+        const isIOS = /iPhone|iPad|iPod/i.test(ua);
+        const isMobile = isAndroid || isIOS;
+
+        if (!isMobile) {
+            window.open(webUrl, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        let appUrl = '';
+        if (platform === 'youtube') {
+            if (isAndroid) {
+                appUrl = 'intent://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8#Intent;package=com.google.android.youtube;scheme=https;end;';
+            } else if (isIOS) {
+                appUrl = 'vnd.youtube://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
+            }
+        } else if (platform === 'instagram') {
+            const igUser = 'divineclasses_paschimpuri';
+            if (isAndroid) {
+                appUrl = 'intent://instagram.com/_u/' + igUser + '#Intent;package=com.instagram.android;scheme=https;end;';
+            } else if (isIOS) {
+                appUrl = 'instagram://user?username=' + igUser;
+            }
+        } else if (platform === 'facebook') {
+            const fbPage = 'edivineclasses';
+            if (isAndroid) {
+                appUrl = 'intent://facebook.com/' + fbPage + '#Intent;package=com.facebook.katana;scheme=https;end;';
+            } else if (isIOS) {
+                appUrl = 'fb://facewebmodal/f?href=https://www.facebook.com/' + fbPage;
+            }
+        }
+
+        if (appUrl) {
+            if (isAndroid) {
+                try {
+                    window.location.href = appUrl;
+                    return;
+                } catch (e) {
+                    window.open(webUrl, '_blank', 'noopener,noreferrer');
+                    return;
+                }
+            } else if (isIOS) {
+                const startTime = Date.now();
+                window.location.href = appUrl;
+                setTimeout(function () {
+                    if (Date.now() - startTime < 2000) {
+                        window.open(webUrl, '_blank', 'noopener,noreferrer');
+                    }
+                }, 1000);
+                return;
+            }
+        }
+
+        window.open(webUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    function updateSocialLinksUI() {
+        const fbEl = document.getElementById('sidebar-link-fb');
+        if (fbEl) {
+            fbEl.href = getSocialLink('facebook');
+            fbEl.onclick = function (e) { openSocialExternalApp('facebook', e); };
+        }
+
+        const igEl = document.getElementById('sidebar-link-ig');
+        if (igEl) {
+            igEl.href = getSocialLink('instagram');
+            igEl.onclick = function (e) { openSocialExternalApp('instagram', e); };
+        }
+
+        const ytEl = document.getElementById('sidebar-link-yt');
+        if (ytEl) {
+            ytEl.href = getSocialLink('youtube');
+            ytEl.onclick = function (e) { openSocialExternalApp('youtube', e); };
+        }
     }
 
     function isRequirementLabelsEnabled() {
@@ -1820,6 +2004,24 @@
                 state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
             });
         }
+        if (state.students && Array.isArray(state.students)) {
+            state.students.forEach(function (s) {
+                if (!s.admissionDate) s.admissionDate = '2026-10-10';
+                if (!s.monthlyFee) {
+                    if (s.totalFee && s.totalFee > 10000) {
+                        s.monthlyFee = Math.round(s.totalFee / 12);
+                    } else {
+                        s.monthlyFee = Number(s.totalFee) || 2500;
+                    }
+                }
+                s.totalFee = s.monthlyFee;
+                if (!s.dueDate || s.dueDate === 'Paid' || s.dueDate === 'Fully Paid') {
+                    // keep
+                } else if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) {
+                    s.dueDate = calculateNextFeeReminder(s.admissionDate, 1);
+                }
+            });
+        }
         state.notifications = Array.from(notifMap.values()).filter(function (n) {
             return n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_'));
         });
@@ -1827,11 +2029,12 @@
         loadAuthSession();
         updateRoleUI();
         updateNotificationBadge();
+        updateSocialLinksUI();
     }
 
     function autoSyncToDatabase(immediate) {
         if (autoSyncTimer) clearTimeout(autoSyncTimer);
-        updateSyncBadge('Syncing to Google Sheet...', 'syncing');
+        updateSyncBadge('Syncing to Database...', 'syncing');
 
         const delay = immediate ? 0 : 50; // Ultra-fast auto-sync as soon as data is added
 
@@ -1840,7 +2043,7 @@
                 google.script.run
                     .withSuccessHandler(function (res) {
                         state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                        updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
                     })
                     .withFailureHandler(function (err) {
                         console.warn('Auto-sync notice:', err);
@@ -1857,7 +2060,7 @@
                     .then(function (res) { return res.json(); })
                     .then(function (res) {
                         state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                        updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
                     })
                     .catch(function (err) {
                         console.warn('Remote sync notice:', err);
@@ -1910,7 +2113,7 @@
         }
 
         if (!skipRemoteSync) {
-            // Real-time automatic Cloud Database & Google Sheet persistence as soon as data is added
+            // Real-time automatic Database persistence as soon as data is added
             autoSyncToDatabase(immediate !== false);
         }
     }
@@ -1945,13 +2148,13 @@
                             }
                             stopSpin();
                             state.lastSyncTime = new Date().toLocaleTimeString();
-                            updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
+                            updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
                             showToast('Data Synced!', 'success');
                             renderMainContent();
                         })
                         .withFailureHandler(function (err) {
                             stopSpin();
-                            updateSyncBadge('✓ Sheet Synced', 'success');
+                            updateSyncBadge('✓ Database Synced', 'success');
                         })
                         .apiGetInitialData();
                 })
@@ -1979,8 +2182,8 @@
                     }
                     stopSpin();
                     state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Sheet Synced (' + state.lastSyncTime + ')', 'success');
-                    showToast('2-Way Google Sheet sync complete! All tabs updated.', 'success');
+                    updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+                    showToast('Database sync complete! All records updated.', 'success');
                     renderMainContent();
                 })
                 .catch(function (err) {
@@ -2229,7 +2432,7 @@
         const mainContent = document.getElementById('main-content');
         const body = document.body;
 
-        // Toggle Developer-only Links (Google Drive & Google Sheets Buttons) — visible ONLY in Developer role
+        // Toggle Developer-only Links (Drive & Databases Buttons) — visible ONLY in Developer role
         const isDev = state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
         document.querySelectorAll('.dev-only-link').forEach(el => {
             el.style.display = isDev ? '' : 'none';
@@ -2301,20 +2504,20 @@
                         <div class="flex flex-wrap items-center justify-between w-full gap-2">
                             <div class="flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
-                                <span><strong>Developer Mode Active:</strong> Full Administrative Controls + Google Sheets Restructuring & Per-Sheet Demo Data Manager.</span>
+                                <span><strong>Developer Mode Active:</strong> Full Administrative Controls + Database Restructuring & Per-Table Demo Data Manager.</span>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
-                                <button onclick="openDummyDataManagerModal()" class="px-2.5 py-1 text-xs font-bold rounded-lg border transition cursor-pointer shadow-xs flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500" title="Manage demo data per sheet & restructure Google Sheets">
+                                <button onclick="openDummyDataManagerModal()" class="px-2.5 py-1 text-xs font-bold rounded-lg border transition cursor-pointer shadow-xs flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500" title="Manage demo data per table & optimize Database">
                                     <i class="fa-solid fa-table-list text-amber-300"></i>
-                                    <span>Sheet Data Manager</span>
+                                    <span>Database Manager</span>
                                 </button>
-                                <button onclick="toggleDemoData(!${dummyOn})" class="px-2.5 py-1 text-xs font-bold rounded-lg border transition cursor-pointer shadow-xs flex items-center gap-1.5 ${dummyOn ? 'bg-purple-700 hover:bg-purple-800 text-white border-purple-500' : 'bg-amber-400 hover:bg-amber-500 text-slate-950 border-amber-500'}" title="${dummyOn ? 'Click to delete all dummy data from Google Sheets' : 'Click to create demo data and write to Google Sheets'}">
+                                <button onclick="toggleDemoData(!${dummyOn})" class="px-2.5 py-1 text-xs font-bold rounded-lg border transition cursor-pointer shadow-xs flex items-center gap-1.5 ${dummyOn ? 'bg-purple-700 hover:bg-purple-800 text-white border-purple-500' : 'bg-amber-400 hover:bg-amber-500 text-slate-950 border-amber-500'}" title="${dummyOn ? 'Click to delete all dummy data from Databases' : 'Click to create demo data and write to Databases'}">
                                     <i class="fa-solid ${dummyOn ? 'fa-toggle-on text-emerald-300' : 'fa-toggle-off text-slate-700'} text-sm"></i>
                                     <span>All Demo: <strong>${dummyOn ? 'ON' : 'OFF'}</strong></span>
                                 </button>
-                                <button onclick="reStructureGoogleSheets()" class="px-2 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600 hidden sm:inline-flex items-center gap-1" title="Format & Restructure Google Sheet tabs in standard sequence">
+                                <button onclick="reStructureGoogleSheets()" class="px-2 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600 hidden sm:inline-flex items-center gap-1" title="Format & Optimize Database tables in standard sequence">
                                     <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i>
-                                    <span>Restructure Sheets</span>
+                                    <span>Restructure Database</span>
                                 </button>
                             </div>
                         </div>
@@ -2471,6 +2674,7 @@
         const sidebar = document.getElementById('sidebar');
         const navContainer = document.getElementById('nav-links');
         renderMobileBottomNav();
+        updateSocialLinksUI();
         if (!state.isAuthenticated) {
             if (sidebar) sidebar.style.display = 'none';
             if (navContainer) navContainer.innerHTML = '';
@@ -2528,8 +2732,8 @@
             gallery: ['Result Banners & Coaching Gallery', 'Requirement #8: Previous result banners and classroom achievements'],
             links: ['External Study Material Hub', 'Requirement #9: Curated study material links from trusted educational websites'],
             feedback: ['Parent & Student Feedback Portal', 'Requirement #10: Submit and review feedback from parents and students'],
-            access: ['Access Control & Password Settings', 'Requirement #11: Manage student/faculty passwords and authorize app access synced with Google Sheet'],
-            settings: ['Institute Settings Console', 'Developer Only: Full institute configuration, passwords, contact details, social links & Google Drive / Sheet access']
+            access: ['Access Control & Password Settings', 'Requirement #11: Manage student/faculty passwords and authorize app access synced with Database'],
+            settings: ['Institute Settings Console', 'Developer Only: Full institute configuration, passwords, contact details, social links & Cloud Database access']
         };
 
         const [rawTitle, rawSubtitle] = titles[state.activeTab] || titles.dashboard;
@@ -2615,14 +2819,14 @@
         const totalStudents = activeStudents.length;
         const totalBatches = state.batches.length;
         const totalMaterials = state.materials.length;
-        const pendingFeeStudents = activeStudents.filter(s => s.paidFee < s.totalFee).length;
-        const totalPendingAmount = activeStudents.reduce((acc, s) => acc + (s.totalFee - s.paidFee), 0);
-        const totalExpected = activeStudents.reduce((acc, s) => acc + s.totalFee, 0);
+        const pendingFeeStudents = activeStudents.filter(s => s.paidFee < (s.monthlyFee || s.totalFee)).length;
+        const totalPendingAmount = activeStudents.reduce((acc, s) => acc + Math.max(0, (s.monthlyFee || s.totalFee) - s.paidFee), 0);
+        const totalExpected = activeStudents.reduce((acc, s) => acc + (s.monthlyFee || s.totalFee), 0);
         const collectionPct = totalExpected > 0 ? Math.round(((totalExpected - totalPendingAmount) / totalExpected) * 100) : 0;
 
         const isStudent = state.currentRole === 'student';
         const curStudent = isStudent ? (state.students.find(s => s.id === state.activeStudentId && s.status !== 'Inactive') || state.students.find(s => s.status !== 'Inactive') || state.students[0]) : null;
-        const stuBalance = curStudent ? (curStudent.totalFee - curStudent.paidFee) : 0;
+        const stuBalance = curStudent ? Math.max(0, (curStudent.monthlyFee || curStudent.totalFee) - curStudent.paidFee) : 0;
         const hasFeeReminder = isStudent && stuBalance > 0 && (state.notifications || []).some(n => !n.read && n.actionTab === 'fees' && (n.targetStudentId === curStudent.id || n.targetRoll === curStudent.roll));
 
         return `
@@ -2637,13 +2841,13 @@
                                 <div>
                                     <div class="flex items-center gap-2">
                                         <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 tracking-wide">Notice from Administration</span>
-                                        <span class="text-xs text-amber-800 dark:text-amber-300 font-bold">Tuition Fee Due</span>
+                                        <span class="text-xs text-amber-800 dark:text-amber-300 font-bold">Monthly Fee Reminder</span>
                                     </div>
                                     <h3 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 mt-1 font-heading">
-                                        Pending Balance: ₹${stuBalance.toLocaleString('en-IN')} (Due: ${curStudent.dueDate || 'Immediate'})
+                                        Pending Monthly Fee: ₹${stuBalance.toLocaleString('en-IN')} (Next Due Date: ${formatFeeDateDisplay(curStudent.dueDate)})
                                     </h3>
                                     <p class="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                                        Dear ${curStudent.name}, please clear the tuition fee installment via UPI (${state.settings.upiId}) to ensure uninterrupted class materials & offline test evaluations.
+                                        Dear ${curStudent.name}, please deposit your monthly fee via UPI (${state.settings.upiId}) to ensure uninterrupted class materials & offline test evaluations.
                                     </p>
                                 </div>
                             </div>
@@ -2734,7 +2938,7 @@
                                     </button>
                                     ${state.currentRole === 'developer' ? `
                                     <button onclick="syncWithGoogleSheet()" class="px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold flex items-center gap-2 transition">
-                                        <i class="fa-solid fa-database"></i> Google Sheet DB
+                                        <i class="fa-solid fa-database"></i> Database
                                     </button>
                                     ` : ''}
                                 </div>
@@ -2845,9 +3049,9 @@
                                 <div>
                                     <div class="flex items-center gap-1.5">
                                         <p class="text-sm font-semibold text-slate-900">Access Control & Passwords</p>
-                                        ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? '<span class="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-medium">Sheet Synced</span>' : ''}
+                                        ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? '<span class="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-medium">Database Synced</span>' : ''}
                                     </div>
-                                    <p class="text-xs text-slate-500 mt-0.5">Authorize/block students & teachers from Google Sheet</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Authorize/block students & teachers from Database</p>
                                 </div>
                             </button>
                         </div>
@@ -2861,14 +3065,14 @@
                             <p class="text-xs text-indigo-100 mt-1">Watch free YouTube concept marathons, topper interviews on Instagram, and daily exam schedules on Facebook.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 shrink-0">
-                            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" onclick="showToast('Opening Divine Classes Facebook...', 'info')" class="px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition">
+                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('facebook', event)" class="px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
                                 <i class="fa-brands fa-facebook text-base"></i> Facebook Page
                             </a>
-                            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" onclick="showToast('Opening Divine Classes Instagram...', 'info')" class="px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition">
+                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('instagram', event)" class="px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
                                 <i class="fa-brands fa-instagram text-base"></i> Instagram
                             </a>
-                            <a href="https://www.youtube.com/@chem_crush9" target="_blank" rel="noopener noreferrer" onclick="showToast('Opening Divine Classes YouTube lectures (@chem_crush9)...', 'info')" class="px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition">
-                                <i class="fa-brands fa-youtube text-base"></i> YouTube Lectures
+                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('youtube', event)" class="px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                                <i class="fa-brands fa-youtube text-base"></i> YouTube Channel
                             </a>
                         </div>
                     </div>
@@ -3086,15 +3290,23 @@
                                 <input type="text" id="new-stu-parent" required placeholder="e.g., Ramesh Deshmukh" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">Contact Phone *</label>
                                 <input type="text" id="new-stu-phone" required placeholder="+91 98765 11223" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Total Course Fee (₹) *</label>
-                                <input type="number" id="new-stu-fee" required value="48000" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Admission Date *</label>
+                                <input type="date" id="new-stu-admdate" required value="${new Date().toISOString().split('T')[0]}" onchange="updateNewStudentReminderPreview(this.value)" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-indigo-500 font-semibold">
                             </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Monthly Tuition Fee (₹) *</label>
+                                <input type="number" id="new-stu-monthlyfee" required value="2500" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-indigo-500 font-semibold">
+                            </div>
+                        </div>
+                        <div class="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between text-xs">
+                            <span class="text-indigo-800 font-medium"><i class="fa-solid fa-calendar-check text-indigo-600 mr-1.5"></i>Next Fee Reminder:</span>
+                            <span id="new-stu-reminder-preview" class="font-bold text-indigo-900">${formatFeeDateDisplay(calculateNextFeeReminder(new Date().toISOString().split('T')[0], 1))}</span>
                         </div>
 
                         <!-- Optional Photo Upload -->
@@ -3160,7 +3372,10 @@
         const name = document.getElementById('new-stu-name').value.trim();
         const parentName = document.getElementById('new-stu-parent').value.trim();
         const phone = document.getElementById('new-stu-phone').value.trim();
-        const totalFee = parseInt(document.getElementById('new-stu-fee').value, 10) || 48000;
+        const admissionDate = document.getElementById('new-stu-admdate').value || new Date().toISOString().split('T')[0];
+        const monthlyFee = parseInt(document.getElementById('new-stu-monthlyfee').value, 10) || 2500;
+        const initialPaid = monthlyFee; // Admitted with first month deposit
+        const nextDueDate = calculateNextFeeReminder(admissionDate, 1);
 
         const newStu = {
             id: 's' + Date.now(),
@@ -3168,11 +3383,15 @@
             name,
             parentName,
             phone,
-            totalFee,
-            paidFee: Math.round(totalFee * 0.5),
-            dueDate: '2026-11-05',
+            admissionDate,
+            monthlyFee,
+            totalFee: monthlyFee,
+            paidFee: initialPaid,
+            dueDate: nextDueDate,
             lastReminder: 'Never',
-            photo: window.newStudentPhotoData || ''
+            photo: window.newStudentPhotoData || '',
+            password: 'password123',
+            status: 'Active'
         };
         window.newStudentPhotoData = '';
 
@@ -3270,7 +3489,7 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function () {
-                    showToast(`Student ${stu.name} (${stu.roll}) marked Inactive in Google Sheet & Database!`, 'warning');
+                    showToast(`Student ${stu.name} (${stu.roll}) marked Inactive in Database!`, 'warning');
                 })
                 .apiUpdateStudentProfile(studentId, { status: 'Inactive', batchId: '' });
         } else {
@@ -3309,7 +3528,7 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function () {
-                    showToast(`Student ${stu.name} restored as Active in Google Sheet & Database!`, 'success');
+                    showToast(`Student ${stu.name} restored as Active in Database!`, 'success');
                 })
                 .apiUpdateStudentProfile(studentId, { status: 'Active' });
         } else {
@@ -3375,7 +3594,7 @@
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function () {
-                        showToast(`Photo for ${stu.name} saved in Database & Google Sheet!`, 'success');
+                        showToast(`Photo for ${stu.name} saved in Database!`, 'success');
                     })
                     .apiUpdateStudentPhoto(studentId, photoDataUrl);
             } else {
@@ -3538,7 +3757,7 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Student Passport Photo</p>
-                            <p class="text-[11px] text-slate-400">Stored in Developer Google Drive • Mirrored in Sheet.</p>
+                            <p class="text-[11px] text-slate-400">Stored in Cloud Storage • Mirrored in Database.</p>
                             <div class="flex flex-wrap items-center gap-2 mt-1.5">
                                 <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition inline-flex items-center gap-1 shadow-2xs">
                                     <i class="fa-solid fa-camera"></i>
@@ -3593,18 +3812,24 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Total Course Fee (₹) *</label>
-                            <input type="number" id="edit-stu-totalfee" value="${Number(stu.totalFee) || 0}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Admission Date *</label>
+                            <input type="date" id="edit-stu-admdate" value="${escapeAttr(stu.admissionDate || '2026-10-10')}" onchange="handleEditAdmDateChange(this.value)" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Paid Fee (₹) *</label>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Monthly Tuition Fee (₹) *</label>
+                            <input type="number" id="edit-stu-monthlyfee" value="${Number(stu.monthlyFee || stu.totalFee) || 0}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Fees Deposited (₹) *</label>
                             <input type="number" id="edit-stu-paidfee" value="${Number(stu.paidFee) || 0}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Fee Due Date *</label>
-                            <input type="date" id="edit-stu-duedate" value="${escapeAttr(stu.dueDate || '2026-11-05')}" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Next Fee Reminder / Due Date *</label>
+                            <input type="date" id="edit-stu-duedate" value="${escapeAttr(stu.dueDate || '2026-11-11')}" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                         </div>
                     </div>
 
@@ -3642,7 +3867,8 @@
         const parentName = document.getElementById('edit-stu-parent').value.trim();
         const batchId = document.getElementById('edit-stu-batch').value;
         const status = document.getElementById('edit-stu-status').value;
-        const totalFee = parseInt(document.getElementById('edit-stu-totalfee').value, 10) || 0;
+        const admissionDate = document.getElementById('edit-stu-admdate').value.trim() || '2026-10-10';
+        const monthlyFee = parseInt(document.getElementById('edit-stu-monthlyfee').value, 10) || 0;
         const paidFee = parseInt(document.getElementById('edit-stu-paidfee').value, 10) || 0;
         const dueDate = document.getElementById('edit-stu-duedate').value.trim();
         const password = document.getElementById('edit-stu-pwd').value.trim();
@@ -3654,7 +3880,9 @@
         stu.phone = phone;
         stu.parentName = parentName;
         stu.status = status;
-        stu.totalFee = totalFee;
+        stu.admissionDate = admissionDate;
+        stu.monthlyFee = monthlyFee;
+        stu.totalFee = monthlyFee;
         stu.paidFee = paidFee;
         stu.dueDate = dueDate || stu.dueDate;
         stu.password = password || 'password123';
@@ -3676,10 +3904,10 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function () {
-                    showToast(`Student ${name} (${roll}) updated in Google Sheet & Database!`, 'success');
+                    showToast(`Student ${name} (${roll}) updated in Database!`, 'success');
                 })
                 .apiUpdateStudentProfile(studentId, {
-                    name, roll, phone, parentName, batchId, status, totalFee, paidFee, dueDate, password, photo
+                    name, roll, phone, parentName, batchId, status, admissionDate, monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
                 });
         } else {
             showToast(`Student ${name} updated successfully!`, 'success');
@@ -3719,7 +3947,7 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Faculty Member Photo</p>
-                            <p class="text-[11px] text-slate-400">Stored in Developer Google Drive • Mirrored in Sheet.</p>
+                            <p class="text-[11px] text-slate-400">Stored in Cloud Storage • Mirrored in Database.</p>
                             <div class="flex flex-wrap items-center gap-2 mt-1.5">
                                 <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition inline-flex items-center gap-1 shadow-2xs">
                                     <i class="fa-solid fa-camera"></i>
@@ -3840,7 +4068,7 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function () {
-                    showToast(`Faculty ${name} updated in Google Sheet & Database!`, 'success');
+                    showToast(`Faculty ${name} updated in Database!`, 'success');
                 })
                 .apiUpdateTeacherProfile(teacherId, {
                     name, email, subject, qualification, experience, phone, status, specialization, bio, password, photo
@@ -3855,11 +4083,29 @@
      ********************************************************************/
     function renderFeesView() {
         const activeStudents = (state.students || []).filter(s => s.status !== 'Inactive');
-        const totalExpected = activeStudents.reduce((sum, s) => sum + s.totalFee, 0);
+        activeStudents.forEach(s => {
+            if (!s.monthlyFee || s.monthlyFee > 10000) {
+                if (s.totalFee && s.totalFee > 10000) {
+                    s.monthlyFee = Math.round(s.totalFee / 12);
+                } else {
+                    s.monthlyFee = Number(s.totalFee) || 2500;
+                }
+            }
+            s.totalFee = s.monthlyFee;
+            if (s.paidFee > s.monthlyFee) {
+                s.paidFee = s.monthlyFee;
+            }
+            if (!s.dueDate || s.dueDate === 'Paid' || s.dueDate === 'Fully Paid') {
+                // keep
+            } else if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) {
+                s.dueDate = calculateNextFeeReminder(s.admissionDate, 1);
+            }
+        });
+        const totalExpected = activeStudents.reduce((sum, s) => sum + (s.monthlyFee || s.totalFee), 0);
         const totalCollected = activeStudents.reduce((sum, s) => sum + s.paidFee, 0);
-        const totalPending = totalExpected - totalCollected;
-        const pendingCount = activeStudents.filter(s => s.paidFee < s.totalFee).length;
-        const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+        const totalPending = activeStudents.reduce((sum, s) => sum + Math.max(0, (s.monthlyFee || s.totalFee) - s.paidFee), 0);
+        const pendingCount = activeStudents.filter(s => s.paidFee < (s.monthlyFee || s.totalFee)).length;
+        const collectionRate = totalExpected > 0 ? Math.round((totalCollected / (totalCollected + totalPending)) * 100) : 0;
 
         return `
                 <div class="fade-in space-y-6">
@@ -3884,9 +4130,9 @@
                     <!-- Financial Summary Cards -->
                     <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <div class="bg-white p-5 rounded-2xl border border-slate-200">
-                            <p class="text-xs font-semibold text-slate-500">Total Course Fees</p>
+                            <p class="text-xs font-semibold text-slate-500">Monthly Tuition Commitment</p>
                             <p class="text-2xl font-bold text-slate-900 mt-1 font-heading">₹${totalExpected.toLocaleString('en-IN')}</p>
-                            <p class="text-xs text-slate-500 mt-1">${activeStudents.length} Active Enrolled</p>
+                            <p class="text-xs text-slate-500 mt-1">${activeStudents.length} Active Monthly Students</p>
                         </div>
                         <div class="bg-white p-5 rounded-2xl border border-emerald-200 bg-emerald-50/20">
                             <p class="text-xs font-semibold text-emerald-600">Total Collected</p>
@@ -3909,12 +4155,12 @@
                         </div>
                     </div>
 
-                    <!-- Fees Table -->
+                    <!-- Fees Table: 1-to-1 with Database Student_Fees_Ledger Table -->
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
                                 <h3 class="text-sm font-bold text-slate-900 font-heading">Student Fee Ledger & Automated Reminders ${isRequirementLabelsEnabled() ? '<span class="text-xs font-normal text-slate-500">(Req #5)</span>' : ''}</h3>
-                                <p class="text-xs text-slate-500">Click WhatsApp or SMS reminder buttons to notify parent immediately</p>
+                                <p class="text-xs text-slate-500">Synchronized 1-to-1 with Database <code>Student_Fees_Ledger</code> tab</p>
                             </div>
                             <button onclick="exportFeesToCSV()" class="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto">
                                 <i class="fa-solid fa-file-excel text-emerald-600"></i> Export to CSV
@@ -3924,22 +4170,24 @@
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="bg-slate-50 text-xs font-semibold text-slate-600 border-b border-slate-200">
-                                        <th class="py-3.5 px-4">Student & Roll</th>
-                                        <th class="py-3.5 px-4">Parent / Contact</th>
-                                        <th class="py-3.5 px-4">Total Fee</th>
-                                        <th class="py-3.5 px-4">Paid</th>
-                                        <th class="py-3.5 px-4">Pending Balance</th>
-                                        <th class="py-3.5 px-4 whitespace-nowrap">Status / Due Date</th>
+                                        <th class="py-3.5 px-4">Roll No & Student</th>
+                                        <th class="py-3.5 px-4 whitespace-nowrap">Admission Date</th>
+                                        <th class="py-3.5 px-4">Parent Name & Contact</th>
+                                        <th class="py-3.5 px-4 whitespace-nowrap">Monthly Fee (INR)</th>
+                                        <th class="py-3.5 px-4 whitespace-nowrap">Paid Fee (INR)</th>
+                                        <th class="py-3.5 px-4 whitespace-nowrap">Pending Dues (INR)</th>
+                                        <th class="py-3.5 px-4 whitespace-nowrap">Fee Payment Status</th>
+                                        <th class="py-3.5 px-4 whitespace-nowrap">Next Fee Due Date</th>
                                         <th class="py-3.5 px-4 text-right whitespace-nowrap">Reminder Actions ${isRequirementLabelsEnabled() ? '<span class="text-[11px] font-normal text-slate-400">(Req #5)</span>' : ''}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-xs">
                                     ${activeStudents.length === 0 ? `
                                         <tr>
-                                            <td colspan="7" class="py-8 text-center text-slate-400">No active students enrolled.</td>
+                                            <td colspan="9" class="py-8 text-center text-slate-400">No active students enrolled.</td>
                                         </tr>
                                     ` : activeStudents.map(stu => {
-            const balance = stu.totalFee - stu.paidFee;
+            const balance = Math.max(0, (stu.monthlyFee || stu.totalFee) - stu.paidFee);
             const isPaid = balance <= 0;
             return `
                                             <tr class="hover:bg-slate-50/80 transition">
@@ -3948,32 +4196,36 @@
                                                         ${renderUserAvatar(stu.photo, stu.name, 'student', 'w-8 h-8')}
                                                         <div>
                                                             <p class="font-bold text-slate-900">${stu.name}</p>
-                                                            <p class="text-[11px] text-slate-400">${stu.roll}</p>
+                                                            <p class="text-[11px] font-mono text-slate-500">${stu.roll}</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td class="py-3.5 px-4">
-                                                    <p class="font-medium text-slate-700">${stu.parentName}</p>
-                                                    <p class="text-[11px] text-slate-400">${stu.phone}</p>
+                                                <td class="py-3.5 px-4 whitespace-nowrap">
+                                                    <p class="font-medium text-slate-700">${formatFeeDateDisplay(stu.admissionDate || '2026-10-10')}</p>
                                                 </td>
-                                                <td class="py-3.5 px-4 font-semibold text-slate-700">₹${stu.totalFee.toLocaleString('en-IN')}</td>
-                                                <td class="py-3.5 px-4 font-semibold text-emerald-600">₹${stu.paidFee.toLocaleString('en-IN')}</td>
-                                                <td class="py-3.5 px-4 font-bold ${isPaid ? 'text-slate-400' : 'text-rose-600'}">
+                                                <td class="py-3.5 px-4">
+                                                    <p class="font-medium text-slate-700">${stu.parentName || 'Parent'}</p>
+                                                    <p class="text-[11px] text-slate-400 font-mono">${stu.phone || '-'}</p>
+                                                </td>
+                                                <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">₹${(stu.monthlyFee || stu.totalFee).toLocaleString('en-IN')}</td>
+                                                <td class="py-3.5 px-4 font-semibold text-emerald-600 whitespace-nowrap">₹${stu.paidFee.toLocaleString('en-IN')}</td>
+                                                <td class="py-3.5 px-4 font-bold whitespace-nowrap ${isPaid ? 'text-slate-400' : 'text-rose-600'}">
                                                     ₹${balance.toLocaleString('en-IN')}
                                                 </td>
                                                 <td class="py-3.5 px-4 whitespace-nowrap">
                                                     ${isPaid ? `
                                                         <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 whitespace-nowrap inline-flex items-center">
-                                                            <i class="fa-solid fa-circle-check mr-1"></i>Fully Paid
+                                                            <i class="fa-solid fa-circle-check mr-1"></i>Current Month Paid
                                                         </span>
                                                     ` : `
-                                                        <div class="whitespace-nowrap">
-                                                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 whitespace-nowrap inline-block">
-                                                                Due: ${stu.dueDate}
-                                                            </span>
-                                                            <p class="text-[10px] text-slate-400 mt-1 whitespace-nowrap">Last reminded: ${stu.lastReminder}</p>
-                                                        </div>
+                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 whitespace-nowrap inline-flex items-center">
+                                                            <i class="fa-solid fa-clock mr-1"></i>Payment Due
+                                                        </span>
                                                     `}
+                                                </td>
+                                                <td class="py-3.5 px-4 whitespace-nowrap">
+                                                    <span class="font-mono font-semibold text-slate-800">${isPaid ? '-' : formatFeeDateDisplay(stu.dueDate)}</span>
+                                                    <p class="text-[10px] text-slate-400 mt-0.5">Last: ${stu.lastReminder || 'Never'}</p>
                                                 </td>
                                                 <td class="py-3.5 px-4 text-right">
                                                     <div class="flex items-center justify-end gap-1.5">
@@ -3985,11 +4237,11 @@
                                                         ` : ''}
                                                         ${!isPaid ? `
                                                             <!-- 1-Click WhatsApp Reminder Only -->
-                                                            <button onclick="sendWhatsAppFeeReminder('${stu.id}')" title="Send WhatsApp Fee Reminder" class="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-2xs transition shrink-0">
+                                                            <button onclick="sendWhatsAppFeeReminder('${stu.id}')" title="Send WhatsApp Fee Reminder" class="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-2xs transition shrink-0 cursor-pointer">
                                                                 <i class="fa-brands fa-whatsapp text-base"></i>
                                                             </button>
                                                             <!-- Record Payment -->
-                                                            <button onclick="openRecordPaymentModal('${stu.id}')" title="Record Partial or Full Payment" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg text-xs transition">
+                                                            <button onclick="openRecordPaymentModal('${stu.id}')" title="Record Partial or Full Payment" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg text-xs transition cursor-pointer">
                                                                 + Payment
                                                             </button>
                                                         ` : `
@@ -4016,7 +4268,8 @@
     function addFeeReminderNotification(studentId, channel = 'App Notification') {
         const stu = state.students.find(s => s.id === studentId);
         if (!stu) return;
-        const balance = stu.totalFee - stu.paidFee;
+        const monthly = stu.monthlyFee || stu.totalFee || 2500;
+        const balance = Math.max(0, monthly - stu.paidFee);
         if (balance <= 0) return;
 
         if (!state.notifications) state.notifications = [];
@@ -4026,8 +4279,8 @@
 
         const newNotif = {
             id: 'notif_fee_' + stu.id + '_' + Date.now(),
-            title: `Fee Payment Reminder: ₹${balance.toLocaleString('en-IN')}`,
-            message: `Dear ${stu.name} (${stu.roll}), your tuition fee installment balance of ₹${balance.toLocaleString('en-IN')} is due on ${stu.dueDate || 'this week'}. Sent via ${channel}. Please clear via UPI: ${state.settings.upiId || 'divineclasses@upi'}.`,
+            title: `Monthly Fee Reminder: ₹${balance.toLocaleString('en-IN')}`,
+            message: `Dear ${stu.name} (${stu.roll}), your monthly tuition fee due is ₹${balance.toLocaleString('en-IN')} (Next Reminder Due Date: ${formatFeeDateDisplay(stu.dueDate)}). Sent via ${channel}. Please deposit via UPI: ${state.settings.upiId || 'divineclasses@upi'}.`,
             time: 'Just now',
             timestamp: Date.now(),
             read: false,
@@ -4072,7 +4325,8 @@
             }
         }
 
-        const balance = stu.totalFee - stu.paidFee;
+        const monthly = stu.monthlyFee || stu.totalFee || 2500;
+        const balance = Math.max(0, monthly - stu.paidFee);
         const isPaid = balance <= 0;
         const upiId = (state.settings && state.settings.upiId) ? state.settings.upiId : 'divineclasses@upi';
 
@@ -4083,8 +4337,8 @@
                             <i class="fa-solid fa-indian-rupee-sign"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold text-slate-900 font-heading">Student Fee & Payment Portal</h3>
-                            <p class="text-xs text-slate-500">${escapeHtml(stu.name)} • Roll: ${escapeHtml(stu.roll)}</p>
+                            <h3 class="text-base font-bold text-slate-900 font-heading">Monthly Tuition Fee & Payment Portal</h3>
+                            <p class="text-xs text-slate-500">${escapeHtml(stu.name)} • Roll: ${escapeHtml(stu.roll)} • Admission: ${formatFeeDateDisplay(stu.admissionDate || '2026-10-10')}</p>
                         </div>
                     </div>
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -4093,15 +4347,15 @@
                 <div class="py-4 space-y-4 text-xs">
                     <div class="grid grid-cols-3 gap-2.5 text-center">
                         <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                            <p class="text-xs text-slate-500 font-semibold">Total Course Fee</p>
-                            <p class="text-sm font-bold text-slate-900 mt-1">₹${stu.totalFee.toLocaleString('en-IN')}</p>
+                            <p class="text-xs text-slate-500 font-semibold">Monthly Tuition Fee</p>
+                            <p class="text-sm font-bold text-slate-900 mt-1">₹${monthly.toLocaleString('en-IN')}</p>
                         </div>
                         <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                            <p class="text-xs text-emerald-700 font-semibold">Paid Amount</p>
+                            <p class="text-xs text-emerald-700 font-semibold">Fees Deposited</p>
                             <p class="text-sm font-bold text-emerald-700 mt-1">₹${stu.paidFee.toLocaleString('en-IN')}</p>
                         </div>
                         <div class="p-3 rounded-xl ${isPaid ? 'bg-slate-50 border-slate-200' : 'bg-rose-50 border-rose-200'} border">
-                            <p class="text-xs ${isPaid ? 'text-slate-500' : 'text-rose-700'} font-semibold">Outstanding</p>
+                            <p class="text-xs ${isPaid ? 'text-slate-500' : 'text-rose-700'} font-semibold">Pending Dues</p>
                             <p class="text-sm font-bold ${isPaid ? 'text-slate-700' : 'text-rose-700'} mt-1">₹${balance.toLocaleString('en-IN')}</p>
                         </div>
                     </div>
@@ -4110,10 +4364,10 @@
                         <div class="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200 space-y-2">
                             <div class="flex items-center gap-2 text-amber-800 font-bold">
                                 <i class="fa-solid fa-bell animate-pulse text-amber-600"></i>
-                                <span>Fee Due Date: ${stu.dueDate || 'Immediate'}</span>
+                                <span>Next Fee Reminder: ${formatFeeDateDisplay(stu.dueDate)}</span>
                             </div>
                             <p class="text-[11px] text-amber-900 leading-relaxed">
-                                Please clear the pending fee balance of <strong>₹${balance.toLocaleString('en-IN')}</strong> to maintain active batch enrollment and test reports.
+                                Please deposit the monthly tuition fee of <strong>₹${balance.toLocaleString('en-IN')}</strong> to maintain active batch enrollment and offline test evaluations.
                             </p>
                             <div class="flex items-center justify-between p-2.5 bg-white rounded-lg border border-amber-200 mt-2">
                                 <div>
@@ -4160,8 +4414,9 @@
         const cleanPhone = (stu.phone || '').replace(/[^0-9]/g, '');
         const phoneParam = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
 
+        const monthly = stu.monthlyFee || stu.totalFee || 2500;
         const text = encodeURIComponent(
-            `Dear ${stu.parentName},\nGreetings from *Divine Classes*.\nThis is a gentle reminder regarding ${stu.name}'s (Roll: ${stu.roll}) pending tuition fee balance of *₹${balance.toLocaleString('en-IN')}* due on ${stu.dueDate}.\nKindly clear the dues at your earliest convenience to ensure uninterrupted class materials & test series.\nUPI ID: ${state.settings.upiId}\nThank you,\nAdministration, Divine Classes`
+            `Dear ${stu.parentName},\nGreetings from *Divine Classes*.\nThis is a gentle reminder regarding ${stu.name}'s (Roll: ${stu.roll}) monthly tuition fee of *₹${monthly.toLocaleString('en-IN')}*.\nAdmission Date: ${formatFeeDateDisplay(stu.admissionDate || '2026-10-10')}\nNext Fee Due Date / Reminder: ${formatFeeDateDisplay(stu.dueDate)}\nPending Amount: *₹${balance.toLocaleString('en-IN')}*\nKindly deposit the monthly fee via UPI (${state.settings.upiId || 'divineclasses@upi'}) at your earliest convenience to ensure uninterrupted class materials & test series.\nThank you,\nAdministration, Divine Classes`
         );
 
         const waUrl = `https://wa.me/${phoneParam}?text=${text}`;
@@ -4197,20 +4452,22 @@
 
     function openRecordPaymentModal(studentId) {
         const stu = state.students.find(s => s.id === studentId);
-        const balance = stu.totalFee - stu.paidFee;
+        const monthly = stu.monthlyFee || stu.totalFee || 2500;
+        const balance = Math.max(0, monthly - stu.paidFee);
+        const defaultDeposit = balance > 0 ? balance : monthly;
 
         const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div>
-                        <h3 class="text-base font-bold text-slate-900 font-heading">Record Fee Payment</h3>
-                        <p class="text-xs text-slate-500">${stu.name} (${stu.roll}) • Outstanding: ₹${balance.toLocaleString('en-IN')}</p>
+                        <h3 class="text-base font-bold text-slate-900 font-heading">Deposit Monthly Fee</h3>
+                        <p class="text-xs text-slate-500">${stu.name} (${stu.roll}) • Admission: ${formatFeeDateDisplay(stu.admissionDate || '2026-10-10')} • Monthly Fee: ₹${monthly.toLocaleString('en-IN')}</p>
                     </div>
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <form onsubmit="handleRecordPayment(event, '${stu.id}')" class="space-y-4 mt-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Amount (₹) *</label>
-                        <input type="number" id="pay-amount" required max="${balance}" value="${balance}" min="1" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Deposit Amount (₹) *</label>
+                        <input type="number" id="pay-amount" required value="${defaultDeposit}" min="1" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Mode *</label>
@@ -4242,14 +4499,14 @@
         const ref = document.getElementById('pay-ref').value.trim() || 'N/A';
 
         stu.paidFee += amount;
-        if (stu.paidFee >= stu.totalFee) {
-            stu.paidFee = stu.totalFee;
-            stu.dueDate = 'Paid';
-        }
+        const monthly = stu.monthlyFee || stu.totalFee || 2500;
+        const monthsPaid = Math.max(1, Math.floor(stu.paidFee / monthly));
+        stu.dueDate = calculateNextFeeReminder(stu.admissionDate || '2026-10-10', monthsPaid);
+
         saveStateLocally();
         closeModal();
         renderMainContent();
-        showToast(`₹${amount.toLocaleString('en-IN')} payment recorded for ${stu.name}!`, 'success');
+        showToast(`₹${amount.toLocaleString('en-IN')} fee deposit recorded for ${stu.name}! Next reminder: ${formatFeeDateDisplay(stu.dueDate)}`, 'success');
         printFeeReceipt(stu.id, amount, mode, ref);
     }
 
@@ -4288,16 +4545,20 @@
                     </div>
                     <div class="py-4 border-b border-slate-200 space-y-2 text-xs">
                         <div class="flex justify-between">
-                            <span class="text-slate-600">Total Course Fee</span>
-                            <span class="font-bold">₹${stu.totalFee.toLocaleString('en-IN')}</span>
+                            <span class="text-slate-600">Admission Date</span>
+                            <span class="font-semibold text-slate-800">${formatFeeDateDisplay(stu.admissionDate || '2026-10-10')}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-600">Monthly Tuition Fee</span>
+                            <span class="font-bold">₹${(stu.monthlyFee || stu.totalFee || 2500).toLocaleString('en-IN')}</span>
                         </div>
                         <div class="flex justify-between text-emerald-700 font-bold">
-                            <span>Total Paid till Date</span>
+                            <span>Total Deposited till Date</span>
                             <span>₹${stu.paidFee.toLocaleString('en-IN')}</span>
                         </div>
-                        <div class="flex justify-between text-rose-600 font-bold">
-                            <span>Balance Due</span>
-                            <span>₹${(stu.totalFee - stu.paidFee).toLocaleString('en-IN')}</span>
+                        <div class="flex justify-between text-slate-700">
+                            <span>Next Fee Reminder / Due Date</span>
+                            <span class="font-bold text-indigo-700">${formatFeeDateDisplay(stu.dueDate)}</span>
                         </div>
                         <div class="flex justify-between text-[11px] text-slate-500 pt-1">
                             <span>Payment Mode / Ref:</span>
@@ -4338,24 +4599,26 @@
         if (!stu) return;
         const cleanPhone = (stu.phone || '').replace(/[^0-9]/g, '');
         const phoneWithCode = cleanPhone.length === 10 ? ('91' + cleanPhone) : cleanPhone;
-        const total = Number(totalFee) || stu.totalFee || 0;
+        const monthly = Number(stu.monthlyFee || stu.totalFee || totalFee || 2500);
         const paid = Number(paidFee) || stu.paidFee || 0;
-        const balance = total - paid;
-        const balanceText = balance <= 0 ? '₹0 (Fully Paid ✅)' : `₹${balance.toLocaleString('en-IN')}`;
+        const balance = Math.max(0, monthly - paid);
+        const balanceText = balance <= 0 ? '₹0 (Current Month Paid ✅)' : `₹${balance.toLocaleString('en-IN')}`;
 
         const msg = [
-            `🧾 *OFFICIAL TUITION FEE RECEIPT*`,
+            `🧾 *OFFICIAL MONTHLY TUITION FEE RECEIPT*`,
             `*Divine Classes* — Paschimpuri, New Delhi`,
             `────────────────────────────`,
             `*Receipt No:* ${receiptNo}`,
             `*Date:* ${dateStr}`,
             ``,
             `*Student Name:* ${stu.name} (${stu.roll})`,
+            `*Admission Date:* ${formatFeeDateDisplay(stu.admissionDate || '2026-10-10')}`,
             `*Parent Name:* ${stu.parentName}`,
             `*Contact Phone:* ${stu.phone}`,
             ``,
-            `*Total Course Fee:* ₹${total.toLocaleString('en-IN')}`,
-            `*Total Paid till Date:* ₹${paid.toLocaleString('en-IN')}`,
+            `*Monthly Tuition Fee:* ₹${monthly.toLocaleString('en-IN')}`,
+            `*Total Deposited till Date:* ₹${paid.toLocaleString('en-IN')}`,
+            `*Next Fee Reminder / Due Date:* ${formatFeeDateDisplay(stu.dueDate)}`,
             `*Balance Due:* ${balanceText}`,
             `*Payment Mode:* UPI / Cash (Verified)`,
             `*Verification:* Digitally Signed by Admin (${state.settings.adminName || 'Er. Rajesh Chahar'}) ✅`,
@@ -4373,19 +4636,26 @@
     }
 
     function exportFeesToCSV() {
-        const headers = ['Roll No', 'Student Name', 'Parent Name', 'Phone', 'Total Fee', 'Paid Fee', 'Balance Due', 'Status', 'Last Reminder'];
+        const headers = ['Roll No', 'Student Name', 'Admission Date', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent'];
         const activeStudents = (state.students || []).filter(s => s.status !== 'Inactive');
-        const rows = activeStudents.map(s => [
-            s.roll,
-            `"${s.name}"`,
-            `"${s.parentName}"`,
-            `"${s.phone}"`,
-            s.totalFee,
-            s.paidFee,
-            s.totalFee - s.paidFee,
-            s.paidFee >= s.totalFee ? 'Fully Paid' : s.dueDate,
-            `"${s.lastReminder}"`
-        ]);
+        const rows = activeStudents.map(s => {
+            const monthly = s.monthlyFee || s.totalFee || 2500;
+            const paid = s.paidFee || 0;
+            const balance = Math.max(0, monthly - paid);
+            return [
+                s.roll,
+                `"${s.name}"`,
+                `"${s.admissionDate || '2026-10-10'}"`,
+                `"${s.parentName || 'Parent'}"`,
+                `"${s.phone || ''}"`,
+                monthly,
+                paid,
+                balance,
+                `"${balance <= 0 ? 'Current Month Paid' : 'Payment Due'}"`,
+                `"${balance <= 0 ? '-' : (s.dueDate || '')}"`,
+                `"${s.lastReminder || 'Never'}"`
+            ];
+        });
 
         const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
         const encodedUri = encodeURI(csvContent);
@@ -4489,7 +4759,7 @@
                                     </span>
                                 </div>
                                 <p class="text-[11px] text-indigo-200 mt-0.5">
-                                    Assignments & DPPs are stored here. Download URLs are linked directly in the <strong>Materials_Repository</strong> Google Sheet for 1-click mobile access.
+                                    Assignments & DPPs are stored here. Download URLs are linked directly in the <strong>Materials_Repository</strong> Database for 1-click mobile access.
                                 </p>
                             </div>
                         </div>
@@ -4724,7 +4994,7 @@
         showConfirmDialog({
             title: 'Delete "' + mat.title + '"?',
             message: hasLink
-                ? 'This will remove the material from the portal, delete its Google Drive file, and remove the row from the Google Sheet. Students will no longer be able to download it.'
+                ? 'This will remove the material from the portal, delete its Google Drive file, and remove the row from the Database. Students will no longer be able to download it.'
                 : '⚠ This is an old record with NO Drive link — the file was never actually uploaded.\n\nDelete it, then re-upload the file so students get a working download.',
             confirmText: 'Yes, Delete',
             cancelText: 'Keep It',
@@ -4739,7 +5009,7 @@
                             state.materials = state.materials.filter(m => m.id !== matId);
                             saveStateLocally();
                             renderMainContent();
-                            showToast('"' + mat.title + '" deleted (removed from Cloud DB, Drive & Google Sheet).', 'success');
+                            showToast('"' + mat.title + '" deleted (removed from Cloud Storage & Database).', 'success');
                         } else {
                             showToast('Delete failed: ' + ((res && res.error) || 'unknown error'), 'error');
                         }
@@ -4821,7 +5091,7 @@
         saveStateLocally();
         closeModal();
         renderMainContent();
-        showToast('"' + mat.title + '" details updated' + (typeof google !== 'undefined' && google.script && google.script.run ? ' & synced to Google Sheet.' : ' (local mode).'), 'success');
+        showToast('"' + mat.title + '" details updated' + (typeof google !== 'undefined' && google.script && google.script.run ? ' & synced to Database.' : ' (local mode).'), 'success');
     }
 
     function openUploadMaterialModal() {
@@ -4941,11 +5211,11 @@
                 renderMainContent();
                 updateNotificationBadge();
                 checkNewNotificationSound();
-                showToast(`"${mat.title}" uploaded to Google Drive & Google Sheet ✓ Download link active!`, 'success');
+                showToast(`"${mat.title}" uploaded to Drive & Database ✓ Download link active!`, 'success');
             };
 
             if (typeof google !== 'undefined' && google.script && google.script.run) {
-                // Real upload: file → Google Drive, URL → Cloud DB + Google Sheet
+                // Real upload: file → Google Drive, URL → Cloud DB + Database
                 google.script.run
                     .withSuccessHandler(function (res) {
                         if (res && res.success && res.material) {
@@ -5191,7 +5461,7 @@
                         <p class="text-[11px] text-indigo-800 leading-relaxed">
                             • <strong>Developer Account:</strong> Hosts the master Google Apps Script code and cloud storage.<br>
                             • <strong>Admin Account:</strong> Receives full Editor permissions to the <code>Study Materials & Documents</code> folder.<br>
-                            • <strong>Google Sheet Sync:</strong> Direct download URLs for every assignment are auto-logged in the <code>Materials_Repository</code> tab so students can download them on mobile.
+                            • <strong>Database Sync:</strong> Direct download URLs for every assignment are auto-logged in the <code>Materials_Repository</code> tab so students can download them on mobile.
                         </p>
                     </div>
 
@@ -5523,7 +5793,7 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5">
                             ${canEditMarks ? `
-                            <button onclick="submitAllTestMarks('${selectedTest.id}')" id="btn-submit-all-top" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer" title="Submit and save marks for all students to Google Sheet">
+                            <button onclick="submitAllTestMarks('${selectedTest.id}')" id="btn-submit-all-top" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer" title="Submit and save marks for all students to Database">
                                 <i class="fa-solid fa-cloud-arrow-up text-[11px]"></i> Submit All
                             </button>
                             <button onclick="openViewTestModal('${selectedTest.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-2xs transition cursor-pointer" title="View test details and analytics">
@@ -5638,7 +5908,7 @@
                                                 <td class="py-3 px-5 text-right">
                                                     <div class="flex items-center justify-end gap-1.5">
                                                         ${canEditMarks ? `
-                                                        <button onclick="saveStudentTestMark('${selectedTest.id}', '${stu.id}')" title="Save this student's mark to Sheet" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-2xs cursor-pointer">
+                                                        <button onclick="saveStudentTestMark('${selectedTest.id}', '${stu.id}')" title="Save this student's mark to Database" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-2xs cursor-pointer">
                                                             <i class="fa-solid fa-check text-[10px]"></i> Save
                                                         </button>
                                                         ` : ''}
@@ -5664,7 +5934,7 @@
                                 <span><strong>${batchStudents.length} Students</strong> in batch. Edit marks above and submit all at once or individually.</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="submitAllTestMarks('${selectedTest.id}')" id="btn-submit-all-bottom" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer" title="Submit all marks to Google Sheet tab">
+                                <button onclick="submitAllTestMarks('${selectedTest.id}')" id="btn-submit-all-bottom" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer" title="Submit all marks to Database table">
                                     <i class="fa-solid fa-cloud-arrow-up text-xs"></i> Submit All
                                 </button>
                             </div>
@@ -5799,8 +6069,8 @@
         if (topBtn) topBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> Submitting...';
         if (btmBtn) btmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Submitting...';
 
-        showToast(`Submitting marks for all ${savedCount} students to Google Sheet...`, 'info');
-        saveStateLocally(false, true); // Immediate cloud sync to Google Sheets
+        showToast(`Submitting marks for all ${savedCount} students to Database...`, 'info');
+        saveStateLocally(false, true); // Immediate cloud sync to Databases
 
         const payload = {
             testId: test.id,
@@ -5813,7 +6083,7 @@
         };
 
         dispatchRemoteSaveTestMarks(payload, function(res) {
-            showToast(`✓ All ${savedCount} student marks saved into Google Sheet tab (Offline_Test_Marks)!`, 'success');
+            showToast(`✓ All ${savedCount} student marks saved into Database table (Offline_Test_Marks)!`, 'success');
             renderMainContent();
         });
     }
@@ -5841,7 +6111,7 @@
             remarks: remarkVal || (scoreVal >= test.maxMarks * 0.8 ? 'Excellent performance' : 'Updated')
         };
 
-        saveStateLocally(false, true); // Immediate cloud sync to Google Sheets
+        saveStateLocally(false, true); // Immediate cloud sync to Databases
 
         dispatchRemoteSaveTestMarks({
             testId: test.id,
@@ -5852,7 +6122,7 @@
             batchId: test.batchId,
             marks: test.marks
         }, function() {
-            showToast(`✓ Saved to Google Sheet for ${stu.name} (${scoreVal}/${test.maxMarks})`, 'success');
+            showToast(`✓ Saved to Database for ${stu.name} (${scoreVal}/${test.maxMarks})`, 'success');
         });
 
         renderMainContent();
@@ -5890,7 +6160,7 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">Full Detailed Mentor Remarks *</label>
                     <textarea id="modal-remark-input" rows="4" placeholder="Write comprehensive feedback, student strengths, areas for improvement, and study recommendations..." class="w-full p-3 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 leading-relaxed font-sans resize-y">${escapeAttr(currentRemark)}</textarea>
-                    <p class="text-[11px] text-slate-400 mt-1">This feedback will be visible to the student, included in their report card, and saved in Google Sheets.</p>
+                    <p class="text-[11px] text-slate-400 mt-1">This feedback will be visible to the student, included in their report card, and saved in Databases.</p>
                 </div>
 
                 <div>
@@ -5937,7 +6207,7 @@
             const pageInput = document.getElementById(`remark-${studentId}`);
             if (pageInput) pageInput.value = newRemark;
             saveStateLocally(false, true);
-            showToast('✓ Mentor remark saved and synced to Google Sheet!', 'success');
+            showToast('✓ Mentor remark saved and synced to Database!', 'success');
         }
         closeModal();
     }
@@ -6004,7 +6274,7 @@
                     <div class="flex items-center gap-2">
                         <button type="button" onclick="closeModal()" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Close</button>
                         <button type="button" onclick="closeModal(); submitAllTestMarks('${test.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition cursor-pointer">
-                            <i class="fa-solid fa-cloud-arrow-up"></i> Submit Marks to Sheet
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Submit Marks to Database
                         </button>
                     </div>
                 </div>
@@ -6101,7 +6371,7 @@
         saveStateLocally(false, true);
         closeModal();
         renderMainContent();
-        showToast('✓ Test removed and synced to Google Sheet!', 'success');
+        showToast('✓ Test removed and synced to Database!', 'success');
     }
 
     function openStudentTestDetailModal(testId, studentId) {
@@ -6214,7 +6484,7 @@
                     </div>
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
-                        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700">Create Test Sheet</button>
+                        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700">Create Test Record</button>
                     </div>
                 </form>
             `;
@@ -6244,10 +6514,10 @@
 
         state.offlineTests.unshift(newTest);
         state.selectedTestId = newTest.id;
-        saveStateLocally(false, true); // Immediate cloud sync to Google Sheets
+        saveStateLocally(false, true); // Immediate cloud sync to Databases
         closeModal();
         renderMainContent();
-        showToast(`Offline test "${newTest.title}" created & synced to Google Sheet!`, 'success');
+        showToast(`Offline test "${newTest.title}" created & synced to Database!`, 'success');
     }
 
     function printStudentFullReport(studentId) {
@@ -6490,7 +6760,7 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Faculty Member Photo</p>
-                            <p class="text-[11px] text-slate-400">Stored in Developer Google Drive • Mirrored in Sheet.</p>
+                            <p class="text-[11px] text-slate-400">Stored in Cloud Storage • Mirrored in Database.</p>
                             <div class="flex flex-wrap items-center gap-2 mt-1.5">
                                 <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition inline-flex items-center gap-1 shadow-2xs">
                                     <i class="fa-solid fa-camera"></i>
@@ -6709,7 +6979,7 @@
                 if (prev) prev.src = compressed;
                 const hiddenInput = document.getElementById('gal-url');
                 if (hiddenInput) hiddenInput.value = compressed;
-                showToast('Banner ready! Click Publish to save in Admin Drive & Sheet.', 'success');
+                showToast('Banner ready! Click Publish to save in Database.', 'success');
             };
             img.src = e.target.result;
         };
@@ -6753,7 +7023,7 @@
                                     <span>Upload Banner File</span>
                                     <input type="file" id="gal-file-input" accept="image/*" class="hidden" onchange="handleGalleryImagePick(event)">
                                 </label>
-                                <p class="text-[10px] text-slate-400 mt-1">Uploads automatically to Admin's Google Drive & Google Sheet</p>
+                                <p class="text-[10px] text-slate-400 mt-1">Uploads automatically to Admin's Drive & Database</p>
                             </div>
                         </div>
                         <input type="hidden" id="gal-url" value="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=800&q=80">
@@ -6794,7 +7064,7 @@
         saveStateLocally(false, true); // Immediate sync to Google Cloud & Sheets
         closeModal();
         renderMainContent();
-        showToast('Banner published! Auto-saving to Admin Drive & Google Sheet...', 'success');
+        showToast('Banner published! Auto-saving to Cloud Storage & Database...', 'success');
 
         if (typeof google !== 'undefined' && google.script && google.script.run && bannerImg.startsWith('data:image/')) {
             google.script.run
@@ -7090,7 +7360,7 @@
         if (!fb) return;
         showConfirmDialog({
             title: 'Delete feedback from ' + fb.authorName + '?',
-            message: '"' + fb.comment + '"\n\nThis removes it from the Feedback Wall for every role and from the Feedback_Responses sheet on next sync.',
+            message: '"' + fb.comment + '"\n\nThis removes it from the Feedback Wall for every role and from the Feedback_Responses table on next sync.',
             confirmText: 'Yes, Delete',
             cancelText: 'Keep It',
             danger: true
@@ -7099,13 +7369,13 @@
             state.feedbacks = state.feedbacks.filter(x => x.id !== fbId);
             saveStateLocally();
             renderMainContent();
-            showToast('Feedback from ' + fb.authorName + ' deleted (synced to Cloud DB & Google Sheet).', 'success');
+            showToast('Feedback from ' + fb.authorName + ' deleted (synced to Cloud DB & Database).', 'success');
         });
     }
 
     /********************************************************************
      * REQUIREMENT #11: ACCESS CONTROL & PASSWORD MANAGEMENT
-     * Synced with Google Sheet tabs (Students_Master & Teachers_Roster)
+     * Synced with Database tables (Students_Master & Teachers_Roster)
      ********************************************************************/
     window.accessSubTab = 'students';
     window.accessSearchTerm = '';
@@ -7147,7 +7417,7 @@
                                 </div>
                                 <h2 class="text-xl font-bold font-heading">User Login & Database Authorization Management</h2>
                                 <p class="text-xs text-slate-300 max-w-2xl mt-1 leading-relaxed inline-flex items-center gap-2 flex-wrap">
-                                    <span>Manage student and faculty credentials in the persistent Cloud Database, synchronized automatically with Google Sheets.</span>
+                                    <span>Manage student and faculty credentials in the persistent Cloud Database, synchronized automatically with Database.</span>
                                     <button onclick="syncWithDatabase()" id="btn-sync-access-icon" title="Auto-syncs data immediately as records are edited. Click for instant sync." class="w-7 h-7 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition inline-flex items-center justify-center shadow-xs cursor-pointer align-middle shrink-0" aria-label="Auto-Sync Database">
                                         <i class="fa-solid fa-arrows-rotate text-xs" id="auth-sync-icon"></i>
                                     </button>
@@ -7509,16 +7779,16 @@
                             <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                                 <i class="fa-solid fa-circle-info"></i>
                             </div>
-                            <h4 class="text-sm font-bold text-indigo-950 font-heading">How Google Sheet Sync Works</h4>
+                            <h4 class="text-sm font-bold text-indigo-950 font-heading">How Database Sync Works</h4>
                         </div>
                         <ul class="space-y-3 text-xs text-slate-600 leading-relaxed">
                             <li class="flex items-start gap-2">
                                 <i class="fa-solid fa-check text-emerald-600 mt-0.5"></i>
-                                <span><strong>Instant Sync:</strong> Any status or password update is immediately mirrored into the <code>Students_Master</code> and <code>Teachers_Roster</code> tabs of your spreadsheet.</span>
+                                <span><strong>Instant Sync:</strong> Any status or password update is immediately mirrored into the <code>Students_Master</code> and <code>Teachers_Roster</code> tables of your database.</span>
                             </li>
                             <li class="flex items-start gap-2">
                                 <i class="fa-solid fa-check text-emerald-600 mt-0.5"></i>
-                                <span><strong>Direct Sheet Editing:</strong> You can open the Google Sheet directly, change a student or teacher's <em>Access Status</em> to <code>Blocked</code>, and they will immediately be blocked from logging in!</span>
+                                <span><strong>Direct Database Editing:</strong> You can open the Database directly, change a student or teacher's <em>Access Status</em> to <code>Blocked</code>, and they will immediately be blocked from logging in!</span>
                             </li>
                             <li class="flex items-start gap-2">
                                 <i class="fa-solid fa-check text-emerald-600 mt-0.5"></i>
@@ -7629,11 +7899,11 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             if (userType === 'student') {
                 google.script.run
-                    .withSuccessHandler(function () { showToast(`Password for ${target.name} updated in Google Sheet!`, 'success'); })
+                    .withSuccessHandler(function () { showToast(`Password for ${target.name} updated in Database!`, 'success'); })
                     .apiUpdateStudentAuth(id, newPwd, target.status);
             } else {
                 google.script.run
-                    .withSuccessHandler(function () { showToast(`Password for ${target.name} updated in Google Sheet!`, 'success'); })
+                    .withSuccessHandler(function () { showToast(`Password for ${target.name} updated in Database!`, 'success'); })
                     .apiUpdateTeacherAuth(id, newPwd, target.status);
             }
         } else {
@@ -7656,7 +7926,7 @@
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function () { showToast('Admin master password saved to Google Sheet!', 'success'); })
+                .withSuccessHandler(function () { showToast('Admin master password saved to Database!', 'success'); })
                 .apiUpdateAdminPassword(p1);
         } else {
             showToast('Admin master password updated successfully!', 'success');
@@ -7927,7 +8197,7 @@
             updateRoleUI();
             renderSidebar();
             renderMainContent();
-            showToast('Developer Mode activated — Settings console + Google Drive & Sheet links unlocked.', 'success');
+            showToast('Developer Mode activated — Settings console + Database controls unlocked.', 'success');
             return;
         }
 
@@ -8025,8 +8295,8 @@
             const studentNotifs = getRelevantNotifications();
             const unreadFeeNotifs = studentNotifs.filter(n => !n.read && n.actionTab === 'fees');
             if (unreadFeeNotifs.length > 0) {
-                const balance = stu.totalFee - stu.paidFee;
-                showToast(`📢 Important: You have a Fee Payment Reminder in your Bell Icon (Outstanding: ₹${balance.toLocaleString('en-IN')})!`, 'warning');
+                const balance = Math.max(0, (stu.monthlyFee || stu.totalFee || 2500) - stu.paidFee);
+                showToast(`📢 Important: You have a Monthly Fee Reminder in your Bell Icon (Outstanding: ₹${balance.toLocaleString('en-IN')})!`, 'warning');
 
                 // Highlight & bounce bell icon button to alert student
                 const bellBtn = document.getElementById('btn-notifications');
@@ -8156,7 +8426,7 @@
             { id: 'all', label: 'All Settings', icon: 'fa-layer-group' },
             { id: 'admin_permissions', label: 'Admin Permissions & Security', icon: 'fa-user-shield' },
             { id: 'profile', label: 'Institute Profile & Branding', icon: 'fa-school' },
-            { id: 'cloud_sync', label: 'Google Sheet 2-Way Sync', icon: 'fa-table-cells' },
+            { id: 'cloud_sync', label: 'Database 2-Way Sync', icon: 'fa-table-cells' },
             { id: 'drive', label: 'Google Drive Storage', icon: 'fa-brands fa-google-drive' },
             { id: 'demo', label: 'Client Handover & Demo Controls', icon: 'fa-eye-slash' }
         ];
@@ -8172,7 +8442,7 @@
                                         <i class="fa-solid fa-code"></i> Developer Mode • Command Console
                                     </span>
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
-                                        <i class="fa-solid fa-database"></i> 10 Google Sheet Tabs Synced
+                                        <i class="fa-solid fa-database"></i> 10 Database Tables Synced
                                     </span>
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
                                         Last Sync: ${state.lastSyncTime || 'Active'}
@@ -8180,12 +8450,12 @@
                                 </div>
                                 <h2 class="text-xl sm:text-2xl font-bold font-heading">Institute Configuration & Integration Console</h2>
                                 <p class="text-xs text-slate-300 max-w-2xl mt-1.5 leading-relaxed">
-                                    Central control for institute branding, contact, payments, Admin permissions, and full 2-way dynamic sync with Google Sheets & Google Drive.
+                                    Central control for institute branding, contact, payments, Admin permissions, and full 2-way dynamic sync with Database & Google Drive.
                                 </p>
                             </div>
                             <div class="flex flex-wrap items-center gap-2.5 shrink-0">
                                 <a href="${sheetUrl}" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white border border-indigo-400/30 transition flex items-center gap-1.5 shadow-sm">
-                                    <i class="fa-solid fa-table-cells text-emerald-300"></i> Open Sheet
+                                    <i class="fa-solid fa-database text-emerald-300"></i> Open Database Console
                                 </a>
                                 <button type="button" onclick="openDriveFolder()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600/80 hover:bg-emerald-600 text-white border border-emerald-400/30 transition flex items-center gap-1.5 shadow-sm">
                                     <i class="fa-brands fa-google-drive text-amber-300"></i> Open Drive
@@ -8222,7 +8492,7 @@
                                         <i class="fa-solid fa-shield-halved text-violet-600 dark:text-violet-400 text-base mt-0.5"></i>
                                         <div>
                                             <span class="font-bold">Admin Privileges & Password Controls</span>
-                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Control what Admin can delete and modify. Passwords sync directly to the Google Sheet <code>Settings_Config</code> tab.</p>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Control what Admin can delete and modify. Passwords sync directly to the Database <code>Settings_Config</code> tab.</p>
                                         </div>
                                     </div>
 
@@ -8297,30 +8567,34 @@
                                 <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60">
                                     <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">${isRequirementLabelsEnabled() ? 'Official Social Media Channels (Requirement #7):' : 'Official Social Media Channels:'}</label>
                                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        ${inputField('youtubeUrl', 'YouTube URL', s.youtubeUrl, 'text', 'https://www.youtube.com/@chem_crush9')}
-                                        ${inputField('instagramUrl', 'Instagram URL', s.instagramUrl, 'text', 'https://instagram.com')}
-                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://facebook.com')}
+                                        ${inputField('youtubeUrl', 'YouTube URL', s.youtubeUrl, 'text', 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8')}
+                                        ${inputField('instagramUrl', 'Instagram URL', s.instagramUrl, 'text', 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq')}
+                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://m.facebook.com/edivineclasses/')}
                                     </div>
                                 </div>
                             `)}
 
-                            <!-- 3. GOOGLE SHEET 2-WAY DATABASE MIRROR -->
-                            ${sectionCard('cloud_sync', 'Google Sheet 2-Way Sync & Live Tabs', 'fa-table-cells', 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300', `
+                            <!-- 3. DATABASE 2-WAY SYNC ENGINE -->
+                            ${sectionCard('cloud_sync', 'Database 2-Way Sync & Storage', 'fa-table-cells', 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300', `
                                 <div class="space-y-4">
                                     <div class="p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-950 dark:text-emerald-200 flex items-start justify-between gap-3">
                                         <div>
                                             <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-cloud-arrow-down text-emerald-600"></i> Full 2-Way Dynamic Database Sync</span>
-                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Every creation, update, or deletion in the app reflects in its respective Google Sheet tab automatically.</p>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Every creation, update, or deletion in the app reflects in its respective Database table automatically.</p>
                                         </div>
                                         <a href="${sheetUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 transition shadow-xs flex items-center gap-1">
-                                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Sheet
+                                            <i class="fa-solid fa-database"></i> Open Database Console
                                         </a>
                                     </div>
 
-                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
                                         <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
                                             <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Students_Master</p>
                                             <p class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">${(state.students || []).length} Rows</p>
+                                        </div>
+                                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-emerald-200 dark:border-emerald-800 bg-emerald-50/30">
+                                            <p class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Student_Fees_Ledger</p>
+                                            <p class="text-sm font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">${(state.students || []).length} Rows</p>
                                         </div>
                                         <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
                                             <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Teachers_Roster</p>
@@ -8341,7 +8615,7 @@
                                             <i class="fa-solid fa-arrows-rotate"></i> Force Instant 2-Way Sync
                                         </button>
                                         <button type="button" onclick="reStructureGoogleSheets()" class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 transition cursor-pointer shadow-xs flex items-center gap-1.5">
-                                            <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i> Restructure Sheet Tabs Sequence
+                                            <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i> Restructure Database Sequence
                                         </button>
                                     </div>
                                 </div>
@@ -8354,7 +8628,7 @@
                                         <i class="fa-brands fa-google-drive text-sky-600 dark:text-sky-400 text-base mt-0.5"></i>
                                         <div>
                                             <span class="font-bold">Admin Google Drive Assignments Integration</span>
-                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">All assignments, DPPs, and documents upload to Drive and mirror direct download links into the <strong>Materials_Repository</strong> sheet tab.</p>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">All assignments, DPPs, and documents upload to Drive and mirror direct download links into the <strong>Materials_Repository</strong> database table.</p>
                                         </div>
                                     </div>
 
@@ -8392,7 +8666,7 @@
                                     <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
                                         <div class="min-w-0">
                                             <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Master Switch: Show Dummy / Demo Data</p>
-                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = demo records active. <strong>OFF = all demo rows are wiped from Google Sheets</strong> (leaves only real data).</p>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = demo records active. <strong>OFF = all demo rows are wiped from Databases</strong> (leaves only real data).</p>
                                         </div>
                                         <div class="relative w-11 h-6 shrink-0">
                                             <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} class="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" aria-label="Show Dummy Demo Data">
@@ -8402,7 +8676,7 @@
 
                                     <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
                                         <button type="button" onclick="openDummyDataManagerModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5">
-                                            <i class="fa-solid fa-table-list text-amber-300"></i> Open Per-Sheet Dummy Data Manager
+                                            <i class="fa-solid fa-database text-amber-300"></i> Open Per-Table Dummy Data Manager
                                         </button>
                                         <span class="text-xs font-bold ${s.showDummyData === false ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">
                                             Status: ${s.showDummyData === false ? 'Demo Data Cleared' : 'Demo Data Active'}
@@ -8416,7 +8690,7 @@
                         <div class="sticky bottom-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:px-6 shadow-xl">
                             <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Changes automatically sync 2-way with Google Sheet (<code>1v7RZX0R8...</code>)</span>
+                                <span>Changes automatically sync 2-way with Database (<code>1v7RZX0R8...</code>)</span>
                             </div>
                             <div class="flex items-center gap-2.5 w-full sm:w-auto">
                                 <button type="submit" id="btn-save-settings" class="w-full sm:w-auto px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all duration-200 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 cursor-pointer">
@@ -8449,6 +8723,9 @@
                 if ((k === 'driveUrl' || k === 'driveFolderUrl' || k === 'adminDriveFolderUrl') && v && !/^https:\/\//i.test(v)) {
                     showToast('Drive link must start with https:// — ' + (k === 'driveFolderUrl' ? 'owner folder' : 'drive') + ' link not saved.', 'error');
                     return;
+                }
+                if (['facebookUrl', 'instagramUrl', 'youtubeUrl'].includes(k) && v && !/^https?:\/\//i.test(v)) {
+                    v = 'https://' + v;
                 }
                 if (v) state.settings[k] = v;
             }
@@ -8502,7 +8779,7 @@
         saveStateLocally(false, true);
         renderSidebar();
 
-        showToast('All institute settings saved smoothly & synced to Cloud Database + Google Sheet!', 'success');
+        showToast('All institute settings saved smoothly & synced to Database!', 'success');
 
         if (saveBtn) {
             saveBtn.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-300"></i> Saved Successfully!';
@@ -9205,7 +9482,7 @@
         updateNotificationBadge();
         startNotificationPoller();
 
-        // Auto-check for Google Sheet backend state (GAS or Vercel)
+        // Auto-check for Database backend state (GAS or Vercel)
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (remoteData) {
@@ -9213,12 +9490,12 @@
                         mergeRemoteData(remoteData);
                         renderSidebar();
                         renderMainContent();
-                        updateSyncBadge('✓ Google Sheet Synced', 'success');
+                        updateSyncBadge('✓ Database Synced', 'success');
                     }
                 })
                 .apiGetInitialData();
         } else {
-            // Standalone Vercel mode: load live Google Sheet data quietly
+            // Standalone Vercel mode: load live Database data quietly
             fetch(GAS_WEBAPP_URL + '?action=getData')
                 .then(function (r) { return r.json(); })
                 .then(function (remoteData) {
@@ -9226,11 +9503,11 @@
                         mergeRemoteData(remoteData);
                         renderSidebar();
                         renderMainContent();
-                        updateSyncBadge('✓ Google Sheet Synced', 'success');
+                        updateSyncBadge('✓ Database Synced', 'success');
                     }
                 })
                 .catch(function (err) {
-                    console.warn('Initial sheet fetch notice:', err);
+                    console.warn('Initial database fetch notice:', err);
                 });
         }
 
@@ -9263,3 +9540,5 @@
         }
     };
 </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 /**
  * ============================================================================
- * Divine Classes - DUMMY / DEMO DATA REPOSITORY (5 RECORDS PER SHEET)
+ * Divine Classes - DUMMY / DEMO DATA REPOSITORY (5 RECORDS PER TABLE)
  * ============================================================================
- * Contains exactly 5 seed / demo records for each sheet tab:
+ * Contains exactly 5 seed / demo records for each database table:
  * - Batches: 5 records
  * - Students: 5 records
  * - Materials: 5 records
@@ -14,8 +14,8 @@
  * External_Links_Hub has 5 permanent official study portals (never deleted).
  *
  * Controlled by Developer via Settings -> Show Dummy / Demo Data:
- * - When ENABLED: Demo data appears in the Web App and is created in Google Sheets.
- * - When DISABLED: Demo data is completely deleted from Google Sheets,
+ * - When ENABLED: Demo data appears in the Web App and is created in Database.
+ * - When DISABLED: Demo data is completely deleted from Database,
  *   showing only real production records (or clean header row).
  */
 
@@ -91,11 +91,11 @@ function getDummySeedData() {
       }
     ],
     students: [
-      { id: 's1', isDummy: true, roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', totalFee: 48000, paidFee: 32000, dueDate: '2026-10-25', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
-      { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', totalFee: 48000, paidFee: 16000, dueDate: '2026-10-18', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', totalFee: 52000, paidFee: 26000, dueDate: '2026-10-20', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
+      { id: 's1', isDummy: true, roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', admissionDate: '2026-10-10', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-11-11', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
+      { id: 's2', isDummy: true, roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', admissionDate: '2026-09-10', monthlyFee: 2500, totalFee: 2500, paidFee: 5000, dueDate: '2026-11-11', lastReminder: '-', password: 'password123', status: 'Active' },
+      { id: 's3', isDummy: true, roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', admissionDate: '2026-10-05', monthlyFee: 2500, totalFee: 2500, paidFee: 0, dueDate: '2026-11-06', lastReminder: 'Never', password: 'password123', status: 'Active' },
+      { id: 's4', isDummy: true, roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', admissionDate: '2026-08-15', monthlyFee: 3000, totalFee: 3000, paidFee: 9000, dueDate: '2026-11-16', lastReminder: '-', password: 'password123', status: 'Active' },
+      { id: 's5', isDummy: true, roll: 'DC-105', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', admissionDate: '2026-09-20', monthlyFee: 2500, totalFee: 2500, paidFee: 2500, dueDate: '2026-10-21', lastReminder: '5 days ago', password: 'password123', status: 'Active' }
     ],
     materials: [
       {

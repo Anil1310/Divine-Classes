@@ -33,7 +33,7 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(res, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 2b. JSON API: Get full live data merged from all Google Sheet tabs
+    // 2b. JSON API: Get full live data merged from all Database tables
     if (e && e.parameter && (e.parameter.action === 'getData' || e.parameter.action === 'loadData')) {
       const data = apiGetInitialData();
       const callback = e.parameter.callback;
@@ -157,7 +157,7 @@ function doPost(e) {
 
     const action = (payload.action || (e && e.parameter && e.parameter.action) || '').trim();
 
-    // 1. Upload Assignment / Material to Google Drive and sync to Google Sheet
+    // 1. Upload Assignment / Material to Google Drive and sync to Database
     if (action === 'uploadMaterial') {
       const fileData = payload.fileData || payload.fileBase64 || payload.dataUrl;
       const fileName = payload.fileName || payload.name;
@@ -182,14 +182,14 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. Get Data (Full live state merged from all Google Sheet tabs)
+    // 3. Get Data (Full live state merged from all Database tables)
     if (action === 'getData' || action === 'loadData') {
       const data = apiGetInitialData();
       return ContentService.createTextOutput(JSON.stringify(data))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 4. Two-Way Sync / Save Data (Persists to DB & all respective Google Sheet tabs)
+    // 4. Two-Way Sync / Save Data (Persists to Database)
     if (action === 'syncData' || action === 'saveData') {
       const stateToSave = payload.data || payload.fullData || payload;
       const result = apiSyncAllData(stateToSave);
@@ -246,7 +246,7 @@ function getDbSpreadsheet() {
 }
 
 /**
- * Returns the Google Sheet URL
+ * Returns the Database URL
  */
 function apiGetSpreadsheetUrl() {
   return 'https://docs.google.com/spreadsheets/d/' + SPREADSHEET_ID + '/edit';
@@ -258,7 +258,7 @@ function apiGetSpreadsheetUrl() {
  * ============================================================================
  * Teacher/Admin file uploads are stored in Google Drive with public-view
  * links. The download URL is saved in the Cloud Database and mirrored to
- * the Materials_Repository Google Sheet tab so students can download it.
+ * the Materials_Repository Database table so students can download it.
  */
 
 const DRIVE_ROOT_FOLDER_NAME = 'Divine Classes Portal Uploads';
@@ -450,7 +450,7 @@ function dbGetAll() {
 }
 
 /**
- * Uploads a result banner to Google Drive and saves it to Cloud Database & Google Sheet
+ * Uploads a result banner to Google Drive and saves it to Database
  */
 function apiUploadBanner(data) {
   try {
@@ -485,7 +485,7 @@ function apiUploadBanner(data) {
 }
 
 /**
- * Saves/updates marks for all students in an offline test and syncs to Google Sheet immediately
+ * Saves/updates marks for all students in an offline test and syncs to Database immediately
  */
 function apiSaveTestMarks(data) {
   try {
@@ -547,7 +547,7 @@ function getRandomAvatarUrl_(seed, role) {
 /**
  * Uploads an assignment / DPP / test paper file to Google Drive, saves the
  * material record (with its URL) to the Cloud Database, and mirrors it to
- * the Materials_Repository Google Sheet tab.
+ * the Materials_Repository Database table.
  *
  * @param {string} fileBase64OrDataUrl  base64 or data:URL string from the browser
  * @param {string} originalFileName     original file name (e.g. DPP08.pdf)
@@ -647,7 +647,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       fileName: fileName
     };
 
-    // Persist to Cloud Database + Google Sheet (URL included in Materials_Repository)
+    // Persist to Database (URL included in Materials_Repository)
     const data = apiGetInitialData();
     if (!data.materials) data.materials = [];
     data.materials.unshift(newMaterial);
@@ -659,7 +659,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
     data.notifications.unshift({
       id: 'notif_mat_' + newMaterial.id + '_' + Date.now(),
       title: 'New ' + newMaterial.category + ' Uploaded',
-      message: '"' + newMaterial.title + '" (' + newMaterial.fileSize + ') for ' + batchLabel + ' is now available in Assignments & DPPs. Download link saved to the Google Sheet.',
+      message: '"' + newMaterial.title + '" (' + newMaterial.fileSize + ') for ' + batchLabel + ' is now available in Assignments & DPPs. Download link saved to the Database.',
       time: 'Just now',
       timestamp: Date.now(),
       read: false,
@@ -796,7 +796,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       folderUrl + '\n\n' +
       '• Folder: Divine Classes Portal Uploads > ' + DRIVE_MATERIALS_FOLDER + '\n' +
       '• Master apps script and storage are hosted in Developer Google account.\n' +
-      '• All assignments, test files, and worksheets uploaded by you or faculty are automatically linked in your Google Sheet (Materials_Repository tab) for student downloads.\n\n' +
+      '• All assignments, test files, and worksheets uploaded by you or faculty are automatically linked in your Database (Materials_Repository tab) for student downloads.\n\n' +
       'Regards,\nDivine Classes System';
 
     const htmlBody = '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">' +
@@ -812,7 +812,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">' +
       '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📂 Shared Folder:</strong> ' + DRIVE_MATERIALS_FOLDER + '</p>' +
       '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📧 Authorized Email:</strong> ' + emailToUse + '</p>' +
-      '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📊 Google Sheet Sync:</strong> Auto-logged to <code>Materials_Repository</code></p>' +
+      '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📊 Database Sync:</strong> Auto-logged to <code>Materials_Repository</code></p>' +
       '<p style="margin: 0 0 6px 0; font-size: 13px; color: #0f172a;"><strong>📲 Student Download:</strong> Instant 1-click mobile download & PDF preview</p>' +
       '</div>' +
       '<p style="font-size: 14px; line-height: 1.6; color: #334155;">Whenever you or faculty upload study material, test papers, or worksheets, the files are stored here and direct download links are published instantly for all enrolled students.</p>' +
@@ -1058,9 +1058,9 @@ function getDefaultSeedData() {
       email: 'contact@divineclasses.in',
       address: '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063',
       upiId: 'divineclasses@upi',
-      facebookUrl: 'https://facebook.com',
-      instagramUrl: 'https://instagram.com',
-      youtubeUrl: 'https://www.youtube.com/@chem_crush9',
+      facebookUrl: 'https://m.facebook.com/edivineclasses/',
+      instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
+      youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
       adminName: 'Er. Rajesh Chahar',
       adminPassword: 'admin123',
       adminEmail: '',
@@ -1196,7 +1196,7 @@ function restoreDummyData_(incoming) {
  * ============================================================================
  * CLOUD DATABASE ENGINE (PropertiesService Persistent NoSQL Store)
  * ============================================================================
- * Primary database engine that runs independently of Google Sheets.
+ * Primary database engine that runs independently of Database.
  * Stores tables (students, batches, teachers, tests, materials, settings, etc.)
  * with ultra-fast persistent access across all users and executions.
  */
@@ -1339,8 +1339,33 @@ function applyTombstones_(appData) {
   return appData;
 }
 
+function calculateNextFeeReminder_(admissionDateStr, monthsCount) {
+  if (!admissionDateStr) return '2026-11-11';
+  if (monthsCount === undefined || monthsCount === null) monthsCount = 1;
+  const parts = String(admissionDateStr).split('-');
+  if (parts.length !== 3) return String(admissionDateStr);
+  let year = parseInt(parts[0], 10);
+  let month = parseInt(parts[1], 10);
+  let day = parseInt(parts[2], 10);
+
+  let targetMonth = month + monthsCount;
+  let targetYear = year + Math.floor((targetMonth - 1) / 12);
+  targetMonth = ((targetMonth - 1) % 12) + 1;
+
+  let targetDay = day + 1;
+  const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+  if (targetDay > daysInMonth) {
+    targetDay = daysInMonth;
+  }
+
+  const yStr = String(targetYear);
+  const mStr = String(targetMonth < 10 ? '0' + targetMonth : targetMonth);
+  const dStr = String(targetDay < 10 ? '0' + targetDay : targetDay);
+  return yStr + '-' + mStr + '-' + dStr;
+}
+
 /**
- * Dynamically merges student records from the Students_Master Google Sheet tab.
+ * Dynamically merges student records from the Students_Master Database table.
  * Adding a row in the sheet (Roll No + Name) creates a new student in the app;
  * editing a row (password, fees, status, contact…) updates the matching student.
  * Students that exist only in the app are preserved. Runs on every data load,
@@ -1375,27 +1400,67 @@ function mergeStudentsFromSheet_(appData) {
       if (sheetRollsNow[r]) clearTombstone_('rolls', r);
     });
 
+    const headers = values[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
+    function getCol(names, fallback) {
+      for (let k = 0; k < names.length; k++) {
+        const idx = headers.indexOf(names[k].toLowerCase());
+        if (idx !== -1) return idx;
+      }
+      return fallback;
+    }
+    const cRoll = getCol(['roll no', 'roll'], 0);
+    const cName = getCol(['student name', 'name'], 1);
+    const cAdmission = getCol(['admission date', 'admission', 'joining date', 'join date'], 2);
+    const cPwd = getCol(['login password', 'password'], 3);
+    const cStatus = getCol(['access status', 'status'], 4);
+    const cParent = getCol(['parent name', 'parent'], 5);
+    const cPhone = getCol(['contact phone', 'phone'], 6);
+    const cMonthlyFee = getCol(['monthly fee (inr)', 'monthly fee', 'monthly tuition fee', 'total fee (inr)', 'total fee'], 7);
+    const cPaidFee = getCol(['paid fee (inr)', 'paid fee', 'fee deposited', 'fees deposited'], 8);
+    const cPending = getCol(['pending dues (inr)', 'pending dues', 'balance'], 9);
+    const cDueDate = getCol(['next fee due date', 'fee due date', 'due date', 'fee reminder date'], 10);
+    const cLastReminder = getCol(['last reminder sent', 'last reminder'], 11);
+    const cPhoto = getCol(['photo url', 'photo'], 12);
+
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
-      const roll = String(row[0] || '').trim();
-      const name = String(row[1] || '').trim();
+      const roll = String(row[cRoll] || '').trim();
+      const name = String(row[cName] || '').trim();
       if (!roll && !name) continue;
 
-      const password = String(row[2] || '').trim() || 'password123';
-      const statusRaw = String(row[3] || 'Active').trim();
+      let admissionDate = cAdmission !== -1 ? row[cAdmission] : '';
+      if (admissionDate instanceof Date && !isNaN(admissionDate)) {
+        admissionDate = Utilities.formatDate(admissionDate, tz, 'yyyy-MM-dd');
+      } else {
+        admissionDate = String(admissionDate || '').trim();
+      }
+
+      const password = String(row[cPwd] || '').trim() || 'password123';
+      const statusRaw = String(row[cStatus] || 'Active').trim();
       const status = /block/i.test(statusRaw) ? 'Blocked' : (/inactive/i.test(statusRaw) ? 'Inactive' : 'Active');
-      const parentName = String(row[4] || '').trim();
-      const phone = String(row[5] || '').trim();
-      const totalFee = Number(row[6]) || 0;
-      const paidFee = Number(row[7]) || 0;
-      let dueDate = row[9];
+      const parentName = String(row[cParent] || '').trim();
+      const phone = String(row[cPhone] || '').trim();
+      let monthlyFee = Number(row[cMonthlyFee]) || 2500;
+      let paidFee = Number(row[cPaidFee]) || 0;
+      if (monthlyFee > 10000) {
+        monthlyFee = Math.round(monthlyFee / 12);
+        paidFee = Math.min(paidFee, monthlyFee);
+      }
+      let dueDate = row[cDueDate];
       if (dueDate instanceof Date && !isNaN(dueDate)) {
-        dueDate = Utilities.formatDate(dueDate, tz, 'dd MMM yyyy');
+        dueDate = Utilities.formatDate(dueDate, tz, 'yyyy-MM-dd');
       } else {
         dueDate = String(dueDate || '').trim();
       }
-      const lastReminder = String(row[10] || '').trim() || 'Never';
-      const photoUrl = String(row[11] || '').trim();
+      if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+        if (paidFee >= monthlyFee && monthlyFee > 0) {
+          dueDate = 'Paid';
+        } else {
+          dueDate = calculateNextFeeReminder_(admissionDate || '2026-10-10', 1);
+        }
+      }
+      const lastReminder = String(row[cLastReminder] || '').trim() || 'Never';
+      const photoUrl = String(row[cPhoto] || '').trim();
 
       let stu = null;
       if (roll) {
@@ -1410,11 +1475,13 @@ function mergeStudentsFromSheet_(appData) {
       if (stu) {
         stu.roll = roll || stu.roll;
         stu.name = name || stu.name;
+        if (admissionDate) stu.admissionDate = admissionDate;
         stu.password = password;
         stu.status = status;
         stu.parentName = parentName || stu.parentName;
         stu.phone = phone || stu.phone;
-        stu.totalFee = totalFee;
+        stu.monthlyFee = monthlyFee;
+        stu.totalFee = monthlyFee;
         stu.paidFee = paidFee;
         if (dueDate && !/^fully paid$/i.test(dueDate)) stu.dueDate = dueDate;
         stu.lastReminder = lastReminder;
@@ -1429,13 +1496,15 @@ function mergeStudentsFromSheet_(appData) {
           id: 's_' + slug + '_' + i,
           roll: roll || ('DC-' + (100 + appData.students.length + 1)),
           name: name || 'Unnamed Student',
+          admissionDate: admissionDate || '2026-10-10',
           password: password,
           status: status,
           parentName: parentName,
           phone: phone,
-          totalFee: totalFee,
+          monthlyFee: monthlyFee,
+          totalFee: monthlyFee,
           paidFee: paidFee,
-          dueDate: /^fully paid$/i.test(dueDate) ? '' : dueDate,
+          dueDate: /^fully paid$/i.test(dueDate) ? '' : (dueDate || '2026-11-11'),
           lastReminder: lastReminder,
           photo: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : null,
           photoUrl: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : ''
@@ -1493,6 +1562,58 @@ function mergeStudentsFromSheet_(appData) {
 
     if (added || updated) {
       Logger.log('Students_Master sheet merge: ' + added + ' added, ' + updated + ' updated');
+    }
+
+    // Merge any direct edits from Student_Fees_Ledger tab
+    try {
+      const feeSh = ss.getSheetByName('Student_Fees_Ledger') || ss.getSheetByName('Student_Fees') || ss.getSheetByName('Fees_Master');
+      if (feeSh) {
+        const feeVals = feeSh.getDataRange().getValues();
+        if (feeVals && feeVals.length > 1) {
+          const feeHeaders = feeVals[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
+          const fRoll = feeHeaders.indexOf('roll no') !== -1 ? feeHeaders.indexOf('roll no') : 0;
+          const fMonthly = feeHeaders.findIndex(function (h) { return h.includes('monthly'); });
+          const fPaid = feeHeaders.findIndex(function (h) { return h.includes('paid fee') || h === 'paid'; });
+          const fDueDate = feeHeaders.findIndex(function (h) { return h.includes('due date') || h.includes('next fee'); });
+          const fAdm = feeHeaders.findIndex(function (h) { return h.includes('admission'); });
+          for (let fi = 1; fi < feeVals.length; fi++) {
+            const fRow = feeVals[fi];
+            const rollKey = String(fRow[fRoll] || '').trim();
+            if (!rollKey) continue;
+            const stuObj = appData.students.find(function (s) { return s.roll === rollKey; });
+            if (stuObj) {
+              if (fMonthly !== -1 && fRow[fMonthly] !== '') {
+                stuObj.monthlyFee = Number(fRow[fMonthly]) || stuObj.monthlyFee;
+                if (stuObj.monthlyFee > 10000) stuObj.monthlyFee = Math.round(stuObj.monthlyFee / 12);
+                stuObj.totalFee = stuObj.monthlyFee;
+              }
+              if (fPaid !== -1 && fRow[fPaid] !== '') {
+                stuObj.paidFee = Number(fRow[fPaid]) || stuObj.paidFee;
+              }
+              if (fDueDate !== -1 && fRow[fDueDate]) {
+                let dVal = fRow[fDueDate];
+                if (dVal instanceof Date && !isNaN(dVal)) {
+                  dVal = Utilities.formatDate(dVal, tz, 'yyyy-MM-dd');
+                } else {
+                  dVal = String(dVal).trim();
+                }
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dVal) || dVal === 'Paid') {
+                  stuObj.dueDate = dVal;
+                }
+              }
+              if (fAdm !== -1 && fRow[fAdm]) {
+                let admVal = fRow[fAdm];
+                if (admVal instanceof Date && !isNaN(admVal)) {
+                  admVal = Utilities.formatDate(admVal, tz, 'yyyy-MM-dd');
+                }
+                stuObj.admissionDate = String(admVal).trim() || stuObj.admissionDate;
+              }
+            }
+          }
+        }
+      }
+    } catch (fErr) {
+      Logger.log('Student_Fees_Ledger merge error: ' + fErr.toString());
     }
   } catch (e) {
     Logger.log('mergeStudentsFromSheet_ error: ' + e.toString());
@@ -2213,11 +2334,11 @@ function mergeSettingsFromSheet_(appData) {
       } else if (param.indexOf('admin google drive folder link') !== -1) {
         appData.settings.adminDriveFolderUrl = val;
       } else if (param.indexOf('facebook') !== -1) {
-        appData.settings.facebookUrl = val;
+        appData.settings.facebookUrl = /^https?:\/\//i.test(val) ? val : ('https://' + val);
       } else if (param.indexOf('instagram') !== -1) {
-        appData.settings.instagramUrl = val;
+        appData.settings.instagramUrl = /^https?:\/\//i.test(val) ? val : ('https://' + val);
       } else if (param.indexOf('youtube') !== -1) {
-        appData.settings.youtubeUrl = val;
+        appData.settings.youtubeUrl = /^https?:\/\//i.test(val) ? val : ('https://' + val);
       }
     }
   } catch (e) {
@@ -2228,7 +2349,7 @@ function mergeSettingsFromSheet_(appData) {
 
 /**
  * Initializes or returns the Database records
- * Primary source is Cloud Database (PropertiesService) & Google Sheet tabs
+ * Primary source is Cloud Database (PropertiesService) & Database tables
  */
 function apiGetInitialData() {
   try {
@@ -2264,7 +2385,7 @@ function apiGetInitialData() {
       }
     }
 
-    // 2b. Dynamically merge records added/edited/deleted directly in Google Sheet tabs
+    // 2b. Dynamically merge records added/edited/deleted directly in Database tables
     appData = mergeStudentsFromSheet_(appData);
     appData = mergeTeachersFromSheet_(appData);
     appData = mergeBatchesFromSheet_(appData);
@@ -2314,7 +2435,7 @@ function apiGetInitialData() {
     // Persist verified state in the Cloud Database
     dbSaveAll(appData);
 
-    // Auto-restructure Google Sheet tabs with Calibri size 10
+    // Auto-restructure Database tables with Calibri size 10
     try {
       const ss = getDbSpreadsheet();
       if (ss) {
@@ -2372,9 +2493,9 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
 }
 
 /**
- * Developer API: Toggle Dummy/Demo Data visibility in Web App and Google Sheets
- * - enabled = true:  Demo records are restored to Web App and written to Google Sheets
- * - enabled = false: Demo records are hidden from all client roles and wiped from Google Sheets
+ * Developer API: Toggle Dummy/Demo Data visibility in Web App and Database
+ * - enabled = true:  Demo records are restored to Web App and written to Database
+ * - enabled = false: Demo records are hidden from all client roles and wiped from Database
  */
 /**
  * Developer API: Toggle Dummy/Demo Data for EACH SHEET individually or for all sheets
@@ -2425,7 +2546,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
     }
 
     // 2. CRITICAL: Inject the seed dummy records for the enabled table(s) into appData
-    // so they are immediately created in the Google Sheet tabs!
+    // so they are immediately created in the Database tables!
     tables.forEach(function (tbl) {
       if (!Array.isArray(appData[tbl])) appData[tbl] = [];
       const have = {};
@@ -2521,7 +2642,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
   // Persist updated state in master database
   dbSaveAll(appData);
 
-  // Sync to Google Sheet: directly writes or deletes data across the different sheet tabs!
+  // Sync to Database: directly writes or deletes data across the different sheet tabs!
   try {
     const ss = getDbSpreadsheet();
     if (ss) {
@@ -2548,7 +2669,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
 }
 
 /**
- * Developer API: Completely audits, restructures, formats, and orders all Google Sheet tabs
+ * Developer API: Completely audits, restructures, formats, and orders all Database tables
  * Applies Calibri 10, freezes header row, custom tab colors, auto-resizes columns,
  * and deletes all unnecessary trailing empty rows/columns.
  * External_Links_Hub is preserved and unchanged!
@@ -2556,7 +2677,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
 function apiRestructureAllSheets() {
   try {
     const ss = getDbSpreadsheet();
-    if (!ss) return { success: false, error: 'Cannot open Google Sheet' };
+    if (!ss) return { success: false, error: 'Cannot open Database' };
 
     // Clear any deletion tombstones that might suppress demo rolls
     try {
@@ -2613,6 +2734,7 @@ function apiRestructureAllSheets() {
     // 2. Order tabs in standard intuitive sequence
     const tabOrder = [
       'Students_Master',
+      'Student_Fees_Ledger',
       'Teachers_Roster',
       'Batches_Roster',
       'Offline_Test_Marks',
@@ -2656,7 +2778,7 @@ function apiRestructureAllSheets() {
 
 /**
  * Syncs full application state to the Primary Cloud Database
- * and optional background mirror to Google Sheets
+ * and optional background mirror to Database
  */
 function apiSyncAllData(fullData) {
   try {
@@ -2698,6 +2820,7 @@ function apiSyncAllData(fullData) {
     try {
       fullData = mergeGalleryFromSheet_(fullData);
       fullData = mergeLinksFromSheet_(fullData);
+      fullData = mergeSettingsFromSheet_(fullData);
       if (!isDemoDisabled && (!Array.isArray(fullData.gallery) || fullData.gallery.length === 0)) {
         fullData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
       }
@@ -2711,7 +2834,7 @@ function apiSyncAllData(fullData) {
     // 1. Primary write: Cloud Database (instant, isolated, persistent)
     dbSaveAll(fullData);
 
-    // 2. Secondary background mirror: Update Google Sheet if available
+    // 2. Secondary background mirror: Update Database if available
     try {
       const ss = getDbSpreadsheet();
       if (ss) {
@@ -2763,7 +2886,7 @@ function getOrCreateSheet(ss, targetName, legacyNames) {
 }
 
 /**
- * Universal Formatter for all Google Sheet tabs:
+ * Universal Formatter for all Database tables:
  * 1. Enforces Font Family 'Calibri' across all cells
  * 2. Enforces Font Size 10 across all cells
  * 3. Freezes header row (Row 1) with 28px height, bold font, and custom color
@@ -2815,7 +2938,7 @@ function formatAndTrimSheet(sheet, numColumns, numRows, headerColor, tabColor) {
 }
 
 /**
- * Ensures the Google Sheet has at least the required rows and columns
+ * Ensures the Database has at least the required rows and columns
  * so that sheet.getRange(...).setValues(...) never fails with out-of-bounds errors.
  */
 function ensureSheetDimensions_(sheet, requiredRows, requiredCols) {
@@ -2834,7 +2957,7 @@ function ensureSheetDimensions_(sheet, requiredRows, requiredCols) {
 }
 
 /**
- * Generates human-friendly Google Sheets tab views for the client.
+ * Generates human-friendly Database table views for the client.
  * Respects showDummyData: when false, removes demo data and displays clean production records.
  */
 function syncReadableSheets(ss, data) {
@@ -2852,13 +2975,13 @@ function syncReadableSheets(ss, data) {
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       stuSheet.clear();
-      const headers = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
+      const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
       const rows = [headers];
       const stuList = getAllRecords_('students');
       stuList.forEach(function(s) {
-        const total = Number(s.totalFee) || 0;
+        const monthly = Number(s.monthlyFee || s.totalFee) || 0;
         const paid = Number(s.paidFee) || 0;
-        const balance = total - paid;
+        const balance = Math.max(0, monthly - paid);
         let pUrl = s.photoUrl || s.photo || '';
         if (pUrl && pUrl.startsWith('data:image')) {
           try {
@@ -2875,14 +2998,15 @@ function syncReadableSheets(ss, data) {
         rows.push([
           s.roll || 'DC-101',
           s.name || 'Student Name',
+          s.admissionDate || '2026-10-10',
           s.password || 'password123',
           s.status || 'Active',
           s.parentName || 'Parent Name',
           s.phone || '+91 98765 43210',
-          total,
+          monthly,
           paid,
           balance,
-          balance <= 0 ? 'Fully Paid' : (s.dueDate || '2026-10-25'),
+          s.dueDate || '2026-11-11',
           s.lastReminder || 'Never',
           pUrl || ''
         ]);
@@ -2891,10 +3015,10 @@ function syncReadableSheets(ss, data) {
       stuSheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
       stuSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
       for (let i = 1; i < rows.length; i++) {
-        const statusCell = stuSheet.getRange(i + 1, 4);
-        if (rows[i][3] === 'Blocked') {
+        const statusCell = stuSheet.getRange(i + 1, 5);
+        if (rows[i][4] === 'Blocked') {
           statusCell.setBackground('#fee2e2').setFontColor('#991b1b').setFontWeight('bold');
-        } else if (rows[i][3] === 'Inactive') {
+        } else if (rows[i][4] === 'Inactive') {
           statusCell.setBackground('#f1f5f9').setFontColor('#64748b').setFontWeight('bold');
         } else {
           statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
@@ -2903,7 +3027,47 @@ function syncReadableSheets(ss, data) {
       formatAndTrimSheet(stuSheet, headers.length, rows.length, '#4f46e5', '#4f46e5');
     }
 
-    // B. Sync Teachers Sheet (Teachers_Roster) - All Records
+    // B. Sync Dedicated Student Fees Sheet (Student_Fees_Ledger)
+    {
+      let feeSheet = getOrCreateSheet(ss, 'Student_Fees_Ledger', ['Student_Fees', 'Fees_Master', 'Fees_Ledger', 'Fees']);
+      feeSheet.clear();
+      const feeHeaders = ['Roll No', 'Student Name', 'Admission Date', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent'];
+      const feeRows = [feeHeaders];
+      const stuList = getAllRecords_('students');
+      stuList.forEach(function(s) {
+        const monthly = Number(s.monthlyFee || s.totalFee) || 0;
+        const paid = Number(s.paidFee) || 0;
+        const balance = Math.max(0, monthly - paid);
+        const isPaid = balance <= 0;
+        feeRows.push([
+          s.roll || 'DC-101',
+          s.name || 'Student Name',
+          s.admissionDate || '2026-10-10',
+          s.parentName || 'Parent Name',
+          s.phone || '+91 98765 43210',
+          monthly,
+          paid,
+          balance,
+          isPaid ? 'Current Month Paid' : 'Payment Due',
+          s.dueDate || '2026-11-11',
+          s.lastReminder || 'Never'
+        ]);
+      });
+      ensureSheetDimensions_(feeSheet, feeRows.length, feeHeaders.length);
+      feeSheet.getRange(1, 1, feeRows.length, feeHeaders.length).setValues(feeRows);
+      feeSheet.getRange(1, 1, 1, feeHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
+      for (let i = 1; i < feeRows.length; i++) {
+        const statusCell = feeSheet.getRange(i + 1, 9);
+        if (feeRows[i][8] === 'Current Month Paid') {
+          statusCell.setBackground('#dcfce7').setFontColor('#166534').setFontWeight('bold');
+        } else {
+          statusCell.setBackground('#fef3c7').setFontColor('#92400e').setFontWeight('bold');
+        }
+      }
+      formatAndTrimSheet(feeSheet, feeHeaders.length, feeRows.length, '#0f766e', '#0f766e');
+    }
+
+    // C. Sync Teachers Sheet (Teachers_Roster) - All Records
     {
       let teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
       teachSheet.clear();
@@ -3182,15 +3346,15 @@ function syncReadableSheets(ss, data) {
       sRows.push(['Display Contact', s.contactDisplay || '9555-6787-53', 'Formatted Helpline']);
       sRows.push(['Official Email', s.email || 'contact@divineclasses.in', 'Inquiry Email']);
       sRows.push(['Address', s.address || '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063', 'Center Location']);
-      sRows.push(['YouTube Channel', s.youtubeUrl || 'https://www.youtube.com/@chem_crush9', 'Official Video Channel']);
+      sRows.push(['YouTube Channel', s.youtubeUrl || 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8', 'Official Video Channel']);
       sRows.push(['Admin Name', s.adminName || 'Er. Rajesh Chahar', 'Display Name of Institute Admin']);
       sRows.push(['Master Admin Password', s.adminPassword || 'admin123', 'Password to access Admin portal']);
       sRows.push(['Admin Email ID', s.adminEmail || '', 'Official Admin Contact / Login Email']);
       sRows.push(['Admin Google Drive Folder Link', s.adminDriveFolderUrl || '', 'Official Shared Assignments & Materials Google Drive Folder']);
       sRows.push(['Admin Drive Access Status', s.adminDriveShared ? ('Authorized (' + (s.adminEmail || 'Admin') + ')') : 'Pending Authorization Mail', 'Google Drive Permission Status']);
       sRows.push(['UPI Payment ID', s.upiId || 'divineclasses@upi', 'Fee Collection UPI']);
-      sRows.push(['Facebook Page', s.facebookUrl || 'https://facebook.com', 'Social Channel']);
-      sRows.push(['Instagram Profile', s.instagramUrl || 'https://instagram.com', 'Social Channel']);
+      sRows.push(['Facebook Page', s.facebookUrl || 'https://m.facebook.com/edivineclasses/', 'Social Channel']);
+      sRows.push(['Instagram Profile', s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq', 'Social Channel']);
       sRows.push(['Show Requirement Labels', (s.showRequirementLabels === false) ? 'Off' : 'On', 'Page header "Requirement #N" tags (toggle in Settings)']);
       sRows.push(['Admin Feedback Delete', (s.allowAdminFeedbackDelete === false) ? 'Off' : 'On', 'Admin delete button on Feedback Wall (toggle in Settings)']);
       sRows.push(['Study Link Delete', (s.allowAdminLinkDelete === false) ? 'Off' : 'On', 'Admin delete button on Study Links cards (toggle in Settings)']);
@@ -3198,13 +3362,13 @@ function syncReadableSheets(ss, data) {
       // Dummy Data Status per sheet
       const cfg = s.dummyDataConfig || {};
       sRows.push(['Overall Dummy Data Master', (s.showDummyData === false) ? 'OFF (All Demo Data Deleted)' : 'ON', 'Master toggle']);
-      sRows.push(['Students Master Dummy Data', (cfg.students === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (11 demo rows)', 'Controlled by Developer']);
-      sRows.push(['Teachers Roster Dummy Data', (cfg.teachers === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (4 demo rows)', 'Controlled by Developer']);
-      sRows.push(['Batches Roster Dummy Data', (cfg.batches === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (3 demo rows)', 'Controlled by Developer']);
-      sRows.push(['Offline Tests Dummy Data', (cfg.offlineTests === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (4 demo rows)', 'Controlled by Developer']);
-      sRows.push(['Materials Dummy Data', (cfg.materials === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (5 demo rows)', 'Controlled by Developer']);
-      sRows.push(['Gallery Dummy Data', (cfg.gallery === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (4 demo rows)', 'Controlled by Developer']);
-      sRows.push(['Feedback Dummy Data', (cfg.feedbacks === false || s.showDummyData === false) ? 'OFF (Deleted from Sheet)' : 'ON (3 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Students Master Dummy Data', (cfg.students === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (11 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Teachers Roster Dummy Data', (cfg.teachers === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (4 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Batches Roster Dummy Data', (cfg.batches === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (3 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Offline Tests Dummy Data', (cfg.offlineTests === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (4 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Materials Dummy Data', (cfg.materials === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (5 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Gallery Dummy Data', (cfg.gallery === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (4 demo rows)', 'Controlled by Developer']);
+      sRows.push(['Feedback Dummy Data', (cfg.feedbacks === false || s.showDummyData === false) ? 'OFF (Deleted from Database)' : 'ON (3 demo rows)', 'Controlled by Developer']);
       sRows.push(['External_Links_Hub Status', 'PERMANENT (All 5 portals active)', 'Curated official study links never deleted']);
       sRows.push(['Last Auto-Sync Timestamp', new Date().toLocaleString(), 'Time of last auto-sync from Web App']);
 
@@ -3257,8 +3421,15 @@ function apiUpdateStudentProfile(studentId, profileData) {
     if (profileData.roll !== undefined) student.roll = String(profileData.roll).trim();
     if (profileData.phone !== undefined) student.phone = String(profileData.phone).trim();
     if (profileData.parentName !== undefined) student.parentName = String(profileData.parentName).trim();
+    if (profileData.admissionDate !== undefined) student.admissionDate = String(profileData.admissionDate).trim();
     if (profileData.password !== undefined) student.password = String(profileData.password).trim();
-    if (profileData.totalFee !== undefined) student.totalFee = Number(profileData.totalFee) || 0;
+    if (profileData.monthlyFee !== undefined) {
+      student.monthlyFee = Number(profileData.monthlyFee) || 0;
+      student.totalFee = student.monthlyFee;
+    } else if (profileData.totalFee !== undefined) {
+      student.monthlyFee = Number(profileData.totalFee) || 0;
+      student.totalFee = student.monthlyFee;
+    }
     if (profileData.paidFee !== undefined) student.paidFee = Number(profileData.paidFee) || 0;
     if (profileData.dueDate !== undefined) student.dueDate = String(profileData.dueDate).trim();
     if (profileData.status !== undefined) student.status = String(profileData.status).trim();
@@ -3339,7 +3510,7 @@ function apiUpdateAdminPassword(newPassword) {
 
 
 /**
- * Automatically executed when any user opens the Google Sheet.
+ * Automatically executed when any user opens the Database.
  * Provides a custom menu to recreate and populate the 6-row demo data with 1 click.
  */
 function onOpen(e) {
