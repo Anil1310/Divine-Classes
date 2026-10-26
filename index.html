@@ -3141,7 +3141,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="flex items-center gap-1.5">
-                                                                <button onclick="openStudentIdCard('${stu.id}')" title="View & Print Student ID Card" class="text-xs text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg border border-slate-200 transition">
+                                                                <button onclick="openStudentIdCard('${stu.id}')" title="View & Download Student ID Card" class="text-xs text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg border border-slate-200 transition">
                                                                     <i class="fa-solid fa-id-card"></i>
                                                                 </button>
                                                                 <button onclick="sendStudentIdCardOnWhatsApp('${stu.id}')" title="Share Official Student ID Card to WhatsApp (${stu.phone})" class="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-2xs transition shrink-0 cursor-pointer">
@@ -4734,113 +4734,8 @@
     
     
     /********************************************************************
-     * PNG EXPORT & WHATSAPP PNG SHARING HELPERS (HIGH RESOLUTION)
+     * PNG EXPORT HELPERS (HIGH RESOLUTION)
      ********************************************************************/
-    function shareStudentIdCardPNGOnWhatsApp(studentId) {
-        const cardEl = document.getElementById('student-id-card-render');
-        if (!cardEl) {
-            showToast('ID Card element not found!', 'error');
-            return;
-        }
-        const stu = state.students.find(s => s.id === studentId);
-        if (!stu) return;
-        const batch = state.batches.find(b => (b.studentIds || []).includes(stu.id)) || state.batches.find(b => b.id === stu.batchId) || state.batches[0];
-        const batchName = batch ? batch.name : 'Divine Classes';
-        const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
-        const studentRoll = stu.roll || stu.id || 'DC-101';
-
-        let phoneClean = (stu.phone || '').replace(/\D/g, '');
-        if (phoneClean.startsWith('0')) {
-            phoneClean = phoneClean.replace(/^0+/, '');
-        }
-        const targetPhone = phoneClean.length === 10 ? ('91' + phoneClean) : (phoneClean.length > 10 ? phoneClean : '');
-
-        const caption = `🎓 *DIVINE CLASSES - OFFICIAL STUDENT IDENTITY CARD* 🎓\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `👤 *Student Name:* ${stu.name}\n` +
-            `🆔 *Roll / Student ID:* ${studentRoll}\n` +
-            `📚 *Assigned Batch:* ${batchName}\n` +
-            `🏷️ *Batch ID:* ${batchId}\n` +
-            `👨‍👩‍👦 *Parent's Name:* ${stu.parentName || 'Parent / Guardian'}\n` +
-            `📞 *Emergency Contact:* ${stu.phone || 'N/A'}\n` +
-            `📅 *Admission Date:* ${stu.admissionDate || 'Active'}\n` +
-            `🏫 *Campus:* Paschimpuri Pocket 2, Club Rd, New Delhi - 110063\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `_Official Student Identity Card issued by Divine Classes._`;
-
-        const waAppUrl = targetPhone ?
-            ('whatsapp://send?phone=' + targetPhone + '&text=' + encodeURIComponent(caption)) :
-            ('whatsapp://send?text=' + encodeURIComponent(caption));
-
-        const waWebUrl = targetPhone ?
-            ('https://api.whatsapp.com/send?phone=' + targetPhone + '&text=' + encodeURIComponent(caption)) :
-            ('https://api.whatsapp.com/send?text=' + encodeURIComponent(caption));
-
-        showToast('Saving ID Card PNG & opening WhatsApp app...', 'info');
-
-        function doShare() {
-            html2canvas(cardEl, {
-                scale: 3,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff'
-            }).then(canvas => {
-                canvas.toBlob(async function (blob) {
-                    const filename = 'Divine_Classes_ID_Card_' + studentRoll + '.png';
-
-                    // 1. Download PNG image automatically
-                    if (blob) {
-                        try {
-                            const link = document.createElement('a');
-                            link.download = filename;
-                            link.href = canvas.toDataURL('image/png');
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        } catch (e) {
-                            console.warn('Download link error:', e);
-                        }
-
-                        // 2. Copy image to clipboard for instant pasting
-                        try {
-                            if (navigator.clipboard && window.ClipboardItem) {
-                                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                            }
-                        } catch (clipErr) {
-                            // ignore clipboard write failure
-                        }
-                    }
-
-                    // 3. Open WhatsApp application directly
-                    showToast('ID Card PNG saved! Opening WhatsApp app...', 'success');
-                    const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
-                    if (isMobile) {
-                        window.location.href = waAppUrl;
-                    } else {
-                        // On desktop, launch WhatsApp App or open Web
-                        window.location.href = waAppUrl;
-                        setTimeout(function () {
-                            window.open(waWebUrl, '_blank');
-                        }, 1000);
-                    }
-                }, 'image/png');
-            }).catch(err => {
-                console.error('ID card render error:', err);
-                // Fallback: still open WhatsApp app
-                window.location.href = waAppUrl;
-            });
-        }
-
-        if (typeof html2canvas === 'undefined') {
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-            script.onload = doShare;
-            document.head.appendChild(script);
-        } else {
-            doShare();
-        }
-    }
-
     function downloadStudentIdCardAsPNG(studentId) {
         const cardEl = document.getElementById('student-id-card-render');
         if (!cardEl) {
@@ -5076,24 +4971,12 @@
                 </div>
                 ` : ''}
 
-                <!-- ACTION BUTTONS: PROMINENT WHATSAPP PNG SHARE + DOWNLOAD PNG + PRINT -->
-                <div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 no-print">
-                    <!-- Official WhatsApp App direct launcher -->
-                    <button onclick="shareStudentIdCardPNGOnWhatsApp('${stu.id}')" class="px-4 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl text-xs font-black shadow-lg hover:shadow-xl transition flex items-center gap-2 cursor-pointer active:scale-95" title="Open WhatsApp App to Send ID Card">
-                        <i class="fa-brands fa-whatsapp text-xl"></i>
-                        <span>WhatsApp</span>
-                    </button>
-
+                <!-- ACTION BUTTONS: ONLY DOWNLOAD PNG -->
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-3 no-print">
                     <!-- Download PNG Image -->
-                    <button onclick="downloadStudentIdCardAsPNG('${stu.id}')" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer active:scale-95" title="Download ID Card as .PNG image">
-                        <i class="fa-solid fa-download"></i>
-                        <span>Download PNG</span>
-                    </button>
-
-                    <!-- Print Card -->
-                    <button onclick="printStudentIdCard()" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer active:scale-95">
-                        <i class="fa-solid fa-print"></i>
-                        <span>Print</span>
+                    <button onclick="downloadStudentIdCardAsPNG('${stu.id}')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download ID Card as .PNG image">
+                        <i class="fa-solid fa-download text-sm"></i>
+                        <span>Download ID Card</span>
                     </button>
 
                     <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
