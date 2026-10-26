@@ -1134,7 +1134,8 @@
             youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
             adminName: 'Er. Rajesh Chahar',
             adminPassword: 'admin123',
-            adminEmail: '',
+            adminEmail: 'divineclasses1010@gmail.com',
+            adminDriveEmail: 'divineclasses1010@gmail.com',
             devPassword: 'dev123',
             driveEmail: '',
             drivePassword: '',
@@ -2015,6 +2016,7 @@
         updateRoleUI();
         updateNotificationBadge();
         updateSocialLinksUI();
+        renderMainContent();
     }
 
     function autoSyncToDatabase(immediate) {
@@ -8452,7 +8454,7 @@
                     </div>
                     <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs text-left flex items-start gap-2">
                         <i class="fa-solid fa-headset mt-0.5 text-amber-700"></i>
-                        <span>To restore or authorize this account, please contact the Divine Classes desk at <strong>9555-6787-53</strong> or visit the office at <strong>235 Paschimpuri Pocket 2, Club Rd New Delhi 110063</strong>.</span>
+                        <span>To restore or authorize this account, please contact the Divine Classes desk at <strong>${(state.settings && state.settings.contactDisplay) || '9555-6787-53'}</strong> or visit the office at <strong>${(state.settings && state.settings.address) || '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063'}</strong>.</span>
                     </div>
                     <div class="pt-2 flex justify-center">
                         <button onclick="closeModal()" class="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs transition">
@@ -8606,8 +8608,9 @@
             return;
         }
 
-        // 1. Admin Login (admin, anil, anil chahar, admin@divineclasses.in)
-        const isAdmin = lowerId === 'admin' || lowerId === 'admin@divineclasses.in' || lowerId === 'anil' || lowerId === 'anil chahar';
+        // 1. Admin Login (admin, anil, anil chahar, admin@divineclasses.in, divineclasses1010@gmail.com)
+        const configuredAdminEmail = (state.settings && state.settings.adminEmail) ? state.settings.adminEmail.toLowerCase() : 'divineclasses1010@gmail.com';
+        const isAdmin = lowerId === 'admin' || lowerId === 'admin@divineclasses.in' || lowerId === 'divineclasses1010@gmail.com' || lowerId === configuredAdminEmail || lowerId === 'anil' || lowerId === 'anil chahar';
         if (isAdmin) {
             const adminPwd = (state.settings && state.settings.adminPassword) ? state.settings.adminPassword : 'admin123';
             if (pwd !== adminPwd && pwd !== 'admin') {

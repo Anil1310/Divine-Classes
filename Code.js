@@ -2255,17 +2255,20 @@ function mergeSettingsFromSheet_(appData) {
     if (!values || values.length <= 1) return appData;
 
     if (!appData.settings) appData.settings = {};
+    if (!appData.settings.dummyDataConfig) appData.settings.dummyDataConfig = {};
+
     for (let i = 1; i < values.length; i++) {
       const param = String(values[i][0] || '').trim().toLowerCase();
       const val = String(values[i][1] || '').trim();
-      if (!param || !val) continue;
+      if (!param) continue;
 
       if (param.indexOf('institute name') !== -1) {
-        if (!/^mia$/i.test(val)) appData.settings.instituteName = val;
+        if (val && !/^mia$/i.test(val)) appData.settings.instituteName = val;
       } else if (param.indexOf('tagline') !== -1) {
         appData.settings.tagline = val;
       } else if (param.indexOf('helpline') !== -1 || param === 'phone') {
         appData.settings.phone = val;
+        appData.settings.helplinePhone = val;
       } else if (param.indexOf('display contact') !== -1) {
         appData.settings.contactDisplay = val;
       } else if (param.indexOf('official email') !== -1) {
@@ -2276,18 +2279,56 @@ function mergeSettingsFromSheet_(appData) {
         appData.settings.upiId = val;
       } else if (param.indexOf('admin name') !== -1) {
         appData.settings.adminName = val;
-      } else if (param.indexOf('admin password') !== -1) {
+      } else if (param.indexOf('master admin password') !== -1 || param.indexOf('admin password') !== -1) {
         appData.settings.adminPassword = val;
       } else if (param.indexOf('admin email') !== -1) {
         appData.settings.adminEmail = val;
-      } else if (param.indexOf('admin google drive folder link') !== -1) {
+        appData.settings.adminDriveEmail = val;
+      } else if (param.indexOf('admin google drive folder link') !== -1 || param.indexOf('drive folder') !== -1) {
         appData.settings.adminDriveFolderUrl = val;
+        appData.settings.driveFolderUrl = val;
+      } else if (param.indexOf('admin drive access status') !== -1) {
+        appData.settings.adminDriveAccessStatus = val;
+        appData.settings.adminDriveShared = (val.toLowerCase().indexOf('authorized') !== -1);
       } else if (param.indexOf('facebook') !== -1) {
         appData.settings.facebookUrl = /^https?:\/\//i.test(val) ? val : ('https://' + val);
       } else if (param.indexOf('instagram') !== -1) {
         appData.settings.instagramUrl = /^https?:\/\//i.test(val) ? val : ('https://' + val);
       } else if (param.indexOf('youtube') !== -1) {
         appData.settings.youtubeUrl = /^https?:\/\//i.test(val) ? val : ('https://' + val);
+      } else if (param.indexOf('show requirement labels') !== -1) {
+        appData.settings.showRequirementLabels = (val.toLowerCase() === 'on' || val.toLowerCase() === 'true' || val.toLowerCase() === 'yes');
+      } else if (param.indexOf('admin feedback delete') !== -1) {
+        appData.settings.allowAdminFeedbackDelete = (val.toLowerCase() === 'on' || val.toLowerCase() === 'true' || val.toLowerCase() === 'yes');
+      } else if (param.indexOf('study link delete') !== -1) {
+        appData.settings.allowAdminLinkDelete = (val.toLowerCase() === 'on' || val.toLowerCase() === 'true' || val.toLowerCase() === 'yes');
+      } else if (param.indexOf('overall dummy data master') !== -1) {
+        const isMasterOff = (val.toLowerCase().indexOf('off') !== -1);
+        appData.settings.showDummyData = !isMasterOff;
+        appData.settings.demoDataPermanentlyDisabled = isMasterOff;
+        try {
+          if (isMasterOff) {
+            PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true');
+          } else {
+            PropertiesService.getScriptProperties().deleteProperty('DUMMY_DATA_DISABLED');
+          }
+        } catch (propErr) { }
+      } else if (param.indexOf('students master dummy data') !== -1) {
+        appData.settings.dummyDataConfig.students = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('teachers roster dummy data') !== -1) {
+        appData.settings.dummyDataConfig.teachers = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('batches roster dummy data') !== -1) {
+        appData.settings.dummyDataConfig.batches = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('offline tests dummy data') !== -1) {
+        appData.settings.dummyDataConfig.offlineTests = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('materials dummy data') !== -1) {
+        appData.settings.dummyDataConfig.materials = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('gallery dummy data') !== -1) {
+        appData.settings.dummyDataConfig.gallery = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('feedback dummy data') !== -1) {
+        appData.settings.dummyDataConfig.feedbacks = (val.toLowerCase().indexOf('off') === -1);
+      } else if (param.indexOf('last auto-sync') !== -1) {
+        appData.settings.lastSyncTimestamp = val;
       }
     }
   } catch (e) {
