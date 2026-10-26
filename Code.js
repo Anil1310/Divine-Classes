@@ -1058,7 +1058,7 @@ function getDefaultSeedData() {
       email: 'contact@divineclasses.in',
       address: '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063',
       upiId: 'divineclasses@upi',
-      facebookUrl: 'https://m.facebook.com/edivineclasses/',
+      facebookUrl: 'https://www.facebook.com/edivineclasses/',
       instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
       youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
       adminName: 'Er. Rajesh Chahar',
@@ -3301,7 +3301,7 @@ function syncReadableSheets(ss, data) {
       sRows.push(['Admin Google Drive Folder Link', s.adminDriveFolderUrl || '', 'Official Shared Assignments & Materials Google Drive Folder']);
       sRows.push(['Admin Drive Access Status', s.adminDriveShared ? ('Authorized (' + (s.adminEmail || 'Admin') + ')') : 'Pending Authorization Mail', 'Google Drive Permission Status']);
       sRows.push(['UPI Payment ID', s.upiId || 'divineclasses@upi', 'Fee Collection UPI']);
-      sRows.push(['Facebook Page', s.facebookUrl || 'https://m.facebook.com/edivineclasses/', 'Social Channel']);
+      sRows.push(['Facebook Page', s.facebookUrl || 'https://www.facebook.com/edivineclasses/', 'Social Channel']);
       sRows.push(['Instagram Profile', s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq', 'Social Channel']);
       sRows.push(['Show Requirement Labels', (s.showRequirementLabels === false) ? 'Off' : 'On', 'Page header "Requirement #N" tags (toggle in Settings)']);
       sRows.push(['Admin Feedback Delete', (s.allowAdminFeedbackDelete === false) ? 'Off' : 'On', 'Admin delete button on Feedback Wall (toggle in Settings)']);

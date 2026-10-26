@@ -318,22 +318,22 @@
             <div class="p-4 border-t border-slate-800 bg-slate-950">
                 <p class="text-[10px] font-bold tracking-wider text-slate-400 mb-2">Connect With Divine Classes</p>
                 <div class="grid grid-cols-3 gap-1.5">
-                    <a href="https://m.facebook.com/edivineclasses/" target="_blank" rel="noopener noreferrer"
-                        onclick="openSocialExternalApp('facebook', event)"
+                    <a href="https://www.facebook.com/edivineclasses/" target="_blank" rel="noopener noreferrer"
+                        
                         id="sidebar-link-fb"
                         class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#1877F2] hover:text-white text-slate-300 transition group cursor-pointer" title="Official Facebook Page">
                         <i class="fa-brands fa-facebook-f text-sm mb-1 text-[#1877F2] group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">Facebook</span>
                     </a>
                     <a href="https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq" target="_blank" rel="noopener noreferrer"
-                        onclick="openSocialExternalApp('instagram', event)"
+                        
                         id="sidebar-link-ig"
                         class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-600 hover:to-purple-600 hover:text-white text-slate-300 transition group cursor-pointer" title="Official Instagram Profile">
                         <i class="fa-brands fa-instagram text-sm mb-1 text-pink-500 group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">Instagram</span>
                     </a>
                     <a href="https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8" target="_blank" rel="noopener noreferrer"
-                        onclick="openSocialExternalApp('youtube', event)"
+                        
                         id="sidebar-link-yt"
                         class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#FF0000] hover:text-white text-slate-300 transition group cursor-pointer" title="Official YouTube Channel">
                         <i class="fa-brands fa-youtube text-sm mb-1 text-[#FF0000] group-hover:text-white"></i>
@@ -1129,7 +1129,7 @@
             contactDisplay: '9555-6787-53',
             email: 'contact@divineclasses.in',
             upiId: 'divineclasses@upi',
-            facebookUrl: 'https://m.facebook.com/edivineclasses/',
+            facebookUrl: 'https://www.facebook.com/edivineclasses/',
             instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
             youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
             adminName: 'Er. Rajesh Chahar',
@@ -1804,13 +1804,13 @@
         } else if (platform === 'instagram') {
             url = s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq';
         } else if (platform === 'facebook') {
-            url = s.facebookUrl || 'https://m.facebook.com/edivineclasses/';
+            url = s.facebookUrl || 'https://www.facebook.com/edivineclasses/';
         }
         url = String(url || '').trim();
         if (!url) {
             if (platform === 'youtube') return 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
             if (platform === 'instagram') return 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq';
-            return 'https://m.facebook.com/edivineclasses/';
+            return 'https://www.facebook.com/edivineclasses/';
         }
         if (!/^https?:\/\//i.test(url)) {
             url = 'https://' + url;
@@ -1819,87 +1819,61 @@
     }
 
     function openSocialExternalApp(platform, event) {
-        if (event && event.preventDefault) {
-            try { event.preventDefault(); } catch (err) {}
+        const url = getSocialLink(platform);
+        if (!url) return;
+        // Do NOT call event.preventDefault()!
+        // In mobile view (Android Chrome, iOS Safari, and Google Apps Script iframes),
+        // standard anchor tags with target="_blank" are the ONLY 100% reliable way to open external URLs
+        // and allow mobile operating systems to trigger native App Links / Universal Links.
+        if (event && event.currentTarget && event.currentTarget.tagName === 'A') {
+            event.currentTarget.href = url;
+            event.currentTarget.target = '_blank';
+            event.currentTarget.rel = 'noopener noreferrer';
+            return true;
         }
-
-        const s = (state && state.settings) || {};
-        let webUrl = getSocialLink(platform);
-        const ua = navigator.userAgent || '';
-        const isAndroid = /Android/i.test(ua);
-        const isIOS = /iPhone|iPad|iPod/i.test(ua);
-        const isMobile = isAndroid || isIOS;
-
-        if (!isMobile) {
-            window.open(webUrl, '_blank', 'noopener,noreferrer');
-            return;
+        // Direct / programmatic fallback
+        try {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.location.href = url;
         }
-
-        let appUrl = '';
-        if (platform === 'youtube') {
-            if (isAndroid) {
-                appUrl = 'intent://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8#Intent;package=com.google.android.youtube;scheme=https;end;';
-            } else if (isIOS) {
-                appUrl = 'vnd.youtube://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
-            }
-        } else if (platform === 'instagram') {
-            const igUser = 'divineclasses_paschimpuri';
-            if (isAndroid) {
-                appUrl = 'intent://instagram.com/_u/' + igUser + '#Intent;package=com.instagram.android;scheme=https;end;';
-            } else if (isIOS) {
-                appUrl = 'instagram://user?username=' + igUser;
-            }
-        } else if (platform === 'facebook') {
-            const fbPage = 'edivineclasses';
-            if (isAndroid) {
-                appUrl = 'intent://facebook.com/' + fbPage + '#Intent;package=com.facebook.katana;scheme=https;end;';
-            } else if (isIOS) {
-                appUrl = 'fb://facewebmodal/f?href=https://www.facebook.com/' + fbPage;
-            }
-        }
-
-        if (appUrl) {
-            if (isAndroid) {
-                try {
-                    window.location.href = appUrl;
-                    return;
-                } catch (e) {
-                    window.open(webUrl, '_blank', 'noopener,noreferrer');
-                    return;
-                }
-            } else if (isIOS) {
-                const startTime = Date.now();
-                window.location.href = appUrl;
-                setTimeout(function () {
-                    if (Date.now() - startTime < 2000) {
-                        window.open(webUrl, '_blank', 'noopener,noreferrer');
-                    }
-                }, 1000);
-                return;
-            }
-        }
-
-        window.open(webUrl, '_blank', 'noopener,noreferrer');
     }
 
     function updateSocialLinksUI() {
+        const fbUrl = getSocialLink('facebook');
+        const igUrl = getSocialLink('instagram');
+        const ytUrl = getSocialLink('youtube');
+
         const fbEl = document.getElementById('sidebar-link-fb');
         if (fbEl) {
-            fbEl.href = getSocialLink('facebook');
-            fbEl.onclick = function (e) { openSocialExternalApp('facebook', e); };
+            fbEl.href = fbUrl;
+            fbEl.target = '_blank';
+            fbEl.rel = 'noopener noreferrer';
+            fbEl.removeAttribute('onclick');
         }
 
         const igEl = document.getElementById('sidebar-link-ig');
         if (igEl) {
-            igEl.href = getSocialLink('instagram');
-            igEl.onclick = function (e) { openSocialExternalApp('instagram', e); };
+            igEl.href = igUrl;
+            igEl.target = '_blank';
+            igEl.rel = 'noopener noreferrer';
+            igEl.removeAttribute('onclick');
         }
 
         const ytEl = document.getElementById('sidebar-link-yt');
         if (ytEl) {
-            ytEl.href = getSocialLink('youtube');
-            ytEl.onclick = function (e) { openSocialExternalApp('youtube', e); };
+            ytEl.href = ytUrl;
+            ytEl.target = '_blank';
+            ytEl.rel = 'noopener noreferrer';
+            ytEl.removeAttribute('onclick');
         }
+
+        const hFb = document.getElementById('header-social-fb');
+        if (hFb) hFb.href = fbUrl;
+        const hIg = document.getElementById('header-social-ig');
+        if (hIg) hIg.href = igUrl;
+        const hYt = document.getElementById('header-social-yt');
+        if (hYt) hYt.href = ytUrl;
     }
 
     function isRequirementLabelsEnabled() {
@@ -3076,13 +3050,13 @@
                             <p class="text-xs text-indigo-100 mt-1">Watch free YouTube concept marathons, topper interviews on Instagram, and daily exam schedules on Facebook.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 shrink-0">
-                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('facebook', event)" class="px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer"  class="px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
                                 <i class="fa-brands fa-facebook text-base"></i> Facebook Page
                             </a>
-                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('instagram', event)" class="px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer"  class="px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
                                 <i class="fa-brands fa-instagram text-base"></i> Instagram
                             </a>
-                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('youtube', event)" class="px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer"  class="px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
                                 <i class="fa-brands fa-youtube text-base"></i> YouTube Channel
                             </a>
                         </div>
@@ -4718,9 +4692,116 @@
     }
 
     
+    
     /********************************************************************
-     * PNG EXPORT HELPERS (html2canvas High-Resolution Download)
+     * PNG EXPORT & WHATSAPP PNG SHARING HELPERS (HIGH RESOLUTION)
      ********************************************************************/
+    function shareStudentIdCardPNGOnWhatsApp(studentId) {
+        const cardEl = document.getElementById('student-id-card-render');
+        if (!cardEl) {
+            showToast('ID Card element not found!', 'error');
+            return;
+        }
+        const stu = state.students.find(s => s.id === studentId);
+        if (!stu) return;
+        const batch = state.batches.find(b => (b.studentIds || []).includes(stu.id)) || state.batches.find(b => b.id === stu.batchId) || state.batches[0];
+        const batchName = batch ? batch.name : 'Divine Classes';
+        const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
+        const studentRoll = stu.roll || stu.id || 'DC-101';
+
+        showToast('Preparing ID Card PNG for WhatsApp...', 'info');
+
+        function doShare() {
+            html2canvas(cardEl, {
+                scale: 3,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            }).then(canvas => {
+                canvas.toBlob(async function (blob) {
+                    if (!blob) {
+                        showToast('Could not generate image blob', 'error');
+                        return;
+                    }
+                    const filename = 'Divine_Classes_ID_Card_' + studentRoll + '.png';
+                    const file = new File([blob], filename, { type: 'image/png' });
+
+                    const caption = `🎓 *DIVINE CLASSES - OFFICIAL STUDENT IDENTITY CARD* 🎓\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `👤 *Student Name:* ${stu.name}\n` +
+                        `🆔 *Roll / Student ID:* ${studentRoll}\n` +
+                        `📚 *Assigned Batch:* ${batchName}\n` +
+                        `🏷️ *Batch ID:* ${batchId}\n` +
+                        `👨‍👩‍👦 *Parent's Name:* ${stu.parentName || 'Parent / Guardian'}\n` +
+                        `📞 *Emergency Contact:* ${stu.phone || 'N/A'}\n` +
+                        `📅 *Admission Date:* ${stu.admissionDate || 'Active'}\n` +
+                        `🏫 *Campus:* Paschimpuri Pocket 2, Club Rd, New Delhi - 110063\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `_Official Student Identity Card issued by Divine Classes._`;
+
+                    // Check if native mobile sharing (files) is supported
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try {
+                            await navigator.share({
+                                files: [file],
+                                title: 'Student ID Card - ' + stu.name,
+                                text: caption
+                            });
+                            showToast('ID card PNG sent on WhatsApp!', 'success');
+                            return;
+                        } catch (err) {
+                            if (err.name !== 'AbortError') {
+                                console.warn('Navigator share error, falling back to download:', err);
+                            } else {
+                                return;
+                            }
+                        }
+                    }
+
+                    // Desktop / fallback:
+                    // 1. Download PNG image automatically
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+
+                    // 2. Try copying image to clipboard for instant Ctrl+V pasting in WhatsApp Web
+                    try {
+                        if (navigator.clipboard && window.ClipboardItem) {
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            showToast('ID Card PNG copied to clipboard & downloaded! Paste (Ctrl+V) in WhatsApp.', 'success');
+                        } else {
+                            showToast('ID Card PNG downloaded! Attach in WhatsApp.', 'success');
+                        }
+                    } catch (clipErr) {
+                        showToast('ID Card PNG downloaded! Attach in WhatsApp.', 'success');
+                    }
+
+                    // 3. Open WhatsApp Web / App
+                    const phoneClean = (stu.phone || '').replace(/\D/g, '');
+                    const targetPhone = phoneClean.length === 10 ? '91' + phoneClean : (phoneClean.length > 10 ? phoneClean : '');
+                    const waUrl = targetPhone ? ('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(caption)) : ('https://wa.me/?text=' + encodeURIComponent(caption));
+                    setTimeout(function () {
+                        window.open(waUrl, '_blank', 'noopener,noreferrer');
+                    }, 400);
+
+                }, 'image/png');
+            }).catch(err => {
+                console.error('ID card render error:', err);
+                showToast('Failed to generate PNG: ' + err, 'error');
+            });
+        }
+
+        if (typeof html2canvas === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            script.onload = doShare;
+            document.head.appendChild(script);
+        } else {
+            doShare();
+        }
+    }
+
     function downloadStudentIdCardAsPNG(studentId) {
         const cardEl = document.getElementById('student-id-card-render');
         if (!cardEl) {
@@ -4795,6 +4876,7 @@
         }
     }
 
+
     function printStudentIdCard() {
         window.print();
     }
@@ -4835,115 +4917,146 @@
             return;
         }
         const batch = state.batches.find(b => (b.studentIds || []).includes(stu.id)) || state.batches.find(b => b.id === stu.batchId) || state.batches[0];
-        const batchName = batch ? batch.name : 'Target 2027';
+        const batchName = batch ? batch.name : 'Divine Classes General Batch';
         const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
         const studentRoll = stu.roll || stu.id || 'DC-101';
         const admissionDate = stu.admissionDate || 'Active';
 
         const cardHtml = `
             <div class="max-w-md mx-auto">
-                <!-- PRINTABLE CARD CONTAINER -->
-                <div id="student-id-card-render" class="bg-white border-2 border-indigo-200 rounded-3xl overflow-hidden shadow-2xl text-slate-900 font-sans w-full max-w-[360px] mx-auto transition-all">
-                    <!-- Top Ribbon / Header -->
-                    <div class="bg-gradient-to-br from-indigo-700 via-indigo-800 to-violet-800 text-white p-4 relative overflow-hidden">
-                        <!-- Decorative background elements -->
-                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-                        <div class="absolute -left-6 -top-6 w-24 h-24 bg-violet-400/20 rounded-full blur-xl pointer-events-none"></div>
-
-                        <div class="relative z-10 flex items-center justify-between gap-3">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-12 h-12 rounded-2xl bg-white p-1 shadow-md border border-white/40 shrink-0 flex items-center justify-center">
-                                    <img src="${COACHING_LOGO_BASE64}" alt="Divine Classes" class="w-full h-full object-contain rounded-xl">
+                <!-- PRINTABLE CARD CONTAINER (Clean, 100% visible, no admin edit buttons inside) -->
+                <div id="student-id-card-render" style="background:#ffffff; border:2px solid #c7d2fe; border-radius:24px; overflow:hidden; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); font-family:system-ui, -apple-system, sans-serif; width:100%; max-width:360px; margin:0 auto; color:#0f172a;">
+                    <!-- Top Header Ribbon -->
+                    <div style="background:linear-gradient(135deg, #4338ca 0%, #3730a3 50%, #4c1d95 100%); color:#ffffff; padding:16px; position:relative; overflow:hidden;">
+                        <div style="position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between;">
+                            <div style="display:flex; align-items:center;">
+                                <div style="width:48px; height:48px; border-radius:14px; background:#ffffff; padding:3px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); border:1px solid rgba(255,255,255,0.4); flex-shrink:0; display:flex; align-items:center; justify-content:center; margin-right:12px;">
+                                    <img src="${COACHING_LOGO_BASE64}" alt="Divine Classes" style="width:100%; height:100%; object-fit:contain; border-radius:10px;">
                                 </div>
-                                <div class="text-left">
-                                    <h3 class="text-base font-black tracking-tight font-heading leading-tight uppercase">Divine Classes</h3>
-                                    <p class="text-[10px] text-indigo-200 tracking-wider font-bold uppercase">Student Identity Card</p>
+                                <div style="text-align:left;">
+                                    <h3 style="font-size:16px; font-weight:900; letter-spacing:-0.5px; line-height:1.2; text-transform:uppercase; margin:0; color:#ffffff;">Divine Classes</h3>
+                                    <p style="font-size:10px; color:#c7d2fe; letter-spacing:1px; font-weight:700; text-transform:uppercase; margin:2px 0 0 0;">Student Identity Card</p>
                                 </div>
                             </div>
-                            <div class="text-right shrink-0">
-                                <span class="inline-block px-2.5 py-1 bg-white/20 backdrop-blur-md text-white rounded-lg text-[10px] font-black tracking-wider uppercase border border-white/30">
-                                    ${batchId}
+                            <div style="text-align:right; flex-shrink:0;">
+                                <span style="display:inline-block; padding:4px 10px; background:rgba(255,255,255,0.22); color:#ffffff; border-radius:8px; font-size:11px; font-weight:900; letter-spacing:0.5px; border:1px solid rgba(255,255,255,0.4);">
+                                    ${escapeHtml(batchId)}
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Card Body -->
-                    <div class="p-5 text-center">
+                    <div style="padding:20px; text-align:center; background:#ffffff;">
                         <!-- Student Photo -->
-                        <div class="relative w-28 h-28 mx-auto mb-3">
-                            <img src="${formatPhotoUrl(stu.photo, stu.name || stu.roll, 'student')}" alt="${escapeHtml(stu.name)}" class="w-28 h-28 rounded-2xl object-cover border-3 border-indigo-600 shadow-lg mx-auto bg-slate-100">
-                            <span class="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs shadow-md border-2 border-white" title="Verified Active Student">
+                        <div style="position:relative; width:112px; height:112px; margin:0 auto 12px auto;">
+                            <img src="${formatPhotoUrl(stu.photo, stu.name || stu.roll, 'student')}" alt="${escapeHtml(stu.name)}" style="width:112px; height:112px; border-radius:18px; object-fit:cover; border:3px solid #4f46e5; box-shadow:0 8px 16px -2px rgba(79,70,229,0.3); background:#f8fafc; display:block;">
+                            <span style="position:absolute; bottom:2px; right:2px; width:24px; height:24px; background:#10b981; color:#ffffff; border-radius:9999px; display:flex; align-items:center; justify-content:center; font-size:11px; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid #ffffff;" title="Verified Student">
                                 <i class="fa-solid fa-check"></i>
                             </span>
                         </div>
 
-                        <!-- Student Name & Roll -->
-                        <h4 class="text-lg font-black text-slate-900 font-heading tracking-tight leading-snug">${escapeHtml(stu.name)}</h4>
-                        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-full mt-1">
-                            <span class="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Roll No:</span>
-                            <span class="text-xs font-black text-indigo-700 tracking-wide">${escapeHtml(studentRoll)}</span>
+                        <!-- Student Name -->
+                        <h4 style="font-size:18px; font-weight:900; color:#0f172a; line-height:1.3; margin:0; letter-spacing:-0.3px;">${escapeHtml(stu.name)}</h4>
+                        
+                        <!-- Crisp, 100% Visible Roll No Badge -->
+                        <div style="display:inline-block; margin-top:6px; padding:4px 14px; background:#eef2ff; border:1.5px solid #818cf8; border-radius:9999px;">
+                            <span style="font-size:11px; font-weight:800; color:#4f46e5; text-transform:uppercase; letter-spacing:0.5px; margin-right:4px;">Roll No:</span>
+                            <span style="font-size:13px; font-weight:900; color:#1e1b4b; font-family:monospace; letter-spacing:0.5px;">${escapeHtml(studentRoll)}</span>
                         </div>
 
-                        <!-- Direct Photo Upload / Change / Remove Controls (Admin & Teachers Only) -->
-                        ${(state.currentRole === 'admin' || state.currentRole === 'teacher') ? `
-                        <div class="mt-3 flex items-center justify-center gap-2 no-print">
-                            <label class="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1.5 transition border border-indigo-200">
-                                <i class="fa-solid fa-camera"></i>
-                                <span>${stu.photo ? 'Change Photo' : 'Upload Photo'}</span>
-                                <input type="file" accept="image/*" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${stu.id}')">
-                            </label>
-                            ${stu.photo ? `
-                                <button onclick="handleRemoveStudentPhoto('${stu.id}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition border border-rose-200" title="Remove Photo">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            ` : ''}
+                        <!-- Details Table (Bulletproof layout for html2canvas & print) -->
+                        <div style="margin-top:16px; padding:12px; background:#f8fafc; border-radius:16px; border:1px solid #e2e8f0; text-align:left;">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px; line-height:1.5;">
+                                <tr style="border-bottom:1px solid #e2e8f0;">
+                                    <td style="padding:6px 2px; color:#64748b; font-weight:700; width:38%; vertical-align:middle;">
+                                        <i class="fa-solid fa-graduation-cap" style="color:#4f46e5; width:16px; margin-right:4px;"></i> Batch
+                                    </td>
+                                    <td style="padding:6px 2px; color:#0f172a; font-weight:800; text-align:right; vertical-align:middle;">
+                                        ${escapeHtml(batchName)}
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #e2e8f0;">
+                                    <td style="padding:6px 2px; color:#64748b; font-weight:700; vertical-align:middle;">
+                                        <i class="fa-solid fa-user" style="color:#4f46e5; width:16px; margin-right:4px;"></i> Parent
+                                    </td>
+                                    <td style="padding:6px 2px; color:#0f172a; font-weight:800; text-align:right; vertical-align:middle;">
+                                        ${escapeHtml(stu.parentName || 'Parent / Guardian')}
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #e2e8f0;">
+                                    <td style="padding:6px 2px; color:#64748b; font-weight:700; vertical-align:middle;">
+                                        <i class="fa-solid fa-phone" style="color:#4f46e5; width:16px; margin-right:4px;"></i> Emergency
+                                    </td>
+                                    <td style="padding:6px 2px; color:#0f172a; font-weight:800; text-align:right; font-family:monospace; vertical-align:middle;">
+                                        ${escapeHtml(stu.phone || 'N/A')}
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #e2e8f0;">
+                                    <td style="padding:6px 2px; color:#64748b; font-weight:700; vertical-align:middle;">
+                                        <i class="fa-solid fa-calendar" style="color:#4f46e5; width:16px; margin-right:4px;"></i> Admission
+                                    </td>
+                                    <td style="padding:6px 2px; color:#0f172a; font-weight:800; text-align:right; font-family:monospace; vertical-align:middle;">
+                                        ${escapeHtml(admissionDate)}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:6px 2px; color:#64748b; font-weight:700; vertical-align:top; padding-top:8px;">
+                                        <i class="fa-solid fa-location-dot" style="color:#4f46e5; width:16px; margin-right:4px;"></i> Campus
+                                    </td>
+                                    <td style="padding:6px 2px; color:#334155; font-weight:600; text-align:right; font-size:11px; line-height:1.35; padding-top:8px;">
+                                        Paschimpuri Pocket 2, Club Rd, New Delhi 110063
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
-                        ` : ''}
 
-                        <!-- Details Grid -->
-                        <div class="mt-4 pt-3 border-t border-slate-100 text-left text-xs space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
-                            <div class="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
-                                <span class="text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-graduation-cap text-indigo-600"></i> Batch</span>
-                                <span class="font-bold text-slate-800 text-right truncate max-w-[190px]">${escapeHtml(batchName)}</span>
-                            </div>
-                            <div class="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
-                                <span class="text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-user text-indigo-600"></i> Parent</span>
-                                <span class="font-bold text-slate-800 text-right truncate max-w-[190px]">${escapeHtml(stu.parentName || 'N/A')}</span>
-                            </div>
-                            <div class="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
-                                <span class="text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-phone text-indigo-600"></i> Emergency</span>
-                                <span class="font-bold text-slate-800 font-mono">${escapeHtml(stu.phone || 'N/A')}</span>
-                            </div>
-                            <div class="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
-                                <span class="text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-calendar text-indigo-600"></i> Admission</span>
-                                <span class="font-bold text-slate-800 font-mono">${escapeHtml(admissionDate)}</span>
-                            </div>
-                            <div class="flex items-start justify-between pt-0.5">
-                                <span class="text-slate-500 font-semibold flex items-center gap-1.5 shrink-0"><i class="fa-solid fa-location-dot text-indigo-600"></i> Campus</span>
-                                <span class="font-medium text-slate-700 text-right text-[11px] leading-snug">Paschimpuri Pocket 2, Club Rd, New Delhi 110063</span>
-                            </div>
-                        </div>
-
-                        <!-- Barcode Simulation & Security Seal -->
-                        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                            <span class="tracking-widest uppercase font-mono font-bold">||| |||| || ||||| ||||</span>
-                            <span class="font-bold text-indigo-600 flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> Official ID</span>
+                        <!-- Barcode Simulation & Official Seal -->
+                        <div style="margin-top:14px; padding-top:10px; border-top:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; font-size:10px; color:#94a3b8;">
+                            <span style="letter-spacing:2px; font-family:monospace; font-weight:700;">||| |||| || ||||| ||||</span>
+                            <span style="font-weight:800; color:#4f46e5; display:flex; align-items:center; gap:4px;">
+                                <i class="fa-solid fa-shield-halved"></i> Verified ID
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <!-- ACTION BUTTONS (NO-PRINT) -->
-                <div class="mt-5 flex flex-wrap items-center justify-center gap-2.5 no-print">
-                    <button onclick="sendStudentIdCardOnWhatsApp('${stu.id}')" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer">
-                        <i class="fa-brands fa-whatsapp text-sm"></i> Share on WhatsApp
+                <!-- PHOTO CONTROLS (OUTSIDE CARD RENDER SO THEY NEVER APPEAR ON EXPORTED PNG) -->
+                ${(state.currentRole === 'admin' || state.currentRole === 'teacher') ? `
+                <div class="mt-3 flex items-center justify-center gap-2 no-print">
+                    <label class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 transition border border-indigo-200 shadow-2xs">
+                        <i class="fa-solid fa-camera"></i>
+                        <span>${stu.photo ? 'Change Photo' : 'Upload Photo'}</span>
+                        <input type="file" accept="image/*" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${stu.id}')">
+                    </label>
+                    ${stu.photo ? `
+                        <button onclick="handleRemoveStudentPhoto('${stu.id}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold transition border border-rose-200" title="Remove Photo">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+                ` : ''}
+
+                <!-- ACTION BUTTONS: PROMINENT WHATSAPP PNG SHARE + DOWNLOAD PNG + PRINT -->
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 no-print">
+                    <!-- Send PNG on WhatsApp with official WhatsApp icon -->
+                    <button onclick="shareStudentIdCardPNGOnWhatsApp('${stu.id}')" class="px-5 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl text-xs font-black shadow-lg hover:shadow-xl transition flex items-center gap-2 cursor-pointer active:scale-95" title="Send official ID Card PNG on WhatsApp">
+                        <i class="fa-brands fa-whatsapp text-lg"></i>
+                        <span>Send PNG on WhatsApp</span>
                     </button>
-                    <button onclick="downloadStudentIdCardAsPNG('${stu.id}')" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer" title="Download crisp ID Card as .PNG image">
-                        <i class="fa-solid fa-file-image"></i> Download ID Card (PNG)
+
+                    <!-- Download PNG Image -->
+                    <button onclick="downloadStudentIdCardAsPNG('${stu.id}')" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer active:scale-95" title="Download ID Card as .PNG image">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Download PNG</span>
                     </button>
-                    <button onclick="printStudentIdCard()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer">
-                        <i class="fa-solid fa-print"></i> Print ID Card
+
+                    <!-- Print Card -->
+                    <button onclick="printStudentIdCard()" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer active:scale-95">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Print</span>
                     </button>
+
                     <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
                         Close
                     </button>
@@ -8810,7 +8923,7 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         ${inputField('youtubeUrl', 'YouTube URL', s.youtubeUrl, 'text', 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8')}
                                         ${inputField('instagramUrl', 'Instagram URL', s.instagramUrl, 'text', 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq')}
-                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://m.facebook.com/edivineclasses/')}
+                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://www.facebook.com/edivineclasses/')}
                                     </div>
                                 </div>
                             `)}
