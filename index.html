@@ -3388,9 +3388,20 @@
         const initialPaid = monthlyFee; // Admitted with first month deposit
         const nextDueDate = calculateNextFeeReminder(admissionDate, 1);
 
+        // Find true maximum numeric roll number across all students to prevent roll collisions
+        let maxRollNum = 100;
+        (state.students || []).forEach(s => {
+            const m = String(s.roll || '').match(/\d+/);
+            if (m) {
+                const num = parseInt(m[0], 10);
+                if (num > maxRollNum) maxRollNum = num;
+            }
+        });
+        const nextRoll = 'DC-' + (maxRollNum + 1);
+
         const newStu = {
             id: 's' + Date.now(),
-            roll: 'DC-' + (100 + state.students.length + 1),
+            roll: nextRoll,
             name,
             parentName,
             phone,
@@ -3408,24 +3419,45 @@
 
         state.students.push(newStu);
         const batch = state.batches.find(b => b.id === batchId);
-        if (!batch.studentIds) batch.studentIds = [];
-        batch.studentIds.push(newStu.id);
+        if (batch) {
+            if (!batch.studentIds) batch.studentIds = [];
+            if (!batch.studentIds.includes(newStu.id)) batch.studentIds.push(newStu.id);
+        }
 
         saveStateLocally();
         closeModal();
         renderMainContent();
-        showToast(`New student ${name} (${newStu.roll}) registered & added to ${batch.name}!`, 'success');
+        showToast(`New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}! Syncing to Google Sheet...`, 'info');
 
+        // Immediately append to Students_Master in Google Sheet (Two-Way Sync)
         if (typeof google !== 'undefined' && google.script && google.script.run) {
-            showToast(`Appending ${newStu.name} to Google Sheet (Students_Master)... `, 'info');
             google.script.run
                 .withSuccessHandler(function (res) {
-                    showToast(`Student ${newStu.name} (${newStu.roll}) appended to Google Sheet in row ${res.row || 'appended'}!`, 'success');
+                    if (res && res.success) {
+                        showToast(`✓ ${name} (${newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
+                        updateSyncBadge('✓ Sheet Synced', 'success');
+                    } else {
+                        console.warn('apiAppendStudent response:', res);
+                    }
                 })
                 .withFailureHandler(function (err) {
+                    console.error('apiAppendStudent error:', err);
                     showToast('Google Sheet append notice: ' + err, 'warning');
                 })
                 .apiAppendStudent(newStu, batchId);
+        } else {
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'appendStudent', studentData: newStu, batchId: batchId })
+            })
+                .then(function (res) { return res.json(); })
+                .then(function (res) {
+                    if (res && res.success) {
+                        showToast(`✓ ${name} (${newStu.roll}) appended to Students_Master in Google Sheet!`, 'success');
+                    }
+                })
+                .catch(function (e) { console.warn('Fetch appendStudent notice:', e); });
         }
     }
 
@@ -4653,8 +4685,14 @@
         stu.lastReminder = 'Receipt sent on WhatsApp (' + new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ')';
         saveStateLocally();
 
-        const waUrl = `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`;
-        window.open(waUrl, '_blank');
+        const waAppUrl = `whatsapp://send?phone=${phoneWithCode}&text=${encodeURIComponent(msg)}`;
+        const waWebUrl = `https://api.whatsapp.com/send?phone=${phoneWithCode}&text=${encodeURIComponent(msg)}`;
+        const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+        if (isMobile) {
+            window.location.href = waAppUrl;
+        } else {
+            window.open(waWebUrl, '_blank');
+        }
         showToast(`Official Fee Receipt dispatched to ${stu.name}'s WhatsApp (+${phoneWithCode})!`, 'success');
     }
 
@@ -4709,7 +4747,34 @@
         const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
         const studentRoll = stu.roll || stu.id || 'DC-101';
 
-        showToast('Preparing ID Card PNG for WhatsApp...', 'info');
+        let phoneClean = (stu.phone || '').replace(/\D/g, '');
+        if (phoneClean.startsWith('0')) {
+            phoneClean = phoneClean.replace(/^0+/, '');
+        }
+        const targetPhone = phoneClean.length === 10 ? ('91' + phoneClean) : (phoneClean.length > 10 ? phoneClean : '');
+
+        const caption = `🎓 *DIVINE CLASSES - OFFICIAL STUDENT IDENTITY CARD* 🎓\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `👤 *Student Name:* ${stu.name}\n` +
+            `🆔 *Roll / Student ID:* ${studentRoll}\n` +
+            `📚 *Assigned Batch:* ${batchName}\n` +
+            `🏷️ *Batch ID:* ${batchId}\n` +
+            `👨‍👩‍👦 *Parent's Name:* ${stu.parentName || 'Parent / Guardian'}\n` +
+            `📞 *Emergency Contact:* ${stu.phone || 'N/A'}\n` +
+            `📅 *Admission Date:* ${stu.admissionDate || 'Active'}\n` +
+            `🏫 *Campus:* Paschimpuri Pocket 2, Club Rd, New Delhi - 110063\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `_Official Student Identity Card issued by Divine Classes._`;
+
+        const waAppUrl = targetPhone ?
+            ('whatsapp://send?phone=' + targetPhone + '&text=' + encodeURIComponent(caption)) :
+            ('whatsapp://send?text=' + encodeURIComponent(caption));
+
+        const waWebUrl = targetPhone ?
+            ('https://api.whatsapp.com/send?phone=' + targetPhone + '&text=' + encodeURIComponent(caption)) :
+            ('https://api.whatsapp.com/send?text=' + encodeURIComponent(caption));
+
+        showToast('Saving ID Card PNG & opening WhatsApp app...', 'info');
 
         function doShare() {
             html2canvas(cardEl, {
@@ -4719,76 +4784,48 @@
                 backgroundColor: '#ffffff'
             }).then(canvas => {
                 canvas.toBlob(async function (blob) {
-                    if (!blob) {
-                        showToast('Could not generate image blob', 'error');
-                        return;
-                    }
                     const filename = 'Divine_Classes_ID_Card_' + studentRoll + '.png';
-                    const file = new File([blob], filename, { type: 'image/png' });
 
-                    const caption = `🎓 *DIVINE CLASSES - OFFICIAL STUDENT IDENTITY CARD* 🎓\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                        `👤 *Student Name:* ${stu.name}\n` +
-                        `🆔 *Roll / Student ID:* ${studentRoll}\n` +
-                        `📚 *Assigned Batch:* ${batchName}\n` +
-                        `🏷️ *Batch ID:* ${batchId}\n` +
-                        `👨‍👩‍👦 *Parent's Name:* ${stu.parentName || 'Parent / Guardian'}\n` +
-                        `📞 *Emergency Contact:* ${stu.phone || 'N/A'}\n` +
-                        `📅 *Admission Date:* ${stu.admissionDate || 'Active'}\n` +
-                        `🏫 *Campus:* Paschimpuri Pocket 2, Club Rd, New Delhi - 110063\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                        `_Official Student Identity Card issued by Divine Classes._`;
-
-                    // Check if native mobile sharing (files) is supported
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        try {
-                            await navigator.share({
-                                files: [file],
-                                title: 'Student ID Card - ' + stu.name,
-                                text: caption
-                            });
-                            showToast('ID card PNG sent on WhatsApp!', 'success');
-                            return;
-                        } catch (err) {
-                            if (err.name !== 'AbortError') {
-                                console.warn('Navigator share error, falling back to download:', err);
-                            } else {
-                                return;
-                            }
-                        }
-                    }
-
-                    // Desktop / fallback:
                     // 1. Download PNG image automatically
-                    const link = document.createElement('a');
-                    link.download = filename;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-
-                    // 2. Try copying image to clipboard for instant Ctrl+V pasting in WhatsApp Web
-                    try {
-                        if (navigator.clipboard && window.ClipboardItem) {
-                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                            showToast('ID Card PNG copied to clipboard & downloaded! Paste (Ctrl+V) in WhatsApp.', 'success');
-                        } else {
-                            showToast('ID Card PNG downloaded! Attach in WhatsApp.', 'success');
+                    if (blob) {
+                        try {
+                            const link = document.createElement('a');
+                            link.download = filename;
+                            link.href = canvas.toDataURL('image/png');
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        } catch (e) {
+                            console.warn('Download link error:', e);
                         }
-                    } catch (clipErr) {
-                        showToast('ID Card PNG downloaded! Attach in WhatsApp.', 'success');
+
+                        // 2. Copy image to clipboard for instant pasting
+                        try {
+                            if (navigator.clipboard && window.ClipboardItem) {
+                                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            }
+                        } catch (clipErr) {
+                            // ignore clipboard write failure
+                        }
                     }
 
-                    // 3. Open WhatsApp Web / App
-                    const phoneClean = (stu.phone || '').replace(/\D/g, '');
-                    const targetPhone = phoneClean.length === 10 ? '91' + phoneClean : (phoneClean.length > 10 ? phoneClean : '');
-                    const waUrl = targetPhone ? ('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(caption)) : ('https://wa.me/?text=' + encodeURIComponent(caption));
-                    setTimeout(function () {
-                        window.open(waUrl, '_blank', 'noopener,noreferrer');
-                    }, 400);
-
+                    // 3. Open WhatsApp application directly
+                    showToast('ID Card PNG saved! Opening WhatsApp app...', 'success');
+                    const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+                    if (isMobile) {
+                        window.location.href = waAppUrl;
+                    } else {
+                        // On desktop, launch WhatsApp App or open Web
+                        window.location.href = waAppUrl;
+                        setTimeout(function () {
+                            window.open(waWebUrl, '_blank');
+                        }, 1000);
+                    }
                 }, 'image/png');
             }).catch(err => {
                 console.error('ID card render error:', err);
-                showToast('Failed to generate PNG: ' + err, 'error');
+                // Fallback: still open WhatsApp app
+                window.location.href = waAppUrl;
             });
         }
 
@@ -5039,10 +5076,10 @@
 
                 <!-- ACTION BUTTONS: PROMINENT WHATSAPP PNG SHARE + DOWNLOAD PNG + PRINT -->
                 <div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 no-print">
-                    <!-- Send PNG on WhatsApp with official WhatsApp icon -->
-                    <button onclick="shareStudentIdCardPNGOnWhatsApp('${stu.id}')" class="px-5 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl text-xs font-black shadow-lg hover:shadow-xl transition flex items-center gap-2 cursor-pointer active:scale-95" title="Send official ID Card PNG on WhatsApp">
-                        <i class="fa-brands fa-whatsapp text-lg"></i>
-                        <span>Send PNG on WhatsApp</span>
+                    <!-- Official WhatsApp App direct launcher -->
+                    <button onclick="shareStudentIdCardPNGOnWhatsApp('${stu.id}')" class="px-4 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl text-xs font-black shadow-lg hover:shadow-xl transition flex items-center gap-2 cursor-pointer active:scale-95" title="Open WhatsApp App to Send ID Card">
+                        <i class="fa-brands fa-whatsapp text-xl"></i>
+                        <span>WhatsApp</span>
                     </button>
 
                     <!-- Download PNG Image -->
@@ -7215,7 +7252,9 @@
             avatarColor: 'from-rose-500 to-orange-500',
             initials,
             photo: photo,
-            photoUrl: photo
+            photoUrl: photo,
+            password: 'teacher123',
+            status: 'Active'
         };
         state.teachers.push(newTeacherObj);
         saveStateLocally();
@@ -7888,6 +7927,10 @@
                                 <i class="fa-solid fa-box-archive"></i>
                                 <span>${showInactive ? 'Viewing Inactive Archive (' + list.length + ')' : 'View Inactive Archive (' + inactiveCount + ')'}</span>
                             </button>
+                            <button onclick="openAddStudentToBatchModal(state.batches[0] ? state.batches[0].id : '')" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer" title="Enroll new student to Divine Classes">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <span>Add Student</span>
+                            </button>
                         </div>
                     </div>
 
@@ -8366,12 +8409,20 @@
         }
 
         if (cleanPhone) {
-            const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
-            const win = window.open(waUrl, '_blank');
-            if (win) {
+            const waAppUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+            const waWebUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+            const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+            if (isMobile) {
+                window.location.href = waAppUrl;
                 showToast(`Opening WhatsApp chat with ${target.name} (${phone}) & copied credentials to clipboard!`, 'success');
             } else {
-                showToast(`Credentials copied! Popup blocked; send WhatsApp to ${phone}`, 'info');
+                const win = window.open(waWebUrl, '_blank');
+                if (win) {
+                    showToast(`Opening WhatsApp chat with ${target.name} (${phone}) & copied credentials to clipboard!`, 'success');
+                } else {
+                    window.location.href = waAppUrl;
+                    showToast(`Credentials copied! Opening WhatsApp for ${target.name}...`, 'info');
+                }
             }
         } else {
             showToast(`Credentials copied to clipboard for ${target.name} (No phone number saved)`, 'success');

@@ -215,6 +215,23 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 7. Append New Student directly to Students_Master in Google Sheet
+    if (action === 'appendStudent') {
+      const studentData = payload.studentData || payload.data || payload;
+      const batchId = payload.batchId || '';
+      const result = apiAppendStudent(studentData, batchId);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 8. Append New Faculty directly to Teachers_Roster in Google Sheet
+    if (action === 'appendTeacher') {
+      const teacherData = payload.teacherData || payload.data || payload;
+      const result = apiAppendTeacher(teacherData);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Unknown action: ' + action }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -1295,39 +1312,12 @@ function clearTombstone_(key, value) {
   } catch (e) { }
 }
 
-// Strips tombstoned students (by roll) and links (by URL) from a data object.
+// Strips tombstoned records from a data object safely without deleting valid active students.
 function applyTombstones_(appData) {
   if (!appData) return appData;
-  const deadRolls = getTombstones_('rolls');
-  const deadUrls = getTombstones_('linkUrls');
-
-  if (deadRolls.length && Array.isArray(appData.students)) {
-    const rollSet = {};
-    const demoRolls = { 'DC-101': true, 'DC-102': true, 'DC-103': true, 'DC-104': true, 'DC-105': true };
-    deadRolls.forEach(function (r) {
-      if (!demoRolls[r]) rollSet[r] = true;
-    });
-    const removedIds = {};
-    appData.students = appData.students.filter(function (s) {
-      if (s && s.roll && rollSet[String(s.roll).trim()]) {
-        if (s.id) removedIds[s.id] = true;
-        return false;
-      }
-      return true;
-    });
-    if (Object.keys(removedIds).length > 0) {
-      (appData.batches || []).forEach(function (b) {
-        if (Array.isArray(b.studentIds)) {
-          b.studentIds = b.studentIds.filter(function (id) { return !removedIds[id]; });
-        }
-      });
-      (appData.offlineTests || []).forEach(function (t) {
-        if (t && t.marks && typeof t.marks === 'object') {
-          Object.keys(removedIds).forEach(function (sid) { delete t.marks[sid]; });
-        }
-      });
-    }
-  }
+  try {
+    PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
+  } catch (e) { }
 
   if (deadUrls.length && Array.isArray(appData.externalLinks)) {
     const urlSet = {};
@@ -1514,51 +1504,48 @@ function mergeStudentsFromSheet_(appData) {
       }
     }
 
-    // Honor row deletions: only if the sheet actually contains valid student rows!
-    // If the sheet is blank or has 0 student rows, DO NOT wipe all students!
-    {
-      const keepRolls = {};
-      const keepNames = {};
+    // Two-Way Sync: If students exist in the app but are not yet in Students_Master,
+    // append them to Students_Master so the Google Sheet stays 100% in sync with web app!
+    try {
+      const sheetRollsMap = {};
       for (let i = 1; i < values.length; i++) {
-        const r = String(values[i][0] || '').trim();
-        const n = String(values[i][1] || '').trim();
-        if (r) keepRolls[r] = true;
-        if (n) keepNames[n] = true;
+        const r = String(values[i][cRoll !== -1 ? cRoll : 0] || '').trim();
+        if (r) sheetRollsMap[r] = true;
       }
-      if (Object.keys(keepRolls).length === 0 && Object.keys(keepNames).length === 0) {
-        Logger.log('Students_Master has no student rows (blank or header-only); keeping existing database.');
-        return appData;
-      }
-      const removedIds = {};
-      const removedRolls = [];
-      const kept = [];
-      appData.students.forEach(function (s) {
+      const unappendedStudents = (appData.students || []).filter(function (s) {
         const roll = String(s.roll || '').trim();
-        const name = String(s.name || '').trim();
-        // Keep if the student's roll row exists; name fallback only for roll-less records
-        if ((roll && keepRolls[roll]) || (!roll && name && keepNames[name])) {
-          kept.push(s);
-        } else {
-          if (s.id) removedIds[s.id] = true;
-          if (roll) removedRolls.push(roll);
-        }
+        return roll && !sheetRollsMap[roll] && s.status !== 'Inactive';
       });
-      if (Object.keys(removedIds).length > 0) {
-        appData.students = kept;
-        (appData.batches || []).forEach(function (b) {
-          if (Array.isArray(b.studentIds)) {
-            b.studentIds = b.studentIds.filter(function (id) { return !removedIds[id]; });
-          }
+      if (unappendedStudents.length > 0) {
+        unappendedStudents.forEach(function (s) {
+          const monthly = Number(s.monthlyFee || s.totalFee) || 0;
+          const paid = Number(s.paidFee) || 0;
+          const balance = Math.max(0, monthly - paid);
+          const isPaid = balance <= 0;
+          const adm = s.admissionDate || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+          const due = s.dueDate || calculateNextFeeReminder_(adm, 1);
+          const pUrl = s.photoUrl || s.photo || getRandomAvatarUrl_(s.name || s.roll, 'student');
+          sheet.appendRow([
+            s.roll,
+            s.name || 'Student Name',
+            adm,
+            s.password || 'password123',
+            s.status || 'Active',
+            s.parentName || 'Parent Name',
+            s.phone || '',
+            monthly,
+            paid,
+            balance,
+            isPaid ? 'Paid' : 'Pending',
+            due,
+            s.lastReminder || 'Never',
+            pUrl
+          ]);
         });
-        (appData.offlineTests || []).forEach(function (t) {
-          if (t && t.marks && typeof t.marks === 'object') {
-            Object.keys(removedIds).forEach(function (sid) { delete t.marks[sid]; });
-          }
-        });
-        // PERMANENT: tombstone deleted rolls so no future save can resurrect them
-        addTombstones_('rolls', removedRolls);
-        Logger.log('Students_Master deletions honored: ' + Object.keys(removedIds).length + ' student(s) removed (tombstoned)');
+        Logger.log('Two-Way Sync: Appended ' + unappendedStudents.length + ' app student(s) to Students_Master in Google Sheet.');
       }
+    } catch (syncAppendErr) {
+      Logger.log('Two-way sync append notice: ' + syncAppendErr.toString());
     }
 
     if (added || updated) {
@@ -3516,12 +3503,20 @@ function apiAppendStudent(studentData, batchId) {
     // Ensure unique roll number
     let roll = studentData.roll;
     if (!roll) {
-      roll = 'DC-' + (100 + data.students.length + 1);
+      let maxNum = 100;
+      data.students.forEach(function(s) {
+        const m = String(s.roll || '').match(/\d+/);
+        if (m) {
+          const n = parseInt(m[0], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      });
+      roll = 'DC-' + (maxNum + 1);
     }
     
     // Check if student with this roll or id already exists
     let existingIndex = data.students.findIndex(function(s) { 
-      return s.id === studentData.id || (studentData.roll && s.roll === studentData.roll); 
+      return s.id === studentData.id || (roll && s.roll === roll); 
     });
 
     // Handle photo upload to drive if base64
@@ -3588,9 +3583,9 @@ function apiAppendStudent(studentData, batchId) {
     clearTombstone_('rolls', roll);
 
     // Save to Database Properties
-    saveAppDataToDb_(data);
+    dbSaveAll(data);
 
-    // Append directly to Students_Master in Google Sheet
+    // Append or update in Students_Master in Google Sheet
     const newRow = [
       roll,
       newStudentObj.name,
@@ -3608,24 +3603,37 @@ function apiAppendStudent(studentData, batchId) {
       pUrl
     ];
 
-    stuSheet.appendRow(newRow);
-    const lastRow = stuSheet.getLastRow();
-    
-    // Style the appended row
-    stuSheet.getRange(lastRow, 1, 1, 14).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
-    // Access status cell (Col 5)
-    const stCell = stuSheet.getRange(lastRow, 5);
-    stCell.setBackground(status === 'Active' ? '#dcfce7' : (status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
-          .setFontColor(status === 'Active' ? '#166534' : (status === 'Blocked' ? '#991b1b' : '#64748b'))
-          .setFontWeight('bold');
-    // Fee status cell (Col 11)
-    const feeCell = stuSheet.getRange(lastRow, 11);
-    feeCell.setBackground(isPaid ? '#dcfce7' : '#fee2e2')
-           .setFontColor(isPaid ? '#166534' : '#991b1b')
-           .setFontWeight('bold');
+    const stuVals = stuSheet.getDataRange().getValues();
+    let targetRow = -1;
+    for (let r = 1; r < stuVals.length; r++) {
+      if (String(stuVals[r][0] || '').trim() === roll) {
+        targetRow = r + 1;
+        break;
+      }
+    }
 
-    Logger.log('Successfully appended student ' + newStudentObj.name + ' (' + roll + ') to Students_Master sheet row ' + lastRow);
-    return { success: true, student: newStudentObj, row: lastRow };
+    if (targetRow > 0) {
+      stuSheet.getRange(targetRow, 1, 1, 14).setValues([newRow]);
+    } else {
+      stuSheet.appendRow(newRow);
+      targetRow = stuSheet.getLastRow();
+    }
+    
+    // Style the row
+    stuSheet.getRange(targetRow, 1, 1, 14).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    // Access status cell (Col 5)
+    stuSheet.getRange(targetRow, 5)
+      .setBackground(status === 'Active' ? '#dcfce7' : (status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
+      .setFontColor(status === 'Active' ? '#166534' : (status === 'Blocked' ? '#991b1b' : '#64748b'))
+      .setFontWeight('bold');
+    // Fee status cell (Col 11)
+    stuSheet.getRange(targetRow, 11)
+      .setBackground(isPaid ? '#dcfce7' : '#fee2e2')
+      .setFontColor(isPaid ? '#166534' : '#991b1b')
+      .setFontWeight('bold');
+
+    Logger.log('Successfully saved student ' + newStudentObj.name + ' (' + roll + ') to Students_Master sheet row ' + targetRow);
+    return { success: true, student: newStudentObj, row: targetRow };
   } catch (err) {
     Logger.log('apiAppendStudent error: ' + err.toString());
     return { success: false, message: err.toString() };
@@ -3686,10 +3694,9 @@ function apiAppendTeacher(teacherData) {
     }
 
     // Save to Database Properties
-    saveAppDataToDb_(data);
+    dbSaveAll(data);
 
-    // Append directly to Teachers_Roster in Google Sheet
-    // trHeaders: ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience', 'Photo URL']
+    // Append or update directly to Teachers_Roster in Google Sheet
     const newTrRow = [
       trId,
       newTeacherObj.name,
@@ -3703,19 +3710,32 @@ function apiAppendTeacher(teacherData) {
       pUrl
     ];
 
-    teachSheet.appendRow(newTrRow);
-    const lastRow = teachSheet.getLastRow();
+    const trVals = teachSheet.getDataRange().getValues();
+    let trRow = -1;
+    for (let r = 1; r < trVals.length; r++) {
+      if (String(trVals[r][0] || '').trim() === trId) {
+        trRow = r + 1;
+        break;
+      }
+    }
 
-    // Style the appended row
-    teachSheet.getRange(lastRow, 1, 1, 10).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    if (trRow > 0) {
+      teachSheet.getRange(trRow, 1, 1, 10).setValues([newTrRow]);
+    } else {
+      teachSheet.appendRow(newTrRow);
+      trRow = teachSheet.getLastRow();
+    }
+
+    // Style the row
+    teachSheet.getRange(trRow, 1, 1, 10).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
     // Access status cell (Col 6)
-    const stCell = teachSheet.getRange(lastRow, 6);
+    const stCell = teachSheet.getRange(trRow, 6);
     stCell.setBackground(newTeacherObj.status === 'Active' ? '#dcfce7' : (newTeacherObj.status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
           .setFontColor(newTeacherObj.status === 'Active' ? '#166534' : (newTeacherObj.status === 'Blocked' ? '#991b1b' : '#64748b'))
           .setFontWeight('bold');
 
-    Logger.log('Successfully appended teacher ' + newTeacherObj.name + ' (' + trId + ') to Teachers_Roster sheet row ' + lastRow);
-    return { success: true, teacher: newTeacherObj, row: lastRow };
+    Logger.log('Successfully appended teacher ' + newTeacherObj.name + ' (' + trId + ') to Teachers_Roster sheet row ' + trRow);
+    return { success: true, teacher: newTeacherObj, row: trRow };
   } catch (err) {
     Logger.log('apiAppendTeacher error: ' + err.toString());
     return { success: false, message: err.toString() };
