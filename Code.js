@@ -3208,6 +3208,8 @@ function apiGetMonthlyAttendance(month, token) {
         id: String(student.id || ''),
         roll: String(student.roll || ''),
         name: String(student.name || ''),
+        photo: String(student.photo || student.photoUrl || ''),
+        photoUrl: String(student.photoUrl || student.photo || ''),
         status: String(student.status || 'Active')
       };
     }).filter(function (student) { return student.id; }),

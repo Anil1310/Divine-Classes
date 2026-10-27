@@ -106,9 +106,16 @@
             const percentage = summary.total ? Math.round(((summary.Present + summary.Late) / summary.total) * 100) : 0;
             return `
                 <tr class="border-t border-slate-100 dark:border-slate-700">
-                    <td class="px-4 py-3 text-xs font-semibold text-slate-800 dark:text-slate-100">${escapeHtml(student.roll || student.id)}</td>
-                    <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-200">${escapeHtml(student.name || 'Student')}</td>
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-3 sm:px-4">
+                        <div class="flex min-w-0 items-center gap-2.5">
+                            ${renderUserAvatar(student.photo || student.photoUrl, student.name || student.roll || 'Student', 'student', 'w-8 h-8')}
+                            <div class="min-w-0">
+                                <div class="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">${escapeHtml(student.name || 'Student')}</div>
+                                <div class="mt-0.5 truncate text-[10px] text-slate-500 dark:text-slate-400">${escapeHtml(student.roll || student.id)}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-3 py-3 sm:px-4">
                         <select data-attendance-student="${escapeAttr(student.id)}" aria-label="Attendance status for ${escapeAttr(student.name || 'student')}" class="w-full sm:w-36 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800">
                             <option value="" ${selectedStatus ? '' : 'selected'}>Select status</option>
                             ${['Present', 'Absent', 'Late', 'Leave'].map(function (status) {
@@ -116,7 +123,7 @@
                             }).join('')}
                         </select>
                     </td>
-                    <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">${summary.total ? `${summary.Present + summary.Late}/${summary.total} · ${percentage}%` : '—'}</td>
+                    <td class="px-3 py-3 text-xs text-slate-600 dark:text-slate-300 sm:px-4">${summary.total ? `${summary.Present + summary.Late}/${summary.total} · ${percentage}%` : '—'}</td>
                 </tr>
             `;
         }).join('');
@@ -188,9 +195,9 @@
                         <span class="text-[11px] text-slate-500 dark:text-slate-400">${state.attendanceLoadedMonth === state.attendanceMonth ? `${students.length} active students` : 'Loading month…'}</span>
                     </div>
                     <div class="overflow-x-auto p-4">
-                        <table class="w-full min-w-[620px] text-left">
-                            <thead><tr class="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400"><th class="px-4 py-2">Roll</th><th class="px-4 py-2">Student</th><th class="px-4 py-2">Status</th><th class="px-4 py-2">Month to date</th></tr></thead>
-                            <tbody>${studentRows || `<tr><td colspan="4" class="px-4 py-8 text-center text-xs text-slate-500">${batch ? 'No active students are assigned to this batch.' : 'Create a batch before marking attendance.'}</td></tr>`}</tbody>
+                        <table class="w-full min-w-[480px] text-left">
+                            <thead><tr class="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400"><th class="px-3 py-2 sm:px-4">Student</th><th class="px-3 py-2 sm:px-4">Status</th><th class="px-3 py-2 sm:px-4">Month to date</th></tr></thead>
+                            <tbody>${studentRows || `<tr><td colspan="3" class="px-4 py-8 text-center text-xs text-slate-500">${batch ? 'No active students are assigned to this batch.' : 'Create a batch before marking attendance.'}</td></tr>`}</tbody>
                         </table>
                     </div>
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4 dark:border-slate-700">
