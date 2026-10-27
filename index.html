@@ -3879,6 +3879,7 @@
         }
 
         try {
+            stopStudentPhotoCamera();
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: { facingMode: 'user' }
@@ -3891,7 +3892,7 @@
                         <h3 class="text-base font-bold text-slate-900">Capture ${escapeHtml(stu.name)}'s Photo</h3>
                         <p class="mt-1 text-xs text-slate-500">Center the student's face, then tap Capture Photo. Allow camera access if your browser asks.</p>
                     </div>
-                    <video id="student-photo-camera-preview" autoplay playsinline class="w-full max-h-[60vh] rounded-2xl bg-slate-950 object-contain"></video>
+                    <video id="student-photo-camera-preview" autoplay playsinline muted class="w-full max-h-[60vh] rounded-2xl bg-slate-950 object-contain"></video>
                     <div class="flex gap-3">
                         <button type="button" onclick="cancelStudentPhotoCamera()" class="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-700">Cancel</button>
                         <button type="button" onclick="captureStudentPhoto()" class="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white"><i class="fa-solid fa-camera mr-1"></i> Capture Photo</button>
@@ -3912,7 +3913,7 @@
             console.error('Could not start student camera:', err);
             let message = 'Could not start the camera: ' + ((err && err.message) || err);
             if (err && err.name === 'NotAllowedError') {
-                message = 'Camera permission was denied or blocked. Allow camera access for this site in your browser settings, then try again.';
+                message = 'Camera access is blocked. In Chrome, tap the site controls beside the address bar > Permissions > Camera > Allow, then reload and try again. If this page is inside another app, open it in Chrome. Or use Upload Photo.';
             } else if (err && err.name === 'NotFoundError') {
                 message = 'No camera was found on this device.';
             } else if (err && err.name === 'NotReadableError') {
@@ -5403,7 +5404,7 @@
                     <label class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 transition border border-indigo-200 shadow-2xs">
                         <i class="fa-solid fa-upload"></i>
                         <span>Upload Photo</span>
-                        <input type="file" accept="image/*" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${escapeAttr(stu.id)}')">
+                        <input type="file" accept="image/*" capture="user" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${escapeAttr(stu.id)}')">
                     </label>
                     ${stu.photo ? `
                         <button onclick="handleRemoveStudentPhoto('${stu.id}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold transition border border-rose-200" title="Remove Photo">
