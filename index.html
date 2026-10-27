@@ -2282,18 +2282,19 @@
      ********************************************************************/
     const navItems = [
         { id: 'dashboard', label: 'Overview Dashboard', icon: 'fa-chart-pie', group: 'Workspace', roles: ['admin', 'teacher', 'student'] },
-        { id: 'batches', label: 'Batches & Students', icon: 'fa-users-rectangle', group: 'Learning', roles: ['admin', 'teacher', 'student'], req: '1' },
-        { id: 'attendance', label: 'Daily Attendance', icon: 'fa-calendar-check', group: 'Learning', roles: ['admin', 'teacher'], req: '12' },
-        { id: 'materials', label: 'Assignments & DPPs', icon: 'fa-file-pdf', group: 'Learning', roles: ['admin', 'teacher', 'student'], req: '3' },
-        { id: 'marks', label: 'Offline Marks Tracker', icon: 'fa-chart-line', group: 'Learning', roles: ['admin', 'teacher', 'student'], req: '4' },
+        { id: 'batches', label: 'Batches & Students', icon: 'fa-users-rectangle', group: 'Academics', roles: ['admin', 'teacher', 'student'], req: '1' },
+        { id: 'attendance', label: 'Daily Attendance', icon: 'fa-calendar-check', group: 'Academics', roles: ['admin', 'teacher'] },
+        { id: 'materials', label: 'Assignments & DPPs', icon: 'fa-file-pdf', group: 'Academics', roles: ['admin', 'teacher', 'student'], req: '3' },
+        { id: 'marks', label: 'Offline Marks Tracker', icon: 'fa-chart-line', group: 'Academics', roles: ['admin', 'teacher', 'student'], req: '4' },
+        { id: 'fees', label: 'Student Fees & Reminders', icon: 'fa-indian-rupee-sign', group: 'Administration', roles: ['admin'], req: '2, 5' },
+        { id: 'access', label: 'Access Control', icon: 'fa-user-gear', group: 'Administration', roles: ['admin'], req: '11' },
+        { id: 'settings', label: 'Settings', icon: 'fa-gear', group: 'Administration', roles: ['developer'] },
         { id: 'teachers', label: 'Teacher Profiles', icon: 'fa-chalkboard-user', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '6' },
         { id: 'gallery', label: 'Results & Gallery', icon: 'fa-images', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '8' },
         { id: 'links', label: 'External Study Hub', icon: 'fa-arrow-up-right-from-square', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '9' },
-        { id: 'feedback', label: 'Parent & Student Feedback', icon: 'fa-comments', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '10' },
-        { id: 'fees', label: 'Student Fees & Reminders', icon: 'fa-indian-rupee-sign', group: 'Management', roles: ['admin'], req: '2, 5' },
-        { id: 'access', label: 'Access Control', icon: 'fa-user-gear', group: 'Management', roles: ['admin'], req: '11' },
-        { id: 'settings', label: 'Settings', icon: 'fa-gear', group: 'Management', roles: ['developer'] }
+        { id: 'feedback', label: 'Parent & Student Feedback', icon: 'fa-comments', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '10' }
     ];
+    const collapsedSidebarGroups = {};
 
     function escapeAttr(str) {
         return (str || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -2786,6 +2787,11 @@
         if (bd) bd.classList.toggle('hidden');
     }
 
+    function toggleSidebarGroup(group) {
+        collapsedSidebarGroups[group] = !collapsedSidebarGroups[group];
+        renderSidebar();
+    }
+
     function renderSidebar() {
         const sidebar = document.getElementById('sidebar');
         const navContainer = document.getElementById('nav-links');
@@ -2815,13 +2821,16 @@
             return groups;
         }, {});
         navContainer.innerHTML = Object.keys(navGroups).map(function (group) {
+            const groupId = 'sidebar-group-' + group.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const hasActiveItem = navGroups[group].some(function (item) { return item.id === state.activeTab; });
+            const isExpanded = !collapsedSidebarGroups[group] || hasActiveItem;
             return `
                 <section aria-label="${group}">
-                    <div class="mb-2 flex items-center justify-between px-3">
+                    <button type="button" onclick="toggleSidebarGroup('${group}')" aria-expanded="${isExpanded}" aria-controls="${groupId}" class="mb-2 flex w-full items-center justify-between rounded-lg px-3 py-1 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
                         <h2 class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">${group}</h2>
-                        <span class="text-[9px] font-semibold text-slate-600">${navGroups[group].length}</span>
-                    </div>
-                    <div class="space-y-1">
+                        <span class="flex items-center gap-2 text-[9px] font-semibold text-slate-600"><span>${navGroups[group].length}</span><i class="fa-solid fa-chevron-down text-[8px] transition-transform ${isExpanded ? '' : '-rotate-90'}"></i></span>
+                    </button>
+                    <div id="${groupId}" class="${isExpanded ? 'space-y-1' : 'hidden'}">
                         ${navGroups[group].map(function (item) {
                             const isActive = state.activeTab === item.id;
                             return `
