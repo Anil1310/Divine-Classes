@@ -2437,6 +2437,10 @@ function mergeSettingsFromSheet_(appData) {
         appData.settings.adminName = val;
       } else if (param.indexOf('master admin password') !== -1 || param.indexOf('admin password') !== -1) {
         appData.settings.adminPassword = val;
+      } else if (param.indexOf('developer name') !== -1) {
+        appData.settings.devName = val;
+      } else if (param.indexOf('developer password') !== -1) {
+        appData.settings.devPassword = val;
       } else if (param.indexOf('admin email') !== -1) {
         appData.settings.adminEmail = val;
         appData.settings.adminDriveEmail = val;
@@ -2762,68 +2766,152 @@ function apiAuthenticatePortalUser(identifier, password, rememberMe) {
   const loginPassword = String(password || '').trim();
   if (!loginId || !loginPassword) return { success: false, error: 'Enter your login ID and password.' };
 
-  const data = getFullInitialData_();
+  let spreadsheet;
+  let settings = {};
+  let students = [];
+  let teachers = [];
+  try {
+    spreadsheet = getDbSpreadsheet();
+    if (!spreadsheet) throw new Error('The configured Google spreadsheet is unavailable.');
+
+    const settingsSheet = spreadsheet.getSheetByName('Settings_Config');
+    if (settingsSheet) {
+      settingsSheet.getDataRange().getValues().forEach(function (row) {
+        const key = String(row[0] || '').trim().toLowerCase();
+        if (!key) return;
+        const value = String(row[1] || '').trim();
+        if (key.indexOf('admin name') !== -1) settings.adminName = value;
+        else if (key.indexOf('master admin password') !== -1 || key.indexOf('admin password') !== -1) settings.adminPassword = value;
+        else if (key.indexOf('admin email') !== -1) settings.adminEmail = value;
+        else if (key.indexOf('developer name') !== -1) settings.devName = value;
+        else if (key.indexOf('developer password') !== -1) settings.devPassword = value;
+      });
+    }
+
+    function readAccountSheet_(sheetName, columns) {
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (!sheet) return [];
+      const values = sheet.getDataRange().getValues();
+      if (!values.length) return [];
+      const headers = values[0].map(function (value) { return String(value || '').trim().toLowerCase(); });
+      function column_(names, fallback) {
+        for (let i = 0; i < names.length; i++) {
+          const index = headers.indexOf(names[i].toLowerCase());
+          if (index !== -1) return index;
+        }
+        return fallback;
+      }
+      const indexes = {};
+      Object.keys(columns).forEach(function (key) {
+        indexes[key] = column_(columns[key].names, columns[key].fallback);
+      });
+      return values.slice(1).map(function (row) {
+        const account = {};
+        Object.keys(indexes).forEach(function (key) {
+          account[key] = String(row[indexes[key]] || '').trim();
+        });
+        return account;
+      }).filter(function (account) {
+        return account.name || account.identifier;
+      });
+    }
+
+    students = readAccountSheet_('Students_Master', {
+      identifier: { names: ['roll no', 'roll'], fallback: 0 },
+      name: { names: ['student name', 'name'], fallback: 1 },
+      password: { names: ['login password', 'password'], fallback: 3 },
+      status: { names: ['access status', 'status'], fallback: 4 },
+      phone: { names: ['contact phone', 'phone'], fallback: 6 }
+    });
+    teachers = readAccountSheet_('Teachers_Roster', {
+      id: { names: ['teacher id', 'id'], fallback: 0 },
+      name: { names: ['teacher name', 'name'], fallback: 1 },
+      email: { names: ['login email', 'email'], fallback: 3 },
+      password: { names: ['login password', 'password'], fallback: 4 },
+      status: { names: ['access status', 'status'], fallback: 5 },
+      phone: { names: ['contact phone', 'phone'], fallback: 6 }
+    });
+  } catch (sheetError) {
+    Logger.log('Portal authentication could not read Google Sheets: ' + sheetError.toString());
+    return { success: false, error: 'Could not verify your account from Google Sheets. Please try again.' };
+  }
+
   const lowerId = loginId.toLowerCase();
-  const settings = data.settings || {};
   let session = null;
   let error = 'Invalid login ID or password.';
 
-  const isDeveloper = ['dev', 'developer', 'developer@divineclasses.in', 'system architect'].indexOf(lowerId) !== -1;
-  if (isDeveloper) {
-    const expected = String(settings.devPassword || 'dev123');
-    if (loginPassword === expected || loginPassword === 'dev') {
-      session = { role: 'developer', userId: 'developer', name: 'Lead Developer', identifier: 'System Architect' };
-    }
+  const developerIds = ['dev', 'developer', 'developer@divineclasses.in', 'system architect', String(settings.devName || '').toLowerCase()];
+  if (developerIds.indexOf(lowerId) !== -1 && settings.devPassword &&
+      loginPassword === String(settings.devPassword)) {
+    session = {
+      role: 'developer',
+      userId: 'developer',
+      name: settings.devName || 'Lead Developer',
+      identifier: settings.devName || 'System Architect'
+    };
   } else {
     const configuredAdminEmail = String(settings.adminEmail || '').toLowerCase();
-    const adminIds = ['admin', 'admin@divineclasses.in', 'divineclasses1010@gmail.com', configuredAdminEmail, 'anil', 'anil chahar'];
+    const adminIds = ['admin', 'admin@divineclasses.in', 'divineclasses1010@gmail.com', configuredAdminEmail, 'anil', 'anil chahar', String(settings.adminName || '').toLowerCase()];
     const isAdmin = adminIds.indexOf(lowerId) !== -1;
-    if (isAdmin) {
-      const expected = String(settings.adminPassword || 'admin123');
-      if (loginPassword === expected || loginPassword === 'admin') {
-        session = {
-          role: 'admin',
-          userId: 'admin',
-          name: settings.adminName || 'Administrator',
-          identifier: 'Admin Master'
-        };
-      }
+    if (isAdmin && settings.adminPassword && loginPassword === String(settings.adminPassword)) {
+      session = {
+        role: 'admin',
+        userId: 'admin',
+        name: settings.adminName || 'Administrator',
+        identifier: settings.adminName || 'Admin Master'
+      };
     }
   }
 
   if (!session) {
     const normalizedPhone = loginId.replace(/[\s+-]/g, '');
-    const teacher = (data.teachers || []).find(function (record) {
-      return String(record.email || '').toLowerCase() === lowerId ||
-        (normalizedPhone && String(record.phone || '').replace(/[\s+-]/g, '').includes(normalizedPhone)) ||
-        String(record.name || '').toLowerCase() === lowerId;
+    const teacher = teachers.find(function (record) {
+      return (record.email && record.email.toLowerCase() === lowerId) ||
+        (normalizedPhone && record.phone.replace(/[\s+-]/g, '').includes(normalizedPhone)) ||
+        record.name.toLowerCase() === lowerId;
     });
     if (teacher) {
-      if (teacher.status === 'Inactive') error = 'This faculty account is inactive.';
-      else if (teacher.status === 'Blocked') error = 'This faculty account is blocked.';
-      else if (loginPassword === String(teacher.password || 'teacher123')) {
-        session = { role: 'teacher', userId: teacher.id, name: teacher.name, identifier: teacher.email || '' };
+      if (/inactive/i.test(teacher.status)) error = 'This faculty account is inactive.';
+      else if (/blocked/i.test(teacher.status)) error = 'This faculty account is blocked.';
+      else if (teacher.password && loginPassword === teacher.password) {
+        session = { role: 'teacher', userId: teacher.id, name: teacher.name, identifier: teacher.email };
       }
     }
   }
 
   if (!session) {
     const normalizedPhone = loginId.replace(/[\s+-]/g, '');
-    const student = (data.students || []).find(function (record) {
-      return String(record.roll || '').toLowerCase() === lowerId ||
-        (normalizedPhone && String(record.phone || '').replace(/[\s+-]/g, '').includes(normalizedPhone)) ||
-        String(record.name || '').toLowerCase() === lowerId;
+    const student = students.find(function (record) {
+      return record.identifier.toLowerCase() === lowerId ||
+        (normalizedPhone && record.phone.replace(/[\s+-]/g, '').includes(normalizedPhone)) ||
+        record.name.toLowerCase() === lowerId;
     });
     if (student) {
-      if (student.status === 'Inactive') error = 'This student record is inactive.';
-      else if (student.status === 'Blocked') error = 'This student account is blocked.';
-      else if (loginPassword === String(student.password || 'password123')) {
-        session = { role: 'student', userId: student.id, name: student.name, identifier: student.roll || '' };
+      if (/inactive/i.test(student.status)) error = 'This student record is inactive.';
+      else if (/blocked/i.test(student.status)) error = 'This student account is blocked.';
+      else if (student.password && loginPassword === student.password) {
+        let studentId = '';
+        try {
+          const appData = getFullInitialData_();
+          const appStudent = (appData.students || []).find(function (record) {
+            return student.identifier
+              ? String(record.roll || '').trim().toLowerCase() === student.identifier.toLowerCase()
+              : String(record.name || '').trim().toLowerCase() === student.name.toLowerCase();
+          });
+          studentId = appStudent && appStudent.id;
+        } catch (dataError) {
+          Logger.log('Could not resolve Google Sheets student account: ' + dataError.toString());
+        }
+        if (!studentId) {
+          return { success: false, error: 'Your student record could not be loaded. Please contact the institute.' };
+        }
+        session = { role: 'student', userId: studentId, name: student.name, identifier: student.identifier };
       }
     }
   }
 
   if (!session) return { success: false, error: error };
+  const data = getFullInitialData_();
   const token = Utilities.getUuid() + Utilities.getUuid();
   const sessionKey = PORTAL_SESSION_PROPERTY_PREFIX + token;
   const sessionCache = CacheService.getScriptCache();
@@ -2856,6 +2944,8 @@ function apiGetInitialData(token) {
 const ATTENDANCE_DB_PREFIX_ = 'DB_attendance_';
 const ATTENDANCE_DB_CHUNK_SIZE_ = 7800;
 const ATTENDANCE_SHEET_MIGRATION_KEY_ = 'DB_attendance_sheet_migration_v1';
+const ATTENDANCE_SHEET_NAME_ = 'attendance';
+const ATTENDANCE_SHEET_HEADERS_ = ['Date', 'Batch ID', 'Batch Name', 'Student ID', 'Roll No', 'Student Name', 'Status', 'Marked By', 'Updated At'];
 
 function attendanceDatabaseManifestKey_(month) {
   return ATTENDANCE_DB_PREFIX_ + month + '_manifest';
@@ -2863,6 +2953,13 @@ function attendanceDatabaseManifestKey_(month) {
 
 function attendanceDatabaseRecordKey_(record) {
   return [record.date, record.batchId, record.studentId].join('|');
+}
+
+function formatAttendanceTimestamp_(value) {
+  if (!value) return '';
+  const timestamp = value instanceof Date ? value : new Date(value);
+  if (isNaN(timestamp.getTime())) throw new Error('An attendance record has an invalid timestamp.');
+  return Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'dd:MM:yyyy:HH:mm:ss');
 }
 
 function getAttendanceDatabaseRecords_(month) {
@@ -2896,6 +2993,60 @@ function getAttendanceDatabaseRecords_(month) {
     Array.prototype.push.apply(records, rows);
   }
   return records;
+}
+
+function getAllAttendanceDatabaseRecords_() {
+  const properties = PropertiesService.getScriptProperties().getProperties();
+  const months = Object.keys(properties).map(function (key) {
+    const match = key.match(/^DB_attendance_(\d{4}-\d{2})_manifest$/);
+    return match ? match[1] : '';
+  }).filter(Boolean);
+  const records = [];
+  months.forEach(function (month) {
+    Array.prototype.push.apply(records, getAttendanceDatabaseRecords_(month));
+  });
+  return records;
+}
+
+function syncAttendanceDatabaseToSheet_() {
+  const spreadsheet = getDbSpreadsheet();
+  if (!spreadsheet) throw new Error('Could not open the attendance spreadsheet.');
+
+  let sheet = spreadsheet.getSheetByName(ATTENDANCE_SHEET_NAME_);
+  if (!sheet) {
+    const legacySheet = spreadsheet.getSheetByName('Attendance');
+    if (legacySheet) {
+      legacySheet.setName(ATTENDANCE_SHEET_NAME_);
+      sheet = legacySheet;
+    } else {
+      sheet = spreadsheet.insertSheet(ATTENDANCE_SHEET_NAME_);
+    }
+  }
+
+  const records = getAllAttendanceDatabaseRecords_().sort(function (a, b) {
+    return [a.date, a.batchId, a.studentId].join('|').localeCompare([b.date, b.batchId, b.studentId].join('|'));
+  });
+  const rows = [ATTENDANCE_SHEET_HEADERS_].concat(records.map(function (record) {
+    return [
+      record.date,
+      record.batchId,
+      record.batchName,
+      record.studentId,
+      record.roll,
+      record.name,
+      record.status,
+      record.markedBy,
+      formatAttendanceTimestamp_(record.updatedAt)
+    ];
+  }));
+  const range = sheet.getRange(1, 1, rows.length, ATTENDANCE_SHEET_HEADERS_.length);
+  range.setNumberFormat('@');
+  range.setValues(rows);
+  const lastRow = sheet.getLastRow();
+  if (lastRow > rows.length) {
+    sheet.getRange(rows.length + 1, 1, lastRow - rows.length, ATTENDANCE_SHEET_HEADERS_.length).clearContent();
+  }
+  sheet.setFrozenRows(1);
 }
 
 function saveAttendanceDatabaseRecords_(month, records) {
@@ -2967,7 +3118,7 @@ function migrateAttendanceSheetToDatabase_() {
     if (!spreadsheet) throw new Error('Could not open the legacy attendance sheet for its one-time database import.');
 
     const sheets = spreadsheet.getSheets().filter(function (sheet) {
-      return sheet.getName() === 'Attendance' || /^Attendance_\d{4}_\d{2}$/.test(sheet.getName());
+      return sheet.getName() === 'attendance' || sheet.getName() === 'Attendance' || /^Attendance_\d{4}_\d{2}$/.test(sheet.getName());
     });
     const recordsByMonth = {};
     sheets.forEach(function (sheet) {
@@ -3042,6 +3193,14 @@ function apiGetMonthlyAttendance(month, token) {
   } catch (error) {
     Logger.log('Attendance database migration error: ' + error.toString());
     return { success: false, error: 'Could not import existing attendance into the database: ' + error.message };
+  }
+  try {
+    const spreadsheet = getDbSpreadsheet();
+    const sheet = spreadsheet && spreadsheet.getSheetByName(ATTENDANCE_SHEET_NAME_);
+    if (!sheet || sheet.getLastRow() <= 1) syncAttendanceDatabaseToSheet_();
+  } catch (error) {
+    Logger.log('Attendance sheet recovery error: ' + error.toString());
+    return { success: false, error: 'Could not restore attendance records to the attendance sheet: ' + error.message };
   }
   const appData = dbLoadAll_();
   if (!appData) return { success: false, error: 'The application database is not initialized.' };
@@ -3177,9 +3336,10 @@ function apiSaveDailyAttendance(payload, token) {
       }
     });
     saveAttendanceDatabaseRecords_(payload.date.slice(0, 7), records);
+    syncAttendanceDatabaseToSheet_();
   } catch (error) {
-    Logger.log('Attendance database save error: ' + error.toString());
-    return { success: false, error: 'Could not save attendance to the database: ' + error.message };
+    Logger.log('Attendance database or sheet save error: ' + error.toString());
+    return { success: false, error: 'Could not save attendance to the database and attendance sheet: ' + error.message };
   } finally {
     lock.releaseLock();
   }
@@ -4124,6 +4284,8 @@ function syncReadableSheets(ss, data) {
       sRows.push(['Admin Name', s.adminName || 'Er. Rajesh Chahar', 'Display Name of Institute Admin']);
       sRows.push(['Master Admin Password', s.adminPassword || 'admin123', 'Password to access Admin portal']);
       sRows.push(['Admin Email ID', s.adminEmail || '', 'Official Admin Contact / Login Email']);
+      sRows.push(['Developer Name', s.devName || 'Lead Developer', 'Display name of the developer account']);
+      sRows.push(['Developer Password', s.devPassword || '', 'Password to access Developer portal']);
       sRows.push(['Admin Google Drive Folder Link', s.adminDriveFolderUrl || '', 'Official Shared Assignments & Materials Google Drive Folder']);
       sRows.push(['Admin Drive Access Status', s.adminDriveShared ? ('Authorized (' + (s.adminEmail || 'Admin') + ')') : 'Pending Authorization Mail', 'Google Drive Permission Status']);
       sRows.push(['UPI Payment ID', s.upiId || 'divineclasses@upi', 'Fee Collection UPI']);

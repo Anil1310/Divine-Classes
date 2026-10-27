@@ -680,7 +680,7 @@
             contactDisplay: '9555-6787-53',
             email: 'contact@divineclasses.in',
             upiId: 'divineclasses@upi',
-            facebookUrl: 'https://m.facebook.com/edivineclasses/',
+            facebookUrl: 'https://www.facebook.com/edivineclasses/',
             instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
             youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
             adminName: 'Er. Rajesh Chahar',
@@ -1361,13 +1361,13 @@
         } else if (platform === 'instagram') {
             url = s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq';
         } else if (platform === 'facebook') {
-            url = s.facebookUrl || 'https://m.facebook.com/edivineclasses/';
+            url = s.facebookUrl || 'https://www.facebook.com/edivineclasses/';
         }
         url = String(url || '').trim();
         if (!url) {
             if (platform === 'youtube') return 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
             if (platform === 'instagram') return 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq';
-            return 'https://m.facebook.com/edivineclasses/';
+            return 'https://www.facebook.com/edivineclasses/';
         }
         if (!/^https?:\/\//i.test(url)) {
             url = 'https://' + url;
@@ -1375,20 +1375,36 @@
         return url;
     }
 
+    function openSocialExternalApp(platform) {
+        const webUrl = getSocialLink(platform);
+        if (!webUrl) return;
+        try {
+            window.open(webUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.location.href = webUrl;
+        }
+    }
+
     function updateSocialLinksUI() {
         const fbEl = document.getElementById('sidebar-link-fb');
         if (fbEl) {
             fbEl.href = getSocialLink('facebook');
+            fbEl.target = '_blank';
+            fbEl.rel = 'noopener noreferrer';
         }
 
         const igEl = document.getElementById('sidebar-link-ig');
         if (igEl) {
             igEl.href = getSocialLink('instagram');
+            igEl.target = '_blank';
+            igEl.rel = 'noopener noreferrer';
         }
 
         const ytEl = document.getElementById('sidebar-link-yt');
         if (ytEl) {
             ytEl.href = getSocialLink('youtube');
+            ytEl.target = '_blank';
+            ytEl.rel = 'noopener noreferrer';
         }
     }
 
@@ -1465,6 +1481,7 @@
 
     let autoSyncTimer = null;
     let lastPortalDataRefreshAt = 0;
+    let isRestoringAuthSession = false;
 
     function updateSyncBadge(text, status) {
         const btn = document.getElementById('btn-sync');
@@ -1808,6 +1825,7 @@
             }
             const session = remoteData.portalSession;
             if (session && token) {
+                isRestoringAuthSession = false;
                 state.authToken = token;
                 state.isAuthenticated = true;
                 state.currentRole = session.role;
@@ -1824,6 +1842,7 @@
                 updateRoleUI();
                 renderSidebar();
             } else {
+                isRestoringAuthSession = false;
                 clearPortalState();
                 if (token) {
                     localStorage.removeItem('Divine_Classes_AUTH_SESSION');
@@ -1835,9 +1854,13 @@
 
         function handleLoadError(err) {
             console.error('Could not load secure portal data:', err);
+            if (token && !state.isAuthenticated) {
+                isRestoringAuthSession = true;
+                renderMainContent();
+            }
             showToast(state.isAuthenticated
                 ? 'Could not refresh portal data. You are still signed in; please try again.'
-                : 'Could not securely load portal data. Please refresh and try again.', 'error');
+                : 'Could not verify your saved session. Your sign-in is preserved; retry when connected.', 'error');
         }
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -1856,6 +1879,18 @@
             })
             .then(applyData)
             .catch(handleLoadError);
+    }
+
+    function retryPortalSessionRestore() {
+        const token = state.authToken || loadAuthSession();
+        if (!token) {
+            isRestoringAuthSession = false;
+            renderMainContent();
+            return;
+        }
+        isRestoringAuthSession = true;
+        renderMainContent();
+        loadPortalData(token);
     }
 
     function handleLogout() {
@@ -2290,6 +2325,18 @@
         if (!container) return;
 
         if (!state.isAuthenticated) {
+            if (isRestoringAuthSession) {
+                if (titleEl) titleEl.textContent = 'Restoring your session';
+                if (subtitleEl) subtitleEl.textContent = 'Verifying your saved sign-in securely';
+                container.innerHTML = `
+                    <div class="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+                        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-500" aria-hidden="true"></i>
+                        <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">Restoring your session…</p>
+                        <button type="button" onclick="retryPortalSessionRestore()" class="text-xs font-semibold text-indigo-600 underline dark:text-indigo-400">Retry verification</button>
+                    </div>
+                `;
+                return;
+            }
             if (titleEl) titleEl.textContent = 'Institute Authentication Portal';
             if (subtitleEl) subtitleEl.textContent = 'Sign in with your credentials to access Student, Faculty, or Administrative tools';
             container.innerHTML = renderLoginScreenView();
@@ -3013,9 +3060,9 @@
         showToast(`${stu ? stu.name : 'Student'} added to ${batch ? batch.name : 'Batch'}`, 'success');
     }
 
-            function handleAddNewStudentToBatch(e, batchId) {
+    function handleAddNewStudentToBatch(e, batchId) {
         e.preventDefault();
-        
+
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const name = (document.getElementById('new-stu-name').value || '').trim();
         const parentName = (document.getElementById('new-stu-parent').value || '').trim();
@@ -8811,7 +8858,7 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         ${inputField('youtubeUrl', 'YouTube URL', s.youtubeUrl, 'text', 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8')}
                                         ${inputField('instagramUrl', 'Instagram URL', s.instagramUrl, 'text', 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq')}
-                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://m.facebook.com/edivineclasses/')}
+                                        ${inputField('facebookUrl', 'Facebook URL', s.facebookUrl, 'text', 'https://www.facebook.com/edivineclasses/')}
                                     </div>
                                 </div>
                             `)}
@@ -9193,47 +9240,101 @@
     }
 
 
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        try {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+        } catch (err) { }
+    });
+
+    function triggerAppInstall() {
+        if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult && choiceResult.outcome === 'accepted') {
+                    showToast('Installing Divine Classes Mobile App...', 'success');
+                }
+                deferredInstallPrompt = null;
+            }).catch(() => {
+                openApkGuideModal();
+            });
+        } else {
+            openApkGuideModal();
+        }
+    }
+
+    function copyApkUrl() {
+        const inp = document.getElementById('apk-app-url-input');
+        if (inp) {
+            inp.select();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(inp.value).then(() => {
+                    showToast('Live App URL copied to clipboard!', 'success');
+                }).catch(() => {
+                    showToast('URL selected. Press Copy.', 'info');
+                });
+            } else {
+                showToast('URL selected. Press Copy.', 'info');
+            }
+        }
+    }
+
     function openApkGuideModal() {
+        const liveUrl = (typeof GAS_WEBAPP_URL !== 'undefined' && GAS_WEBAPP_URL)
+            ? GAS_WEBAPP_URL
+            : 'https://script.google.com/macros/s/AKfycbyGBeVG3Gq1BvhHhahtR1yYNbrsBm4APzn92as_Clv1ySq96ipMSVgI6sToBcBDbZTHsg/exec';
+
         const modal = `
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
                     <div class="flex items-center gap-2">
-                        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
                             <i class="fa-brands fa-android"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold text-slate-900 font-heading">Android Mobile App (.APK)</h3>
-                            <p class="text-xs text-slate-500">Divine Classes Android App Preparation</p>
+                            <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">Divine Classes Mobile App</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">1-Tap Install & Android APK Options</p>
                         </div>
                     </div>
-                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <div class="py-4 space-y-4 text-xs">
-                    <div class="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200">
-                        <p class="font-bold text-emerald-900 mb-1"><i class="fa-solid fa-circle-check mr-1.5 text-emerald-600"></i>App Ready for APK Packaging</p>
-                        <p class="text-emerald-800 leading-relaxed">This Web App is fully responsive with safe-area padding, mobile bottom navigation, touch feedback, offline caching, and a configured <code>manifest.json</code>.</p>
+                    <div class="p-4 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800">
+                        <p class="font-bold text-emerald-900 dark:text-emerald-200 mb-1"><i class="fa-solid fa-circle-check mr-1.5 text-emerald-600 dark:text-emerald-400"></i>Fast Mobile App Installation</p>
+                        <p class="text-emerald-800 dark:text-emerald-300 leading-relaxed">Divine Classes runs as a standalone full-screen mobile app on any Android device or iPhone with full offline caching and instant database sync.</p>
                     </div>
 
                     <div class="space-y-3">
-                        <h4 class="font-bold text-slate-800 text-xs">Recommended Options to Generate your .APK:</h4>
-                        
-                        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                            <p class="font-bold text-slate-900">Option 1: Capacitor / Cordova (Native Android Studio Project)</p>
-                            <p class="text-slate-500 text-[11px] mt-1">Wrap this exact folder with <code>npx @capacitor/cli init</code> & <code>npx cap add android</code> to generate an authentic release APK or Play Store bundle in minutes.</p>
+                        <div class="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
+                            <p class="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
+                                Instant 1-Tap Mobile Install (PWA)
+                            </p>
+                            <p class="text-slate-600 dark:text-slate-300 text-[11px] mt-1.5">
+                                • <strong>On Android Chrome:</strong> Tap browser menu (⋮) and tap <strong>"Install App"</strong> or <strong>"Add to Home screen"</strong>.<br>
+                                • <strong>On iPhone Safari:</strong> Tap the <strong>Share</strong> button (□↑) and tap <strong>"Add to Home Screen"</strong>.
+                            </p>
                         </div>
 
-                        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                            <p class="font-bold text-slate-900">Option 2: Website 2 APK Builder / WebAPK (Zero Code)</p>
-                            <p class="text-slate-500 text-[11px] mt-1">Point the builder to your live Google Apps Script URL: <code class="text-indigo-600 font-semibold break-all">https://script.google.com/macros/s/AKfycbyGBeVG3Gq1BvhHhahtR1yYNbrsBm4APzn92as_Clv1ySq96ipMSVgI6sToBcBDbZTHsg/exec</code> and pick <code>logo.jpeg</code> as the app icon to generate an immediate installable APK.</p>
-                        </div>
-
-                        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                            <p class="font-bold text-slate-900">Option 3: Instant 1-Tap Mobile Install (PWA)</p>
-                            <p class="text-slate-500 text-[11px] mt-1">Open this link in Chrome on any Android device and tap <strong>"Add to Home screen"</strong> or <strong>"Install App"</strong>. It installs with full-screen standalone display and the Divine Classes icon.</p>
+                        <div class="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
+                            <p class="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">2</span>
+                                Generate Installable Android APK
+                            </p>
+                            <p class="text-slate-600 dark:text-slate-300 text-[11px] mt-1.5">
+                                Use <strong>Website 2 APK Builder</strong> or <strong>WebAPK</strong> with your live web app URL:
+                            </p>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input type="text" readonly value="${escapeAttr(liveUrl)}" class="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] text-indigo-600 dark:text-indigo-400 font-mono select-all" id="apk-app-url-input">
+                                <button type="button" onclick="copyApkUrl()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer">
+                                    <i class="fa-solid fa-copy"></i> Copy
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="pt-3 border-t border-slate-100 flex justify-end">
-                    <button onclick="closeModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Got it</button>
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+                    <button onclick="closeModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer">Got it</button>
                 </div>
             `;
         openModal(modal);
@@ -9716,7 +9817,9 @@
     });
 
     // Initialize Application
-    window.onload = function () {
+    function initializeApplication() {
+        const savedToken = loadAuthSession();
+        isRestoringAuthSession = !!savedToken;
         initTheme();
         loadCachedData();
         updateRoleUI();
@@ -9724,7 +9827,6 @@
         renderMainContent();
         updateNotificationBadge();
         startNotificationPoller();
-        const savedToken = loadAuthSession();
         if (savedToken) loadPortalData(savedToken);
 
         // Quiet background sync check when returning to window/tab
@@ -9745,7 +9847,9 @@
                 if (appRootEl.scrollTop !== 0) appRootEl.scrollTop = 0;
             });
         }
-    };
+    }
+
+    initializeApplication();
 
     window.addEventListener('pageshow', function (event) {
         if (!event.persisted) return;
