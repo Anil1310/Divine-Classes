@@ -3100,22 +3100,21 @@
                         </div>
                     </div>
 
-                    <!-- Requirement 7 Highlight Banner: Social Media Links -->
-                    <div class="bg-gradient-to-r from-indigo-700 via-violet-700 to-purple-800 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div>
-                            <span class="text-[10px] tracking-wide font-bold bg-white/20 px-2.5 py-1 rounded-full">${isRequirementLabelsEnabled() ? 'Requirement #7 • Social Media Channels' : 'Official Social Media Channels'}</span>
-                            <h3 class="text-lg font-bold mt-2">Connect With Divine Classes on Official Channels</h3>
-                            <p class="text-xs text-indigo-100 mt-1">Watch free YouTube concept marathons, topper interviews on Instagram, and daily exam schedules on Facebook.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3 shrink-0">
-                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer" aria-label="Facebook Page" class="min-h-12 px-3 sm:px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 active:scale-95 transition cursor-pointer">
-                                <i class="fa-brands fa-facebook text-base" aria-hidden="true"></i><span class="hidden sm:inline">Facebook Page</span>
+                    <!-- Requirement 7 Social Media Links -->
+                    <div class="rounded-xl bg-slate-900 px-3 py-2.5 text-white shadow-md flex items-center justify-between gap-3">
+                        <p class="text-xs font-semibold text-slate-200 shrink-0" aria-label="Official Social Media Channels">Connect with us</p>
+                        <div class="grid grid-cols-3 gap-1.5 shrink-0">
+                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer" aria-label="Facebook Page" title="Facebook Page" class="flex min-h-12 w-12 flex-col items-center justify-center rounded-xl bg-slate-800/70 hover:bg-[#1877F2] active:bg-[#1877F2] transition group cursor-pointer sm:w-auto sm:px-2">
+                                <i class="fa-brands fa-facebook-f text-sm text-[#1877F2] group-hover:text-white sm:mb-1" aria-hidden="true"></i>
+                                <span class="hidden text-[9px] font-medium sm:inline">Facebook</span>
                             </a>
-                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="min-h-12 px-3 sm:px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 active:scale-95 transition cursor-pointer">
-                                <i class="fa-brands fa-instagram text-base" aria-hidden="true"></i><span class="hidden sm:inline">Instagram</span>
+                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram" class="flex min-h-12 w-12 flex-col items-center justify-center rounded-xl bg-slate-800/70 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-600 hover:to-purple-600 active:bg-pink-600 transition group cursor-pointer sm:w-auto sm:px-2">
+                                <i class="fa-brands fa-instagram text-sm text-pink-500 group-hover:text-white sm:mb-1" aria-hidden="true"></i>
+                                <span class="hidden text-[9px] font-medium sm:inline">Instagram</span>
                             </a>
-                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer" aria-label="YouTube Channel" class="min-h-12 px-3 sm:px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 active:scale-95 transition cursor-pointer">
-                                <i class="fa-brands fa-youtube text-base" aria-hidden="true"></i><span class="hidden sm:inline">YouTube Channel</span>
+                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer" aria-label="YouTube Channel" title="YouTube Channel" class="flex min-h-12 w-12 flex-col items-center justify-center rounded-xl bg-slate-800/70 hover:bg-[#FF0000] active:bg-[#FF0000] transition group cursor-pointer sm:w-auto sm:px-2">
+                                <i class="fa-brands fa-youtube text-sm text-[#FF0000] group-hover:text-white sm:mb-1" aria-hidden="true"></i>
+                                <span class="hidden text-[9px] font-medium sm:inline">YouTube</span>
                             </a>
                         </div>
                     </div>
