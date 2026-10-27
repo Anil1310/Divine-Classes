@@ -3013,6 +3013,33 @@ function ensureSheetDimensions_(sheet, requiredRows, requiredCols) {
   }
 }
 
+function removeDemoStudentRows_(sheet, seedData) {
+  const demoStudentsByRoll = {};
+  ((seedData && seedData.students) || []).forEach(function (student) {
+    if (student && student.roll && isDummyRecord_(student)) {
+      demoStudentsByRoll[String(student.roll).trim().toUpperCase()] = String(student.name || '').trim().toLowerCase();
+    }
+  });
+  if (Object.keys(demoStudentsByRoll).length === 0) return;
+
+  const values = sheet.getDataRange().getValues();
+  const rowsToDelete = [];
+  for (let i = 1; i < values.length; i++) {
+    const roll = String(values[i][0] || '').trim().toUpperCase();
+    const name = String(values[i][1] || '').trim().toLowerCase();
+    if (roll && demoStudentsByRoll[roll] && name === demoStudentsByRoll[roll]) {
+      rowsToDelete.push(i + 1);
+    }
+  }
+
+  for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+    sheet.deleteRow(rowsToDelete[i]);
+  }
+  if (rowsToDelete.length) {
+    Logger.log('Removed ' + rowsToDelete.length + ' demo student row(s) from Students_Master.');
+  }
+}
+
 /**
  * Generates human-friendly Database table views for the client.
  * Respects showDummyData: when false, removes demo data and displays clean production records.
@@ -3033,6 +3060,9 @@ function syncReadableSheets(ss, data) {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
       
+      if (!isDummyForSheetEnabled_(data.settings, 'students')) {
+        removeDemoStudentRows_(stuSheet, seed);
+      }
       SpreadsheetApp.flush();
       let curVals = stuSheet.getDataRange().getValues();
       if (!curVals || curVals.length === 0 || curVals[0].length < headers.length) {
