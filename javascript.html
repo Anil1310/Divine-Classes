@@ -3053,19 +3053,18 @@
                             <span id="new-stu-reminder-preview" class="font-bold text-indigo-900">${formatFeeDateDisplay(calculateNextFeeReminder(new Date().toISOString().split('T')[0], 1))}</span>
                         </div>
 
-                        <!-- Required student photo; the server stores it in Google Drive during enrollment. -->
+                        <!-- Required photo is captured from the native camera control and stored in Drive on enrollment. -->
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
-                            <div id="new-stu-photo-preview" class="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 overflow-hidden shrink-0">
-                                <i class="fa-solid fa-camera text-base"></i>
-                            </div>
+                            <label class="relative block shrink-0 cursor-pointer rounded-full focus-within:ring-2 focus-within:ring-indigo-400 focus-within:ring-offset-2" aria-label="Take student photo with camera">
+                                <div id="new-stu-photo-preview" class="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 overflow-hidden">
+                                    <i class="fa-solid fa-camera text-base"></i>
+                                </div>
+                                <input type="file" accept="image/*" capture="user" aria-label="Capture student photo" class="sr-only" onchange="handleNewStudentPhotoPick(event)">
+                            </label>
                             <div class="flex-1">
                                 <p class="text-xs font-bold text-slate-700">Student Photo <span class="text-rose-500">*</span></p>
-                                <p class="text-[10px] text-slate-400">Required · Saved to Google Drive and the student sheet.</p>
+                                <p class="text-[10px] text-slate-400">Tap the camera to take a photo. Saved to Google Drive.</p>
                             </div>
-                            <label class="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition">
-                                <i class="fa-solid fa-camera mr-1"></i> Capture / Choose
-                                <input type="file" accept="image/*" capture="user" class="hidden" onchange="handleNewStudentPhotoPick(event)">
-                            </label>
                         </div>
 
                         <div class="flex justify-end gap-2 pt-2">
