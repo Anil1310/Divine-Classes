@@ -2337,14 +2337,14 @@
         if (!sidebar || !button || !icon) return;
         if (window.matchMedia('(min-width: 1024px)').matches) {
             const isCollapsed = sidebar.classList.contains('lg:w-0');
-            icon.className = 'fa-solid ' + (isCollapsed ? 'fa-angles-right' : 'fa-angles-left') + ' text-lg';
+            icon.className = 'fa-solid fa-bars text-lg';
             button.title = isCollapsed ? 'Show sidebar' : 'Hide sidebar';
             button.setAttribute('aria-label', button.title);
             button.setAttribute('aria-expanded', String(!isCollapsed));
             return;
         }
         const isOpen = !sidebar.classList.contains('-translate-x-full');
-        icon.className = 'fa-solid ' + (isOpen ? 'fa-xmark' : 'fa-bars') + ' text-lg';
+        icon.className = 'fa-solid fa-bars text-lg';
         button.title = isOpen ? 'Close sidebar' : 'Open sidebar';
         button.setAttribute('aria-label', button.title);
         button.setAttribute('aria-expanded', String(isOpen));
