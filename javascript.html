@@ -2350,6 +2350,7 @@
         button.setAttribute('aria-expanded', String(isOpen));
     }
     window.addEventListener('resize', updateSidebarToggleButton);
+    updateSidebarToggleButton();
 
     function toggleSidebarGroup(group) {
         collapsedSidebarGroups[group] = !collapsedSidebarGroups[group];
