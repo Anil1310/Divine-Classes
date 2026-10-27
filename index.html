@@ -256,9 +256,9 @@
 
         <!-- Sidebar Navigation -->
         <aside id="sidebar"
-            class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:h-full lg:shrink-0 border-r border-slate-800">
+            class="fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:h-full lg:shrink-0 border-r border-slate-800/80 shadow-2xl shadow-slate-950/20">
             <!-- Brand Logo -->
-            <div class="flex items-center justify-between px-5 h-16 bg-slate-950 border-b border-slate-800">
+            <div class="flex items-center justify-between px-5 h-[76px] bg-white/[0.03] border-b border-white/[0.08]">
                 <div class="flex items-center gap-3">
                     <div
                         class="w-11 h-11 rounded-2xl bg-white p-1 flex items-center justify-center shadow-lg shadow-indigo-600/20 border border-slate-700/60 overflow-hidden shrink-0">
@@ -278,8 +278,8 @@
             </div>
 
             <!-- Role Status Pill in Sidebar -->
-            <div class="px-4 py-3 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between text-xs">
-                <span class="text-slate-400">Current Role:</span>
+            <div class="mx-3 mt-4 mb-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-3 flex items-center justify-between text-xs shadow-inner shadow-white/[0.02]">
+                <span class="flex items-center gap-2 text-slate-400"><i class="fa-solid fa-shield-halved text-indigo-300"></i>Workspace access</span>
                 <span id="sidebar-role-badge"
                     class="px-2.5 py-0.5 rounded-full font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     Admin
@@ -287,13 +287,13 @@
             </div>
 
             <!-- Navigation Links -->
-            <nav id="nav-links" class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            <nav id="nav-links" aria-label="Main navigation" class="flex-1 px-3 py-4 overflow-y-auto space-y-5">
                 <!-- Populated dynamically via JS based on current role -->
             </nav>
 
             <!-- Database Connection Indicator -->
             <div
-                class="px-4 py-3 bg-slate-950/70 border-t border-slate-800 text-[11px] flex items-center justify-between">
+                class="mx-3 mb-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[11px] flex items-center justify-between">
                 <div class="flex items-center gap-2 text-slate-400">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                     <span class="truncate max-w-[130px]"
@@ -315,7 +315,7 @@
             </div>
 
             <!-- Requirement 7: Social Media Connect Footer in Sidebar -->
-            <div class="p-4 border-t border-slate-800 bg-slate-950">
+            <div class="p-4 border-t border-white/[0.08] bg-black/10">
                 <!-- Install Mobile App Action Button -->
                 <button type="button" onclick="triggerAppInstall()"
                     class="w-full mb-3 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
@@ -2281,18 +2281,18 @@
      * NAVIGATION & ROLE MANAGEMENT (Requirement 2)
      ********************************************************************/
     const navItems = [
-        { id: 'dashboard', label: 'Overview Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'teacher', 'student'] },
-        { id: 'batches', label: 'Batches & Students', icon: 'fa-users-rectangle', roles: ['admin', 'teacher', 'student'], req: '1' },
-        { id: 'attendance', label: 'Daily Attendance', icon: 'fa-calendar-check', roles: ['admin', 'teacher'] },
-        { id: 'fees', label: 'Student Fees & Reminders', icon: 'fa-indian-rupee-sign', roles: ['admin'], req: '2, 5' },
-        { id: 'access', label: 'Access Control', icon: 'fa-user-gear', roles: ['admin'], req: '11' },
-        { id: 'materials', label: 'Assignments & DPPs', icon: 'fa-file-pdf', roles: ['admin', 'teacher', 'student'], req: '3' },
-        { id: 'marks', label: 'Offline Marks Tracker', icon: 'fa-chart-line', roles: ['admin', 'teacher', 'student'], req: '4' },
-        { id: 'teachers', label: 'Teacher Profiles', icon: 'fa-chalkboard-user', roles: ['admin', 'teacher', 'student'], req: '6' },
-        { id: 'gallery', label: 'Results & Gallery', icon: 'fa-images', roles: ['admin', 'teacher', 'student'], req: '8' },
-        { id: 'links', label: 'External Study Hub', icon: 'fa-arrow-up-right-from-square', roles: ['admin', 'teacher', 'student'], req: '9' },
-        { id: 'feedback', label: 'Parent & Student Feedback', icon: 'fa-comments', roles: ['admin', 'teacher', 'student'], req: '10' },
-        { id: 'settings', label: 'Settings', icon: 'fa-gear', roles: ['developer'] }
+        { id: 'dashboard', label: 'Overview Dashboard', icon: 'fa-chart-pie', group: 'Workspace', roles: ['admin', 'teacher', 'student'] },
+        { id: 'batches', label: 'Batches & Students', icon: 'fa-users-rectangle', group: 'Learning', roles: ['admin', 'teacher', 'student'], req: '1' },
+        { id: 'attendance', label: 'Daily Attendance', icon: 'fa-calendar-check', group: 'Learning', roles: ['admin', 'teacher'], req: '12' },
+        { id: 'materials', label: 'Assignments & DPPs', icon: 'fa-file-pdf', group: 'Learning', roles: ['admin', 'teacher', 'student'], req: '3' },
+        { id: 'marks', label: 'Offline Marks Tracker', icon: 'fa-chart-line', group: 'Learning', roles: ['admin', 'teacher', 'student'], req: '4' },
+        { id: 'teachers', label: 'Teacher Profiles', icon: 'fa-chalkboard-user', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '6' },
+        { id: 'gallery', label: 'Results & Gallery', icon: 'fa-images', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '8' },
+        { id: 'links', label: 'External Study Hub', icon: 'fa-arrow-up-right-from-square', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '9' },
+        { id: 'feedback', label: 'Parent & Student Feedback', icon: 'fa-comments', group: 'Institute', roles: ['admin', 'teacher', 'student'], req: '10' },
+        { id: 'fees', label: 'Student Fees & Reminders', icon: 'fa-indian-rupee-sign', group: 'Management', roles: ['admin'], req: '2, 5' },
+        { id: 'access', label: 'Access Control', icon: 'fa-user-gear', group: 'Management', roles: ['admin'], req: '11' },
+        { id: 'settings', label: 'Settings', icon: 'fa-gear', group: 'Management', roles: ['developer'] }
     ];
 
     function escapeAttr(str) {
@@ -2808,20 +2808,39 @@
             return true;
         });
 
-        navContainer.innerHTML = allowedItems.map(item => {
-            const isActive = state.activeTab === item.id;
+        const navGroups = allowedItems.reduce(function (groups, item) {
+            const group = item.group || 'Menu';
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(item);
+            return groups;
+        }, {});
+        navContainer.innerHTML = Object.keys(navGroups).map(function (group) {
             return `
-                    <button onclick="navigateTo('${item.id}')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition group ${isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                }">
-                        <div class="flex items-center gap-3">
-                            <i class="fa-solid ${item.icon} w-5 text-center ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'}"></i>
-                            <span>${item.label}</span>
-                        </div>
-                        ${item.badge ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">${item.badge}</span>` : ''}
-                    </button>
-                `;
+                <section aria-label="${group}">
+                    <div class="mb-2 flex items-center justify-between px-3">
+                        <h2 class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">${group}</h2>
+                        <span class="text-[9px] font-semibold text-slate-600">${navGroups[group].length}</span>
+                    </div>
+                    <div class="space-y-1">
+                        ${navGroups[group].map(function (item) {
+                            const isActive = state.activeTab === item.id;
+                            return `
+                                <button type="button" onclick="navigateTo('${item.id}')" aria-current="${isActive ? 'page' : 'false'}" class="group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${isActive
+                                    ? 'bg-indigo-500/15 text-white ring-1 ring-inset ring-indigo-400/25 shadow-sm shadow-indigo-950/20'
+                                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'
+                                }">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-indigo-500 text-white shadow-md shadow-indigo-950/30' : 'bg-white/[0.05] text-slate-400 transition group-hover:bg-white/[0.09] group-hover:text-indigo-300'}">
+                                        <i class="fa-solid ${item.icon} text-[13px]"></i>
+                                    </span>
+                                    <span class="min-w-0 flex-1 truncate">${item.label}</span>
+                                    ${item.badge ? `<span class="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">${item.badge}</span>` : ''}
+                                    ${isActive ? '<i class="fa-solid fa-chevron-right text-[9px] text-indigo-300"></i>' : ''}
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </section>
+            `;
         }).join('');
     }
 
