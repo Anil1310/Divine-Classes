@@ -9438,6 +9438,7 @@
     let notifSoundBaseline = null;
     let notifSoundSessionActive = false;
     let notifPollTimer = null;
+    let notifPollInFlight = false;
 
     function isNotifSoundMuted() {
         try { return localStorage.getItem('dc_notif_sound_muted') === '1'; } catch (e) { return false; }
@@ -9502,9 +9503,12 @@
     }
 
     function pollNotifications() {
-        if (!state.isAuthenticated || typeof google === 'undefined' || !google.script || !google.script.run) return;
+        if (!state.isAuthenticated || document.hidden || notifPollInFlight ||
+            typeof google === 'undefined' || !google.script || !google.script.run) return;
+        notifPollInFlight = true;
         google.script.run
             .withSuccessHandler(function (remoteNotifs) {
+                notifPollInFlight = false;
                 if (!Array.isArray(remoteNotifs)) return;
                 const map = new Map();
                 (state.notifications || []).forEach(function (n) { if (n && n.id) map.set(n.id, n); });
@@ -9520,7 +9524,10 @@
                 const dd = document.getElementById('notification-dropdown');
                 if (dd && !dd.classList.contains('hidden')) renderNotificationsUI();
             })
-            .withFailureHandler(function () { /* silent — polling is best-effort */ })
+            .withFailureHandler(function (err) {
+                notifPollInFlight = false;
+                console.warn('Notification refresh failed:', err);
+            })
             .apiGetNotifications(state.authToken || '');
     }
 

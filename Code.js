@@ -1068,18 +1068,24 @@ function apiGetAdminDriveStatus() {
  */
 function apiGetNotifications(token) {
   try {
-    const notifs = dbGetTable_('notifications');
     const session = getPortalSession_(token);
     if (!session) return [];
+    const notifs = dbGetTable_('notifications');
     if (session.role === 'admin' || session.role === 'developer') {
       return Array.isArray(notifs) ? notifs : [];
     }
     if (session.role === 'student') {
-      const data = getFullInitialData_();
-      const student = (data.students || []).find(function (record) { return record.id === session.userId; });
+      let studentRoll = String(session.identifier || '').trim();
+      if (!studentRoll) {
+        const students = dbGetTable_('students');
+        const student = (Array.isArray(students) ? students : []).find(function (record) {
+          return record && record.id === session.userId;
+        });
+        studentRoll = student ? String(student.roll || '').trim() : '';
+      }
       return (Array.isArray(notifs) ? notifs : []).filter(function (notification) {
         return notification.targetStudentId === session.userId ||
-          (student && notification.targetRoll === student.roll) ||
+          (studentRoll && notification.targetRoll === studentRoll) ||
           notification.targetRole === 'all';
       });
     }
