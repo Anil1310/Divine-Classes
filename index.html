@@ -3009,8 +3009,10 @@
     const ATTENDANCE_EMBEDDED_SOURCE = '<?!= Utilities.base64Encode(Utilities.newBlob(include("attendance")).getBytes()) ?>';
 
     function installAttendanceSource(source) {
+        const scriptMatch = source.match(/^\s*<script\b[^>]*>([\s\S]*?)<\/script\s*>\s*$/i);
+        const scriptSource = scriptMatch ? scriptMatch[1] : source;
         const attendanceScript = document.createElement('script');
-        attendanceScript.textContent = source;
+        attendanceScript.textContent = scriptSource;
         document.head.appendChild(attendanceScript);
     }
 

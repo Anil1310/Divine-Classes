@@ -1,3 +1,4 @@
+<script>
     function getAttendanceBatchStudents(batch, batches, students) {
         const activeStudents = students.filter(function (student) {
             return student && student.status !== 'Inactive' && student.status !== 'Blocked';
@@ -485,3 +486,4 @@
             handleFailure
         );
     }
+</script>
