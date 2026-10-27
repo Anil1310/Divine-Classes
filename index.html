@@ -321,21 +321,21 @@
                     <a href="https://www.facebook.com/edivineclasses/" target="_blank" rel="noopener noreferrer"
                         
                         id="sidebar-link-fb"
-                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#1877F2] hover:text-white text-slate-300 transition group cursor-pointer" title="Official Facebook Page">
+                        class="flex min-h-12 flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#1877F2] hover:text-white active:bg-[#1877F2] active:text-white text-slate-300 transition group cursor-pointer" title="Official Facebook Page" aria-label="Open the official Facebook Page">
                         <i class="fa-brands fa-facebook-f text-sm mb-1 text-[#1877F2] group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">Facebook</span>
                     </a>
                     <a href="https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq" target="_blank" rel="noopener noreferrer"
                         
                         id="sidebar-link-ig"
-                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-600 hover:to-purple-600 hover:text-white text-slate-300 transition group cursor-pointer" title="Official Instagram Profile">
+                        class="flex min-h-12 flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-600 hover:to-purple-600 active:bg-pink-600 hover:text-white active:text-white text-slate-300 transition group cursor-pointer" title="Official Instagram Profile" aria-label="Open the official Instagram Profile">
                         <i class="fa-brands fa-instagram text-sm mb-1 text-pink-500 group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">Instagram</span>
                     </a>
                     <a href="https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8" target="_blank" rel="noopener noreferrer"
                         
                         id="sidebar-link-yt"
-                        class="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#FF0000] hover:text-white text-slate-300 transition group cursor-pointer" title="Official YouTube Channel">
+                        class="flex min-h-12 flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-800/70 hover:bg-[#FF0000] hover:text-white active:bg-[#FF0000] active:text-white text-slate-300 transition group cursor-pointer" title="Official YouTube Channel" aria-label="Open the official YouTube Channel">
                         <i class="fa-brands fa-youtube text-sm mb-1 text-[#FF0000] group-hover:text-white"></i>
                         <span class="text-[9px] font-medium">YouTube</span>
                     </a>
@@ -1856,87 +1856,20 @@
         return url;
     }
 
-    function openSocialExternalApp(platform, event) {
-        if (event && event.preventDefault) {
-            try { event.preventDefault(); } catch (err) { }
-        }
-
-        const s = (state && state.settings) || {};
-        let webUrl = getSocialLink(platform);
-        const ua = navigator.userAgent || '';
-        const isAndroid = /Android/i.test(ua);
-        const isIOS = /iPhone|iPad|iPod/i.test(ua);
-        const isMobile = isAndroid || isIOS;
-
-        if (!isMobile) {
-            window.open(webUrl, '_blank', 'noopener,noreferrer');
-            return;
-        }
-
-        let appUrl = '';
-        if (platform === 'youtube') {
-            if (isAndroid) {
-                appUrl = 'intent://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8#Intent;package=com.google.android.youtube;scheme=https;end;';
-            } else if (isIOS) {
-                appUrl = 'vnd.youtube://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8';
-            }
-        } else if (platform === 'instagram') {
-            const igUser = 'divineclasses_paschimpuri';
-            if (isAndroid) {
-                appUrl = 'intent://instagram.com/_u/' + igUser + '#Intent;package=com.instagram.android;scheme=https;end;';
-            } else if (isIOS) {
-                appUrl = 'instagram://user?username=' + igUser;
-            }
-        } else if (platform === 'facebook') {
-            const fbPage = 'edivineclasses';
-            if (isAndroid) {
-                appUrl = 'intent://facebook.com/' + fbPage + '#Intent;package=com.facebook.katana;scheme=https;end;';
-            } else if (isIOS) {
-                appUrl = 'fb://facewebmodal/f?href=https://www.facebook.com/' + fbPage;
-            }
-        }
-
-        if (appUrl) {
-            if (isAndroid) {
-                try {
-                    window.location.href = appUrl;
-                    return;
-                } catch (e) {
-                    window.open(webUrl, '_blank', 'noopener,noreferrer');
-                    return;
-                }
-            } else if (isIOS) {
-                const startTime = Date.now();
-                window.location.href = appUrl;
-                setTimeout(function () {
-                    if (Date.now() - startTime < 2000) {
-                        window.open(webUrl, '_blank', 'noopener,noreferrer');
-                    }
-                }, 1000);
-                return;
-            }
-        }
-
-        window.open(webUrl, '_blank', 'noopener,noreferrer');
-    }
-
     function updateSocialLinksUI() {
         const fbEl = document.getElementById('sidebar-link-fb');
         if (fbEl) {
             fbEl.href = getSocialLink('facebook');
-            fbEl.onclick = function (e) { openSocialExternalApp('facebook', e); };
         }
 
         const igEl = document.getElementById('sidebar-link-ig');
         if (igEl) {
             igEl.href = getSocialLink('instagram');
-            igEl.onclick = function (e) { openSocialExternalApp('instagram', e); };
         }
 
         const ytEl = document.getElementById('sidebar-link-yt');
         if (ytEl) {
             ytEl.href = getSocialLink('youtube');
-            ytEl.onclick = function (e) { openSocialExternalApp('youtube', e); };
         }
     }
 
@@ -3175,13 +3108,13 @@
                             <p class="text-xs text-indigo-100 mt-1">Watch free YouTube concept marathons, topper interviews on Instagram, and daily exam schedules on Facebook.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 shrink-0">
-                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('facebook', event)" class="px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                            <a href="${escapeAttr(getSocialLink('facebook'))}" target="_blank" rel="noopener noreferrer" class="min-h-12 px-4 py-2.5 rounded-xl bg-white text-[#1877F2] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 active:scale-95 transition cursor-pointer">
                                 <i class="fa-brands fa-facebook text-base"></i> Facebook Page
                             </a>
-                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('instagram', event)" class="px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                            <a href="${escapeAttr(getSocialLink('instagram'))}" target="_blank" rel="noopener noreferrer" class="min-h-12 px-4 py-2.5 rounded-xl bg-white text-pink-600 font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 active:scale-95 transition cursor-pointer">
                                 <i class="fa-brands fa-instagram text-base"></i> Instagram
                             </a>
-                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer" onclick="openSocialExternalApp('youtube', event)" class="px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 transition cursor-pointer">
+                            <a href="${escapeAttr(getSocialLink('youtube'))}" target="_blank" rel="noopener noreferrer" class="min-h-12 px-4 py-2.5 rounded-xl bg-white text-[#FF0000] font-semibold text-xs flex items-center gap-2 shadow-sm hover:scale-105 active:scale-95 transition cursor-pointer">
                                 <i class="fa-brands fa-youtube text-base"></i> YouTube Channel
                             </a>
                         </div>
