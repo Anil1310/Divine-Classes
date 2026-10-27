@@ -2702,7 +2702,9 @@
         if (sidebar) sidebar.style.display = '';
         if (!navContainer) return;
 
-        const allowedItems = navItems;
+        const allowedItems = navItems.filter(item =>
+            item.id !== 'settings' || state.currentRole === 'developer'
+        );
 
         navContainer.innerHTML = allowedItems.map(item => {
             const isActive = state.activeTab === item.id;
