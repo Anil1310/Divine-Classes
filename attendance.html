@@ -83,7 +83,7 @@
                         <div>
                             <div class="mb-2 flex items-center gap-2 text-indigo-100"><i class="fa-solid fa-calendar-check"></i><span class="text-xs font-semibold uppercase tracking-wide">Daily class register</span></div>
                             <h2 class="text-xl sm:text-2xl font-bold font-heading">Attendance</h2>
-                            <p class="mt-1 text-xs sm:text-sm text-indigo-100">Mark each student's status for the selected class. Attendance is organized into monthly spreadsheet tabs.</p>
+                            <p class="mt-1 text-xs sm:text-sm text-indigo-100">Mark each student's status for the selected class. All records stay in one spreadsheet tab and can be filtered by month.</p>
                         </div>
                         <div class="flex flex-wrap gap-3">
                             <label class="text-xs font-semibold text-indigo-100">Month
@@ -238,7 +238,7 @@
                 showToast((result && result.error) || 'Attendance could not be saved.', 'error');
                 return;
             }
-            showToast('Attendance saved to the ' + result.month + ' spreadsheet tab.', 'success');
+            showToast('Attendance saved to the Attendance sheet.', 'success');
             state.attendanceLoadedMonth = '';
             loadAttendanceMonth(state.attendanceMonth);
         };

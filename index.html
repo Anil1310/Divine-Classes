@@ -2869,7 +2869,7 @@
         }
     }
 
-    const ATTENDANCE_EMBEDDED_SOURCE = String.raw`<?!= JSON.stringify(include('attendance')) ?>`;
+    const ATTENDANCE_EMBEDDED_SOURCE = '<?!= Utilities.base64Encode(Utilities.newBlob(include("attendance")).getBytes()) ?>';
 
     function installAttendanceSource(source) {
         const attendanceScript = document.createElement('script');
@@ -2879,10 +2879,15 @@
 
     const attendanceSourceReady = (function () {
         try {
-            const embeddedSource = JSON.parse(ATTENDANCE_EMBEDDED_SOURCE);
+            if (!/^[A-Za-z0-9+/]+={0,2}$/.test(ATTENDANCE_EMBEDDED_SOURCE)) {
+                throw new Error('Attendance source is not embedded in this deployment.');
+            }
+            const binarySource = atob(ATTENDANCE_EMBEDDED_SOURCE);
+            const sourceBytes = Uint8Array.from(binarySource, function (character) { return character.charCodeAt(0); });
+            const embeddedSource = new TextDecoder().decode(sourceBytes);
             installAttendanceSource(embeddedSource);
             return Promise.resolve();
-        } catch (templateNotProcessed) {
+        } catch (embeddedSourceError) {
             return fetch(new URL('attendance.html', document.baseURI).toString())
                 .then(function (response) {
                     if (!response.ok) throw new Error('Attendance source request failed.');
