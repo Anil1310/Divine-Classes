@@ -3557,7 +3557,7 @@ function apiAppendStudent(studentData, batchId) {
 
   try {
     const ss = getDbSpreadsheet();
-    if (!ss) return { success: false, message: 'Spreadsheet not found' };
+    if (!ss) return { success: false, message: 'Database not found' };
     const stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
     
     SpreadsheetApp.flush();
@@ -3729,7 +3729,7 @@ function apiAppendStudent(studentData, batchId) {
 function apiAppendTeacher(teacherData) {
   try {
     const ss = getDbSpreadsheet();
-    if (!ss) return { success: false, message: 'Spreadsheet not found' };
+    if (!ss) return { success: false, message: 'Database not found' };
     const teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
     
     const data = apiGetInitialData();

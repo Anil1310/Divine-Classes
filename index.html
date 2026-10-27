@@ -1182,7 +1182,7 @@
 
     function toggleSheetDummyData(sheetKey, enable) {
         if (state.currentRole !== 'developer') {
-            showToast('Access Denied: Only Developer can toggle sheet demo data.', 'error');
+            showToast('Access Denied: Only Developer can toggle table demo data.', 'error');
             return;
         }
         if (!state.settings) state.settings = {};
@@ -3572,13 +3572,13 @@
                 }
                 saveStateLocally(true);
                 renderMainContent();
-                showToast(`✓ ${name} (${newStu.roll}) synced to Google Sheet!`, 'success');
-                updateSyncBadge('✓ Sheet Synced', 'success');
+                showToast(`✓ ${name} (${newStu.roll}) synced to Database!`, 'success');
+                updateSyncBadge('✓ Database Synced', 'success');
             }
         }
 
         function onAppendError(err) {
-            console.warn('Google Sheet append notice:', err);
+            console.warn('Database append notice:', err);
         }
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -7274,14 +7274,14 @@
         saveStateLocally();
         closeModal();
         renderMainContent();
-        showToast(`Faculty profile for ${name} published for students! Syncing to Google Sheet...`, 'info');
+        showToast(`Faculty profile for ${name} published for students! Syncing to Database...`, 'info');
 
-        // Immediately append to Teachers_Roster in Google Sheet (Two-Way Sync)
+        // Immediately append to Teachers_Roster in Database (Two-Way Sync)
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (res) {
                     if (res && res.success) {
-                        showToast(`✓ Faculty ${name} appended to Teachers_Roster in Google Sheet!`, 'success');
+                        showToast(`✓ Faculty ${name} added to Faculty Directory in Database!`, 'success');
                     }
                 })
                 .withFailureHandler(function (err) {
