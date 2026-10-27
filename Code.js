@@ -2709,7 +2709,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
         jsonSheet = ss.insertSheet('DB_JSON');
         jsonSheet.hideSheet();
       }
-      jsonSheet.getRange(1, 1).setValue(JSON.stringify(appData));
+      jsonSheet.getRange(1, 1).setValue(JSON.stringify(appData)).setFontFamily('Calibri');
       syncReadableSheets(ss, appData);
     }
   } catch (err) {
@@ -2900,7 +2900,7 @@ function apiSyncAllData(fullData) {
           jsonSheet = ss.insertSheet('DB_JSON');
           jsonSheet.hideSheet();
         }
-        jsonSheet.getRange(1, 1).setValue(JSON.stringify(fullData));
+        jsonSheet.getRange(1, 1).setValue(JSON.stringify(fullData)).setFontFamily('Calibri');
 
         // When demo data is disabled: Human-readable sheets reflect ONLY real production records!
         const sheetData = isDemoDisabled ? stripDummyData_(JSON.parse(JSON.stringify(fullData))) : fullData;
@@ -3090,6 +3090,7 @@ function syncReadableSheets(ss, data) {
           sheetRollRowMap[rollKey] = stuSheet.getLastRow();
         }
       });
+      stuSheet.getDataRange().setFontFamily('Calibri');
       SpreadsheetApp.flush();
     }
 
@@ -3751,7 +3752,7 @@ function apiAppendStudent(studentData, batchId) {
     SpreadsheetApp.flush();
     
     // Style the new row
-    stuSheet.getRange(targetRow, 1, 1, 14).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    stuSheet.getRange(targetRow, 1, 1, 14).setFontFamily('Calibri').setFontSize(10).setVerticalAlignment('middle');
     stuSheet.getRange(targetRow, 5)
       .setBackground(status === 'Active' ? '#dcfce7' : (status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
       .setFontColor(status === 'Active' ? '#166534' : (status === 'Blocked' ? '#991b1b' : '#64748b'))
@@ -3858,7 +3859,7 @@ function apiAppendTeacher(teacherData) {
     }
 
     // Style the row
-    teachSheet.getRange(trRow, 1, 1, 10).setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    teachSheet.getRange(trRow, 1, 1, 10).setFontFamily('Calibri').setFontSize(10).setVerticalAlignment('middle');
     // Access status cell (Col 6)
     const stCell = teachSheet.getRange(trRow, 6);
     stCell.setBackground(newTeacherObj.status === 'Active' ? '#dcfce7' : (newTeacherObj.status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
