@@ -211,7 +211,8 @@ function doPost(e) {
     const action = (payload.action || (e && e.parameter && e.parameter.action) || '').trim();
 
     if (action === 'authenticate') {
-      const result = apiAuthenticatePortalUser(payload.identifier, payload.password);
+      const rememberMe = payload.rememberMe === true || String(payload.rememberMe).toLowerCase() === 'true';
+      const result = apiAuthenticatePortalUser(payload.identifier, payload.password, rememberMe);
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -2570,11 +2571,44 @@ function getFullInitialData_() {
   }
 }
 
+var PORTAL_SESSION_PROPERTY_PREFIX = 'DIVINE_PORTAL_SESSION_';
+var PORTAL_REMEMBERED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function removeExpiredRememberedPortalSessions_() {
+  const properties = PropertiesService.getScriptProperties();
+  const storedProperties = properties.getProperties();
+  const now = Date.now();
+  Object.keys(storedProperties).forEach(function (key) {
+    if (key.indexOf(PORTAL_SESSION_PROPERTY_PREFIX) !== 0) return;
+    try {
+      const record = JSON.parse(storedProperties[key]);
+      if (!record || !record.expiresAt || now >= record.expiresAt) {
+        properties.deleteProperty(key);
+      }
+    } catch (err) {
+      properties.deleteProperty(key);
+    }
+  });
+}
+
 function getPortalSession_(token) {
   if (!token || typeof token !== 'string') return null;
   try {
-    const cached = CacheService.getScriptCache().get('DIVINE_PORTAL_SESSION_' + token);
-    return cached ? JSON.parse(cached) : null;
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(PORTAL_SESSION_PROPERTY_PREFIX + token);
+    if (cached) return JSON.parse(cached);
+
+    const propertyKey = PORTAL_SESSION_PROPERTY_PREFIX + token;
+    const stored = PropertiesService.getScriptProperties().getProperty(propertyKey);
+    if (!stored) return null;
+    const record = JSON.parse(stored);
+    if (!record || !record.session || !record.expiresAt || Date.now() >= record.expiresAt) {
+      PropertiesService.getScriptProperties().deleteProperty(propertyKey);
+      return null;
+    }
+    const remainingSeconds = Math.ceil((record.expiresAt - Date.now()) / 1000);
+    cache.put(propertyKey, JSON.stringify(record.session), Math.min(21600, remainingSeconds));
+    return record.session;
   } catch (err) {
     Logger.log('getPortalSession_ error: ' + err.toString());
     return null;
@@ -2683,7 +2717,7 @@ function filterPortalData_(fullData, session) {
   return data;
 }
 
-function apiAuthenticatePortalUser(identifier, password) {
+function apiAuthenticatePortalUser(identifier, password, rememberMe) {
   const loginId = String(identifier || '').trim();
   const loginPassword = String(password || '').trim();
   if (!loginId || !loginPassword) return { success: false, error: 'Enter your login ID and password.' };
@@ -2751,7 +2785,19 @@ function apiAuthenticatePortalUser(identifier, password) {
 
   if (!session) return { success: false, error: error };
   const token = Utilities.getUuid() + Utilities.getUuid();
-  CacheService.getScriptCache().put('DIVINE_PORTAL_SESSION_' + token, JSON.stringify(session), 21600);
+  const sessionKey = PORTAL_SESSION_PROPERTY_PREFIX + token;
+  const sessionCache = CacheService.getScriptCache();
+  if (rememberMe === true) {
+    removeExpiredRememberedPortalSessions_();
+    const expiresAt = Date.now() + PORTAL_REMEMBERED_SESSION_TTL_MS;
+    PropertiesService.getScriptProperties().setProperty(sessionKey, JSON.stringify({
+      session: session,
+      expiresAt: expiresAt
+    }));
+    sessionCache.put(sessionKey, JSON.stringify(session), 21600);
+  } else {
+    sessionCache.put(sessionKey, JSON.stringify(session), 21600);
+  }
   return {
     success: true,
     token: token,
@@ -2770,7 +2816,8 @@ function apiGetInitialData(token) {
 
 function apiLogoutPortalSession(token) {
   if (!token || typeof token !== 'string') return { success: true };
-  CacheService.getScriptCache().remove('DIVINE_PORTAL_SESSION_' + token);
+  CacheService.getScriptCache().remove(PORTAL_SESSION_PROPERTY_PREFIX + token);
+  PropertiesService.getScriptProperties().deleteProperty(PORTAL_SESSION_PROPERTY_PREFIX + token);
   return { success: true };
 }
 
