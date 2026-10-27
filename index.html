@@ -5405,25 +5405,19 @@
                 </div>
 
                 <!-- ID card download controls -->
-                <div class="mt-4 flex flex-wrap items-center justify-center gap-3 no-print">
-                    <button onclick="downloadStudentIdCardAsJPG('${stu.id}')" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download ID Card as .JPG image">
+                <div class="mt-4 flex w-full flex-nowrap items-center justify-center gap-2 no-print">
+                    <button onclick="downloadStudentIdCardAsJPG('${stu.id}')" class="min-w-0 whitespace-nowrap px-2 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-[10px] font-bold shadow-md transition flex items-center justify-center gap-1 cursor-pointer active:scale-95" title="Download ID Card as .JPG image">
                         <i class="fa-solid fa-image text-sm"></i>
                         <span>Download JPG</span>
                     </button>
-                    <button onclick="downloadStudentIdCardAsPDF('${stu.id}')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download the ID card as a PDF">
+                    <button onclick="downloadStudentIdCardAsPDF('${stu.id}')" class="min-w-0 whitespace-nowrap px-2 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-[10px] font-bold shadow-md transition flex items-center justify-center gap-1 cursor-pointer active:scale-95" title="Download the ID card as a PDF">
                         <i class="fa-solid fa-file-pdf text-sm"></i>
                         <span>Download PDF</span>
                     </button>
-                    <button onclick="printStudentIdCard('${stu.id}')" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Print or save the ID card as PDF">
-                        <i class="fa-solid fa-print text-sm"></i>
-                        <span>Print / Save PDF</span>
-                    </button>
-
-                    <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
+                    <button onclick="closeModal()" class="whitespace-nowrap px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-bold transition cursor-pointer">
                         Close
                     </button>
                 </div>
-                <p class="mt-2 text-center text-[11px] text-slate-500 no-print">Downloads stay in this app. Use Print / Save PDF to print or save a PDF copy.</p>
             </div>
         `;
         openModal(cardHtml);
