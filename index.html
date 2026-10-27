@@ -1059,6 +1059,11 @@
         selectedBatchFilter: 'all',
         selectedTestId: 't1',
         showAllMaterials: false,
+        attendanceRecords: [],
+        attendanceMonth: '',
+        attendanceDate: '',
+        attendanceBatchId: '',
+        attendanceLoadedMonth: '',
 
         // Seed Demo Records from DummyData.js
         batches: seedDemo.batches,
@@ -2217,6 +2222,7 @@
     const navItems = [
         { id: 'dashboard', label: 'Overview Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'teacher', 'student'] },
         { id: 'batches', label: 'Batches & Students', icon: 'fa-users-rectangle', roles: ['admin', 'teacher', 'student'], req: '1' },
+        { id: 'attendance', label: 'Daily Attendance', icon: 'fa-calendar-check', roles: ['admin', 'teacher'] },
         { id: 'fees', label: 'Student Fees & Reminders', icon: 'fa-indian-rupee-sign', roles: ['admin'], req: '2, 5' },
         { id: 'access', label: 'Access Control', icon: 'fa-user-gear', roles: ['admin'], req: '11' },
         { id: 'materials', label: 'Assignments & DPPs', icon: 'fa-file-pdf', roles: ['admin', 'teacher', 'student'], req: '3' },
@@ -2420,6 +2426,9 @@
         if ((state.activeTab === 'fees' || state.activeTab === 'access') && newRole !== 'admin' && newRole !== 'developer') {
             onRestricted = true;
         }
+        if (state.activeTab === 'attendance' && ['admin', 'developer', 'teacher'].indexOf(newRole) === -1) {
+            onRestricted = true;
+        }
         if (state.activeTab === 'settings' && newRole !== 'developer') {
             onRestricted = true;
         }
@@ -2602,6 +2611,10 @@
             showToast('Access Denied! Institute Settings are visible ONLY to the Developer role.', 'error');
             return;
         }
+        if (tabId === 'attendance' && ['admin', 'developer', 'teacher'].indexOf(state.currentRole) === -1) {
+            showToast('Access Denied! Attendance is available only to Admins and Teachers.', 'error');
+            return;
+        }
         state.activeTab = tabId;
         renderSidebar();
         renderMainContent();
@@ -2630,6 +2643,7 @@
                 { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
                 { id: 'batches', label: 'Batches', icon: 'fa-users-rectangle' },
                 { id: 'fees', label: 'Fees', icon: 'fa-indian-rupee-sign' },
+                { id: 'attendance', label: 'Attend', icon: 'fa-calendar-check' },
                 { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
                 { id: 'settings', label: 'Settings', icon: 'fa-gear' },
                 { id: '_menu', label: 'Menu', icon: 'fa-bars', isMenu: true }
@@ -2639,6 +2653,7 @@
                 { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
                 { id: 'batches', label: 'Batches', icon: 'fa-users-rectangle' },
                 { id: 'fees', label: 'Fees', icon: 'fa-indian-rupee-sign' },
+                { id: 'attendance', label: 'Attend', icon: 'fa-calendar-check' },
                 { id: 'materials', label: 'DPPs', icon: 'fa-file-pdf' },
                 { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
                 { id: '_menu', label: 'Menu', icon: 'fa-bars', isMenu: true }
@@ -2647,6 +2662,7 @@
             items = [
                 { id: 'dashboard', label: 'Home', icon: 'fa-chart-pie' },
                 { id: 'batches', label: 'Batches', icon: 'fa-users-rectangle' },
+                { id: 'attendance', label: 'Attend', icon: 'fa-calendar-check' },
                 { id: 'materials', label: 'DPPs', icon: 'fa-file-pdf' },
                 { id: 'marks', label: 'Marks', icon: 'fa-chart-line' },
                 { id: 'feedback', label: 'Feedback', icon: 'fa-comments' },
@@ -2708,6 +2724,7 @@
 
         const allowedItems = navItems.filter(item => {
             if (item.id === 'settings') return state.currentRole === 'developer';
+            if (item.id === 'attendance') return ['admin', 'developer', 'teacher'].indexOf(state.currentRole) !== -1;
             if (item.id === 'fees' || item.id === 'access') {
                 return state.currentRole === 'admin' || state.currentRole === 'developer';
             }
@@ -2751,6 +2768,7 @@
             dashboard: ['Institute Overview Dashboard', 'Divine Classes • Real-time stats, batches, results, and quick actions'],
             batches: ['Batch Creation & Student Roster', 'Requirement #1: Create batches and add or remove students seamlessly'],
             fees: ['Student Fees & Reminder Center', 'Requirement #2 & #5: Strictly Admin-only fee tracking & instant WhatsApp/SMS reminders'],
+            attendance: ['Daily Attendance', 'Record attendance for each class and review the month-wise register'],
             materials: ['Batch Assignments, DPPs & Test Papers', 'Requirement #3: Upload and download PDF assignments, worksheets, and papers'],
             marks: ['Offline Class Test Marks Tracker', 'Requirement #4: Track and update student marks scored in offline tests & report cards'],
             teachers: ['Expert Faculty Profiles', 'Requirement #6: View teacher qualifications, subjects, and doubt-clearing timings'],
@@ -2797,6 +2815,11 @@
             case 'batches':
                 container.innerHTML = renderBatchesView();
                 break;
+            case 'attendance':
+                container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher')
+                    ? renderAttendanceView()
+                    : renderAccessDeniedView('Daily Attendance', 'Admin, Developer or Teacher');
+                break;
             case 'fees':
                 container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer')
                     ? renderFeesView()
@@ -2835,6 +2858,8 @@
                 break;
         }
     }
+
+    <?!= include('attendance'); ?>
 
     /********************************************************************
      * VIEW: OVERVIEW DASHBOARD
@@ -10201,8 +10226,8 @@
     window.addEventListener('pageshow', function (event) {
         if (!event.persisted) return;
         if (state.isAuthenticated && state.authToken) {
-            loadPortalData(state.authToken);
-            return;
+                loadPortalData(state.authToken);
+                return;
         }
         const savedToken = loadAuthSession();
         if (savedToken) loadPortalData(savedToken);

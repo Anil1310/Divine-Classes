@@ -45,6 +45,17 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (e && e.parameter && e.parameter.action === 'getAttendance') {
+      const result = apiGetMonthlyAttendance(e.parameter.month || '', e.parameter.token || '');
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(result) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 2c. Save Offline Test Marks via GET (Executes with zero CORS/redirect failures from Vercel)
     if (e && e.parameter && (e.parameter.action === 'saveTestMarks' || e.parameter.action === 'submitTestMarks' || e.parameter.action === 'submitAllMarks')) {
       let testPayload = {};
@@ -258,6 +269,12 @@ function doPost(e) {
     if (action === 'getData' || action === 'loadData') {
       const data = apiGetInitialData(payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'saveAttendance') {
+      const result = apiSaveDailyAttendance(payload.data || payload, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -2661,6 +2678,7 @@ function filterPortalData_(fullData, session) {
       return {
         id: student.id,
         name: student.name,
+        roll: student.roll,
         status: student.status,
         batchId: student.batchId
       };
@@ -2814,6 +2832,171 @@ function apiGetInitialData(token) {
   const safeData = filterPortalData_(data, session);
   if (session) safeData.portalSession = session;
   return safeData;
+}
+
+const ATTENDANCE_HEADERS_ = ['Date', 'Batch ID', 'Batch Name', 'Student ID', 'Roll No', 'Student Name', 'Status', 'Marked By', 'Updated At'];
+
+function getAttendanceSheet_(spreadsheet, month) {
+  const sheetName = 'Attendance_' + month.replace('-', '_');
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS_.length).setValues([ATTENDANCE_HEADERS_]);
+    sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS_.length)
+      .setFontFamily('Calibri')
+      .setFontSize(10)
+      .setFontWeight('bold')
+      .setBackground('#4f46e5')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    sheet.setTabColor('#4f46e5');
+    sheet.setRowHeight(1, 28);
+    sheet.autoResizeColumns(1, ATTENDANCE_HEADERS_.length);
+  }
+  return sheet;
+}
+
+function apiGetMonthlyAttendance(month, token) {
+  const session = getPortalSession_(token);
+  if (!session || ['admin', 'developer', 'teacher'].indexOf(session.role) === -1) {
+    return { success: false, error: 'Access denied.' };
+  }
+  if (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month) ||
+      Number(month.slice(5, 7)) < 1 || Number(month.slice(5, 7)) > 12) {
+    return { success: false, error: 'A valid attendance month is required.' };
+  }
+
+  const spreadsheet = getDbSpreadsheet();
+  if (!spreadsheet) return { success: false, error: 'Could not open the attendance spreadsheet.' };
+  const sheet = spreadsheet.getSheetByName('Attendance_' + month.replace('-', '_'));
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, records: [] };
+
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, ATTENDANCE_HEADERS_.length).getValues();
+  const records = values.filter(function (row) { return row[0] && row[1] && row[3]; }).map(function (row) {
+    return {
+      date: row[0] instanceof Date ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(row[0]),
+      batchId: String(row[1]),
+      batchName: String(row[2] || ''),
+      studentId: String(row[3]),
+      roll: String(row[4] || ''),
+      name: String(row[5] || ''),
+      status: String(row[6] || ''),
+      markedBy: String(row[7] || ''),
+      updatedAt: String(row[8] || '')
+    };
+  });
+  return { success: true, records: records };
+}
+
+function apiSaveDailyAttendance(payload, token) {
+  const session = getPortalSession_(token);
+  if (!session || ['admin', 'developer', 'teacher'].indexOf(session.role) === -1) {
+    return { success: false, error: 'Access denied.' };
+  }
+  if (!payload || typeof payload.date !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(payload.date) ||
+      isNaN(Date.parse(payload.date + 'T00:00:00Z')) ||
+      Utilities.formatDate(new Date(payload.date + 'T00:00:00Z'), 'UTC', 'yyyy-MM-dd') !== payload.date) {
+    return { success: false, error: 'A valid attendance date is required.' };
+  }
+  if (typeof payload.batchId !== 'string' || !payload.batchId.trim() ||
+      !Array.isArray(payload.entries) || payload.entries.length === 0) {
+    return { success: false, error: 'Select a batch and mark at least one student.' };
+  }
+
+  const allowedStatuses = ['Present', 'Absent', 'Late', 'Leave'];
+  const appData = getFullInitialData_();
+  const batches = Array.isArray(appData.batches) ? appData.batches : [];
+  const students = Array.isArray(appData.students) ? appData.students : [];
+  const batch = batches.find(function (record) { return record.id === payload.batchId; });
+  if (!batch) return { success: false, error: 'The selected batch could not be found.' };
+
+  const batchStudentIds = batch.studentIds || [];
+  const otherBatchStudentIds = [];
+  batches.forEach(function (record) {
+    if (record.id !== batch.id) {
+      (record.studentIds || []).forEach(function (studentId) {
+        otherBatchStudentIds.push(String(studentId));
+      });
+    }
+  });
+  const seenStudents = {};
+  const validatedRows = [];
+  for (let i = 0; i < payload.entries.length; i++) {
+    const entry = payload.entries[i] || {};
+    const student = students.find(function (record) {
+      return String(record.id) === String(entry.studentId);
+    });
+    if (!student || student.status === 'Inactive' || student.status === 'Blocked') {
+      return { success: false, error: 'An active student in this roster could not be found.' };
+    }
+    const isInBatch = batchStudentIds.some(function (identifier) {
+      return String(identifier) === String(student.id) || String(identifier) === String(student.roll);
+    });
+    const isUnassignedPrimaryBatchStudent = batches[0] && batches[0].id === batch.id &&
+      !otherBatchStudentIds.some(function (identifier) {
+        return identifier === String(student.id) || identifier === String(student.roll);
+      });
+    if (!isInBatch && !isUnassignedPrimaryBatchStudent) {
+      return { success: false, error: 'A student is not assigned to the selected batch.' };
+    }
+    if (seenStudents[student.id] || allowedStatuses.indexOf(entry.status) === -1) {
+      return { success: false, error: 'Attendance contains a duplicate student or an invalid status.' };
+    }
+    seenStudents[student.id] = true;
+    validatedRows.push([
+      payload.date,
+      batch.id,
+      batch.name || '',
+      student.id,
+      student.roll || '',
+      student.name || '',
+      entry.status,
+      session.name || session.identifier || '',
+      new Date().toISOString()
+    ]);
+  }
+
+  const spreadsheet = getDbSpreadsheet();
+  if (!spreadsheet) return { success: false, error: 'Could not open the attendance spreadsheet.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const month = payload.date.slice(0, 7);
+    const sheet = getAttendanceSheet_(spreadsheet, month);
+    const lastRow = sheet.getLastRow();
+    const existing = lastRow > 1
+      ? sheet.getRange(2, 1, lastRow - 1, ATTENDANCE_HEADERS_.length).getValues()
+      : [];
+    const rowByStudent = {};
+    existing.forEach(function (row, index) {
+      const rowDate = row[0] instanceof Date
+        ? Utilities.formatDate(row[0], 'UTC', 'yyyy-MM-dd')
+        : String(row[0] || '');
+      if (rowDate === payload.date && String(row[1]) === batch.id) {
+        rowByStudent[String(row[3])] = index + 2;
+      }
+    });
+
+    const appendRows = [];
+    validatedRows.forEach(function (row) {
+      const existingRow = rowByStudent[row[3]];
+      if (existingRow) {
+        sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+      } else {
+        appendRows.push(row);
+      }
+    });
+    if (appendRows.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, appendRows.length, ATTENDANCE_HEADERS_.length).setValues(appendRows);
+    }
+    sheet.getDataRange().setFontFamily('Calibri').setFontSize(10).setVerticalAlignment('middle');
+    sheet.autoResizeColumns(1, ATTENDANCE_HEADERS_.length);
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return { success: true, savedCount: validatedRows.length, month: payload.date.slice(0, 7) };
 }
 
 function apiLogoutPortalSession(token) {
