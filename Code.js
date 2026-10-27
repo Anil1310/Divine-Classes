@@ -4652,17 +4652,20 @@ function apiAppendStudent(studentData, batchId) {
     
     const stuId = 'stu_' + roll.replace(/\D/g, '');
 
-    // Handle photo upload to drive if base64
+    // Store each new student's required photo in Drive before saving the profile.
     let pUrl = studentData.photoUrl || studentData.photo || '';
     if (pUrl && pUrl.startsWith('data:image')) {
       try {
         pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'student_' + roll, studentData.name);
       } catch (photoErr) {
         Logger.log('Drive photo upload error: ' + photoErr.toString());
+        return { success: false, message: 'The student photo could not be uploaded to Google Drive. The student was not enrolled.' };
       }
     }
-    if (!pUrl) {
-      pUrl = getRandomAvatarUrl_(studentData.name || roll, 'student');
+    if (!/^https:\/\/drive\.google\.com\/file\/d\//i.test(pUrl)) {
+      return { success: false, message: pUrl
+        ? 'The student photo was not saved to Google Drive. Please capture or choose the photo again.'
+        : 'A student photo is required. Capture or choose a photo before enrolling.' };
     }
 
     const monthly = Number(studentData.monthlyFee || studentData.totalFee) || 2500;

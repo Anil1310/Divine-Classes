@@ -3053,18 +3053,18 @@
                             <span id="new-stu-reminder-preview" class="font-bold text-indigo-900">${formatFeeDateDisplay(calculateNextFeeReminder(new Date().toISOString().split('T')[0], 1))}</span>
                         </div>
 
-                        <!-- Optional Photo Upload -->
+                        <!-- Required student photo; the server stores it in Google Drive during enrollment. -->
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
                             <div id="new-stu-photo-preview" class="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 overflow-hidden shrink-0">
                                 <i class="fa-solid fa-camera text-base"></i>
                             </div>
                             <div class="flex-1">
-                                <p class="text-xs font-bold text-slate-700">Student Photo</p>
-                                <p class="text-[10px] text-slate-400">Passport photo for ID card & directory.</p>
+                                <p class="text-xs font-bold text-slate-700">Student Photo <span class="text-rose-500">*</span></p>
+                                <p class="text-[10px] text-slate-400">Required · Saved to Google Drive and the student sheet.</p>
                             </div>
                             <label class="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition">
-                                <i class="fa-solid fa-upload mr-1"></i> Choose
-                                <input type="file" accept="image/*" class="hidden" onchange="handleNewStudentPhotoPick(event)">
+                                <i class="fa-solid fa-camera mr-1"></i> Capture / Choose
+                                <input type="file" accept="image/*" capture="user" class="hidden" onchange="handleNewStudentPhotoPick(event)">
                             </label>
                         </div>
 
@@ -3083,6 +3083,7 @@
     async function handleNewStudentPhotoPick(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
+        event.target.value = '';
         try {
             showToast('Compressing photo for storage...', 'info');
             const dataUrl = await processImageUpload(file);
@@ -3158,9 +3159,14 @@
             return;
         }
 
+        if (!window.newStudentPhotoData) {
+            showToast('Capture or choose a student photo before enrolling. It will be saved to Google Drive.', 'error');
+            return;
+        }
+
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Enrolling...';
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving photo & enrolling...';
         }
 
         // Find true maximum numeric roll number across all students to prevent roll collisions
@@ -3192,51 +3198,52 @@
             password: 'password123',
             status: 'Active'
         };
-        window.newStudentPhotoData = '';
-
-        state.students.push(newStu);
-        if (batch) {
-            if (!batch.studentIds) batch.studentIds = [];
-            if (!batch.studentIds.includes(newStu.id)) batch.studentIds.push(newStu.id);
-            if (!batch.studentIds.includes(newStu.roll)) batch.studentIds.push(newStu.roll);
-        }
-
-        saveStateLocally(true);
-        closeModal();
-        renderMainContent();
-        showToast(`✓ New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}!`, 'success');
 
         function onAppendSuccess(res) {
             window.isEnrollingStudent = false;
-            if (res && res.success) {
-                if (res.student) {
-                    const idx = state.students.findIndex(s => (s && s.roll === res.student.roll) || (s && s.id === newStu.id) || (s && s.roll === newStu.roll));
-                    if (idx !== -1) {
-                        state.students[idx] = Object.assign({}, state.students[idx], res.student);
-                    } else {
-                        state.students.push(res.student);
-                    }
+            if (!res || !res.success || !res.student) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Enroll & Add to Batch';
                 }
-                if (res.batches && Array.isArray(res.batches) && res.batches.length > 0) {
-                    res.batches.forEach(rb => {
-                        const localB = state.batches.find(b => b.id === rb.id);
-                        if (localB && Array.isArray(rb.studentIds)) {
-                            rb.studentIds.forEach(id => {
-                                if (!localB.studentIds.includes(id)) localB.studentIds.push(id);
-                            });
-                        }
-                    });
-                }
-                saveStateLocally(true);
-                renderMainContent();
-                showToast(`✓ ${name} (${(res.student && res.student.roll) || newStu.roll}) synced to Database!`, 'success');
-                updateSyncBadge('✓ Database Synced', 'success');
+                showToast((res && res.message) || 'Student could not be enrolled. Please try again.', 'error');
+                return;
             }
+            const savedStudent = res.student;
+            const idx = state.students.findIndex(function (student) {
+                return (student && student.roll === savedStudent.roll) ||
+                    (student && student.id === savedStudent.id) ||
+                    (student && student.roll === newStu.roll);
+            });
+            if (idx !== -1) state.students[idx] = Object.assign({}, state.students[idx], savedStudent);
+            else state.students.push(savedStudent);
+            if (res.batches && Array.isArray(res.batches)) {
+                res.batches.forEach(function (remoteBatch) {
+                    const localBatch = state.batches.find(function (item) { return item.id === remoteBatch.id; });
+                    if (localBatch && Array.isArray(remoteBatch.studentIds)) {
+                        localBatch.studentIds.forEach(function (id) {
+                            if (!localBatch.studentIds.includes(id)) localBatch.studentIds.push(id);
+                        });
+                    }
+                });
+            }
+            window.newStudentPhotoData = '';
+            saveStateLocally(true);
+            closeModal();
+            renderMainContent();
+            showToast(`✓ ${name} (${savedStudent.roll}) enrolled with photo saved to Google Drive and the student sheet.`, 'success');
+            updateSyncBadge('✓ Database Synced', 'success');
         }
 
         function onAppendError(err) {
             window.isEnrollingStudent = false;
-            console.warn('Database append notice:', err);
+            console.error('Student enrollment failed:', err);
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Enroll & Add to Batch';
+            }
+            showToast('Student could not be enrolled or the photo could not be saved to Google Drive: ' +
+                ((err && err.message) || err || 'Please try again.'), 'error');
         }
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
