@@ -259,6 +259,12 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'saveStudentAddress') {
+      const result = apiUpdateStudentAddress(payload.studentId, payload.address, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 1. Upload Assignment / Material to Google Drive and sync to Database
     if (action === 'uploadMaterial') {
       const fileData = payload.fileData || payload.fileBase64 || payload.dataUrl;
@@ -1565,6 +1571,7 @@ function mergeStudentsFromSheet_(appData) {
     const cDueDate = getCol(['next fee due date', 'fee due date', 'due date', 'fee reminder date'], cFeeStatus !== -1 ? 11 : 10);
     const cLastReminder = getCol(['last reminder sent', 'last reminder'], cFeeStatus !== -1 ? 12 : 11);
     const cPhoto = getCol(['photo url', 'photo'], cFeeStatus !== -1 ? 13 : 12);
+    const cAddress = getCol(['student address', 'home address', 'address'], -1);
 
     const duplicateRowsToDelete = [];
     const seenRollsInSheet = {};
@@ -1638,6 +1645,7 @@ function mergeStudentsFromSheet_(appData) {
         stu.paidFee = paidFee;
         if (dueDate && !/^fully paid$/i.test(dueDate)) stu.dueDate = dueDate;
         stu.lastReminder = lastReminder;
+        if (cAddress !== -1) stu.address = String(row[cAddress] || '').trim();
         if (photoUrl && photoUrl !== 'Photo URL') {
           stu.photo = photoUrl;
           stu.photoUrl = photoUrl;
@@ -1660,6 +1668,7 @@ function mergeStudentsFromSheet_(appData) {
           paidFee: paidFee,
           dueDate: /^fully paid$/i.test(dueDate) ? '' : (dueDate || '2026-11-11'),
           lastReminder: lastReminder,
+          address: cAddress !== -1 ? String(row[cAddress] || '').trim() : '',
           photo: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : null,
           photoUrl: (photoUrl && photoUrl !== 'Photo URL') ? photoUrl : ''
         });
@@ -3926,16 +3935,19 @@ function syncReadableSheets(ss, data) {
     {
       let stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
       const headers = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL'];
+      headers.push('Student Address');
       
       if (!isDummyForSheetEnabled_(data.settings, 'students')) {
         removeDemoStudentRows_(stuSheet, seed);
       }
       SpreadsheetApp.flush();
       let curVals = stuSheet.getDataRange().getValues();
-      if (!curVals || curVals.length === 0 || curVals[0].length < headers.length) {
+      if (!curVals || curVals.length === 0 || !String(curVals[0][0] || '').toLowerCase().includes('roll')) {
         stuSheet.clear();
         stuSheet.appendRow(headers);
         curVals = [headers];
+      } else {
+        stuSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       }
       
       const sheetRollRowMap = {};
@@ -3974,7 +3986,8 @@ function syncReadableSheets(ss, data) {
           isPaid ? 'Paid' : 'Pending',
           s.dueDate || calculateNextFeeReminder_(s.admissionDate || '2026-10-10', 1),
           s.lastReminder || 'Never',
-          pUrl
+          pUrl,
+          s.address || ''
         ];
 
         if (sheetRollRowMap[rollKey]) {
@@ -4375,6 +4388,7 @@ function apiUpdateStudentProfile(studentId, profileData, token) {
     if (profileData.roll !== undefined) student.roll = String(profileData.roll).trim();
     if (profileData.phone !== undefined) student.phone = String(profileData.phone).trim();
     if (profileData.parentName !== undefined) student.parentName = String(profileData.parentName).trim();
+    if (profileData.address !== undefined) student.address = String(profileData.address).trim();
     if (profileData.admissionDate !== undefined) student.admissionDate = String(profileData.admissionDate).trim();
     if (profileData.password !== undefined) student.password = String(profileData.password).trim();
     if (profileData.monthlyFee !== undefined) {
@@ -4424,6 +4438,22 @@ function apiUpdateStudentProfile(studentId, profileData, token) {
     return { success: false, profileSaved: true, photoUrl: student.photo || '', message: sheetCheck.message };
   }
   return { success: true, photoUrl: student.photo || '' };
+}
+
+function apiUpdateStudentAddress(studentId, address, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied.' };
+  }
+  const data = getFullInitialData_();
+  const student = (data.students || []).find(function (record) { return record.id === studentId; });
+  if (!student) return { success: false, message: 'Student not found.' };
+  student.address = String(address || '').trim();
+  const result = syncAllData_(data);
+  if (!result || !result.success) {
+    return { success: false, message: (result && result.error) || 'Student address could not be saved.' };
+  }
+  return { success: true, address: student.address };
 }
 
 function verifyStudentPhotoUrlInSheet_(student) {
@@ -4685,6 +4715,7 @@ function apiAppendStudent(studentData, batchId) {
       roll: roll,
       name: studentData.name,
       parentName: parentName,
+      address: String(studentData.address || '').trim(),
       phone: phone,
       admissionDate: admDate,
       monthlyFee: monthly,
@@ -4723,6 +4754,8 @@ function apiAppendStudent(studentData, batchId) {
     dbSaveAll_(data);
 
     // Always APPEND a new row to Students_Master in Google Sheet (never replace existing student row)
+    const studentHeaders = ['Roll No', 'Student Name', 'Admission Date', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Monthly Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Payment Status', 'Next Fee Due Date', 'Last Reminder Sent', 'Photo URL', 'Student Address'];
+    stuSheet.getRange(1, 1, 1, studentHeaders.length).setValues([studentHeaders]);
     const newRow = [
       roll,
       newStudentObj.name,
@@ -4737,7 +4770,8 @@ function apiAppendStudent(studentData, batchId) {
       isPaid ? 'Paid' : 'Pending',
       dueDate,
       lastReminder,
-      pUrl
+      pUrl,
+      newStudentObj.address
     ];
 
     stuSheet.appendRow(newRow);
@@ -4745,7 +4779,7 @@ function apiAppendStudent(studentData, batchId) {
     SpreadsheetApp.flush();
     
     // Style the new row
-    stuSheet.getRange(targetRow, 1, 1, 14).setFontFamily('Calibri').setFontSize(10).setVerticalAlignment('middle');
+    stuSheet.getRange(targetRow, 1, 1, 15).setFontFamily('Calibri').setFontSize(10).setVerticalAlignment('middle');
     stuSheet.getRange(targetRow, 5)
       .setBackground(status === 'Active' ? '#dcfce7' : (status === 'Blocked' ? '#fee2e2' : '#f1f5f9'))
       .setFontColor(status === 'Active' ? '#166534' : (status === 'Blocked' ? '#991b1b' : '#64748b'))
