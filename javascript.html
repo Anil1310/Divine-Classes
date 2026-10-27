@@ -3456,18 +3456,29 @@
         });
     }
 
-    async function saveStudentPhotoToProfile(studentId, photoDataUrl) {
+    async function saveStudentPhotoToProfile(studentId, photoDataUrl, returnToAttendance) {
         const stu = state.students.find(function (student) { return student.id === studentId; });
         if (!stu) throw new Error('Student not found.');
         const result = await updateStudentPhotoOnServer(studentId, photoDataUrl);
         if (result.photoUrl && (result.success || result.profileSaved)) {
             stu.photo = result.photoUrl;
             stu.photoUrl = result.photoUrl;
+            if (state.attendanceRoster && Array.isArray(state.attendanceRoster.students)) {
+                const rosterStudent = state.attendanceRoster.students.find(function (student) {
+                    return student.id === studentId;
+                });
+                if (rosterStudent) {
+                    rosterStudent.photo = result.photoUrl;
+                    rosterStudent.photoUrl = result.photoUrl;
+                }
+            }
             saveStateLocally(true);
             renderMainContent();
             updateRoleUI();
-            closeModal();
-            openStudentIdCard(studentId);
+            if (!returnToAttendance) {
+                closeModal();
+                openStudentIdCard(studentId);
+            }
         }
         if (!result.success) {
             throw new Error(result.message || 'The photo could not be saved to Google Drive and the student sheet.');
@@ -3477,6 +3488,7 @@
 
     let activeStudentCameraStream = null;
     let activeCameraStudentId = '';
+    let activeCameraReturnToAttendance = false;
 
     function stopStudentPhotoCamera() {
         if (activeStudentCameraStream) {
@@ -3484,9 +3496,10 @@
             activeStudentCameraStream = null;
         }
         activeCameraStudentId = '';
+        activeCameraReturnToAttendance = false;
     }
 
-    async function openStudentPhotoCamera(studentId) {
+    async function openStudentPhotoCamera(studentId, returnToAttendance) {
         if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
             showToast('Access denied: only administrators can use the live camera.', 'error');
             return;
@@ -3509,6 +3522,7 @@
             });
             activeStudentCameraStream = stream;
             activeCameraStudentId = studentId;
+            activeCameraReturnToAttendance = returnToAttendance === true;
             openModal(`
                 <div class="space-y-4">
                     <div class="text-center">
@@ -3528,10 +3542,11 @@
             await preview.play();
         } catch (err) {
             const cameraDialogWasOpened = !!activeStudentCameraStream;
+            const shouldReturnToAttendance = activeCameraReturnToAttendance;
             stopStudentPhotoCamera();
             if (cameraDialogWasOpened) {
                 closeModal();
-                openStudentIdCard(studentId);
+                if (!shouldReturnToAttendance) openStudentIdCard(studentId);
             }
             console.error('Could not start student camera:', err);
             let message = 'Could not start the camera: ' + ((err && err.message) || err);
@@ -3550,9 +3565,10 @@
 
     function cancelStudentPhotoCamera() {
         const studentId = activeCameraStudentId;
+        const shouldReturnToAttendance = activeCameraReturnToAttendance;
         stopStudentPhotoCamera();
         closeModal();
-        if (studentId) openStudentIdCard(studentId);
+        if (studentId && !shouldReturnToAttendance) openStudentIdCard(studentId);
     }
 
     async function captureStudentPhoto() {
@@ -3563,6 +3579,7 @@
             return;
         }
         const studentId = activeCameraStudentId;
+        const shouldReturnToAttendance = activeCameraReturnToAttendance;
         const preview = document.getElementById('student-photo-camera-preview');
         if (!studentId || !preview || !preview.videoWidth || !preview.videoHeight) {
             showToast('Camera is not ready yet. Please wait a moment and try again.', 'error');
@@ -3584,10 +3601,10 @@
         try {
             const stu = state.students.find(function (student) { return student.id === studentId; });
             showToast(`Uploading photo for ${stu ? stu.name : 'student'}...`, 'info');
-            await saveStudentPhotoToProfile(studentId, photoDataUrl);
+            await saveStudentPhotoToProfile(studentId, photoDataUrl, shouldReturnToAttendance);
         } catch (err) {
             console.error('Student camera capture upload error:', err);
-            openStudentIdCard(studentId);
+            if (!shouldReturnToAttendance) openStudentIdCard(studentId);
             showToast('Photo was captured but could not be saved: ' + (err.message || err), 'error');
         }
     }
