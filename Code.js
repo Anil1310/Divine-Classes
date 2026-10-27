@@ -47,8 +47,27 @@ function doGet(e) {
 
     if (e && e.parameter && e.parameter.action === 'getAttendance') {
       const result = apiGetMonthlyAttendance(e.parameter.month || '', e.parameter.token || '');
-      const callback = e.parameter.callback;
-      if (callback) {
+      const callback = e.parameter.callback || '';
+      if (/^attendance_jsonp_\d+$/.test(callback)) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(result) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (e && e.parameter && e.parameter.action === 'saveAttendance') {
+      let attendancePayload = {};
+      if (e.parameter.data) {
+        try {
+          attendancePayload = JSON.parse(e.parameter.data);
+        } catch (jsonErr) {
+          attendancePayload = {};
+        }
+      }
+      const result = apiSaveDailyAttendance(attendancePayload, e.parameter.token || '');
+      const callback = e.parameter.callback || '';
+      if (/^attendance_jsonp_\d+$/.test(callback)) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(result) + ');')
           .setMimeType(ContentService.MimeType.JAVASCRIPT);
       }
@@ -2945,8 +2964,26 @@ function apiGetMonthlyAttendance(month, token) {
 
   const spreadsheet = getDbSpreadsheet();
   if (!spreadsheet) return { success: false, error: 'Could not open the attendance spreadsheet.' };
+  const appData = getFullInitialData_();
+  const roster = {
+    students: (Array.isArray(appData.students) ? appData.students : []).map(function (student) {
+      return {
+        id: String(student.id || ''),
+        roll: String(student.roll || ''),
+        name: String(student.name || ''),
+        status: String(student.status || 'Active')
+      };
+    }).filter(function (student) { return student.id; }),
+    batches: (Array.isArray(appData.batches) ? appData.batches : []).map(function (batch) {
+      return {
+        id: String(batch.id || ''),
+        name: String(batch.name || ''),
+        studentIds: Array.isArray(batch.studentIds) ? batch.studentIds.map(String) : []
+      };
+    }).filter(function (batch) { return batch.id; })
+  };
   const sheet = getAttendanceSheet_(spreadsheet);
-  if (sheet.getLastRow() < 2) return { success: true, records: [] };
+  if (sheet.getLastRow() < 2) return { success: true, records: [], roster: roster };
 
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, ATTENDANCE_HEADERS_.length).getValues();
   const records = values.filter(function (row) {
@@ -2967,7 +3004,7 @@ function apiGetMonthlyAttendance(month, token) {
       updatedAt: String(row[8] || '')
     };
   });
-  return { success: true, records: records };
+  return { success: true, records: records, roster: roster };
 }
 
 function apiSaveDailyAttendance(payload, token) {
