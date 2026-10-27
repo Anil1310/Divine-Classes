@@ -1593,7 +1593,53 @@
                 }
             });
         }
+
+        // Intelligently union remote students with any non-dummy local students
+        // so real students enrolled on this device are NEVER wiped out by a remote fetch!
+        const remoteStudents = Array.isArray(remoteData.students) ? remoteData.students : [];
+        const remoteRollSet = new Set(remoteStudents.map(function (s) {
+            return String((s && s.roll) || (s && s.id) || '').trim().toUpperCase();
+        }));
+        const localUnsyncedStudents = (state.students || []).filter(function (s) {
+            if (!s || isDummyRecord(s)) return false;
+            const r = String(s.roll || '').trim().toUpperCase();
+            const id = String(s.id || '').trim().toUpperCase();
+            return (!r || !remoteRollSet.has(r)) && (!id || !remoteRollSet.has(id));
+        });
+        const combinedStudents = remoteStudents.concat(localUnsyncedStudents);
+
+        // Intelligently union faculty / teachers
+        const remoteTeachers = Array.isArray(remoteData.teachers) ? remoteData.teachers : [];
+        const remoteTeacherSet = new Set(remoteTeachers.map(function (t) {
+            return String((t && t.id) || (t && t.name) || '').trim().toUpperCase();
+        }));
+        const localUnsyncedTeachers = (state.teachers || []).filter(function (t) {
+            if (!t || isDummyRecord(t)) return false;
+            const tid = String(t.id || '').trim().toUpperCase();
+            const tname = String(t.name || '').trim().toUpperCase();
+            return (!tid || !remoteTeacherSet.has(tid)) && (!tname || !remoteTeacherSet.has(tname));
+        });
+        const combinedTeachers = remoteTeachers.concat(localUnsyncedTeachers);
+
+        // Intelligently union batches so student IDs in batches are preserved
+        let mergedBatches = remoteData.batches;
+        if (Array.isArray(state.batches) && Array.isArray(remoteData.batches)) {
+            mergedBatches = remoteData.batches.map(function (rb) {
+                const localB = state.batches.find(function (b) { return b.id === rb.id; });
+                if (!localB || !Array.isArray(localB.studentIds)) return rb;
+                const idSet = new Set(rb.studentIds || []);
+                localB.studentIds.forEach(function (id) { idSet.add(id); });
+                const updatedB = Object.assign({}, rb);
+                updatedB.studentIds = Array.from(idSet);
+                return updatedB;
+            });
+        }
+
         state = Object.assign(state, remoteData);
+        state.students = combinedStudents;
+        state.teachers = combinedTeachers;
+        if (mergedBatches) state.batches = mergedBatches;
+
         // USER RULE: If developer disabled demo data, never allow remote dummy records to enter state
         if (state.settings && (state.settings.showDummyData === false || state.settings.demoDataPermanentlyDisabled === true)) {
             state.settings.showDummyData = false;
@@ -3109,24 +3155,35 @@
         showToast(`✓ New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}!`, 'success');
 
         function onAppendSuccess(res) {
+            window.isEnrollingStudent = false;
             if (res && res.success) {
                 if (res.student) {
-                    const idx = state.students.findIndex(s => (s && s.roll === res.student.roll) || (s && s.id === newStu.id));
+                    const idx = state.students.findIndex(s => (s && s.roll === res.student.roll) || (s && s.id === newStu.id) || (s && s.roll === newStu.roll));
                     if (idx !== -1) {
                         state.students[idx] = Object.assign({}, state.students[idx], res.student);
+                    } else {
+                        state.students.push(res.student);
                     }
                 }
                 if (res.batches && Array.isArray(res.batches) && res.batches.length > 0) {
-                    state.batches = res.batches;
+                    res.batches.forEach(rb => {
+                        const localB = state.batches.find(b => b.id === rb.id);
+                        if (localB && Array.isArray(rb.studentIds)) {
+                            rb.studentIds.forEach(id => {
+                                if (!localB.studentIds.includes(id)) localB.studentIds.push(id);
+                            });
+                        }
+                    });
                 }
                 saveStateLocally(true);
                 renderMainContent();
-                showToast(`✓ ${name} (${newStu.roll}) synced to Database!`, 'success');
+                showToast(`✓ ${name} (${(res.student && res.student.roll) || newStu.roll}) synced to Database!`, 'success');
                 updateSyncBadge('✓ Database Synced', 'success');
             }
         }
 
         function onAppendError(err) {
+            window.isEnrollingStudent = false;
             console.warn('Database append notice:', err);
         }
 

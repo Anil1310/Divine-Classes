@@ -107,6 +107,51 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 2f. Append Student via GET (handles mobile apps and redirect fallbacks)
+    if (e && e.parameter && (e.parameter.action === 'appendStudent' || e.parameter.action === 'addStudent')) {
+      let stuPayload = {};
+      if (e.parameter.studentData || e.parameter.data) {
+        try {
+          stuPayload = JSON.parse(e.parameter.studentData || e.parameter.data);
+        } catch (jsonErr) {
+          stuPayload = e.parameter;
+        }
+      } else {
+        stuPayload = e.parameter;
+      }
+      const bId = e.parameter.batchId || '';
+      const res = apiAppendStudent(stuPayload, bId);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2g. Append Faculty via GET (handles mobile apps and redirect fallbacks)
+    if (e && e.parameter && (e.parameter.action === 'appendTeacher' || e.parameter.action === 'addTeacher')) {
+      let teachPayload = {};
+      if (e.parameter.teacherData || e.parameter.data) {
+        try {
+          teachPayload = JSON.parse(e.parameter.teacherData || e.parameter.data);
+        } catch (jsonErr) {
+          teachPayload = e.parameter;
+        }
+      } else {
+        teachPayload = e.parameter;
+      }
+      const res = apiAppendTeacher(teachPayload);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 3. Regular Web App Page rendering
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     let templateName = 'index';
@@ -1328,7 +1373,8 @@ function applyTombstones_(appData) {
     PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
   } catch (e) { }
 
-  if (deadUrls.length && Array.isArray(appData.externalLinks)) {
+  const deadUrls = getTombstones_('linkUrls');
+  if (deadUrls && deadUrls.length && Array.isArray(appData.externalLinks)) {
     const urlSet = {};
     deadUrls.forEach(function (u) { urlSet[u] = true; });
     appData.externalLinks = appData.externalLinks.filter(function (l) {
@@ -1374,8 +1420,9 @@ function mergeStudentsFromSheet_(appData) {
   try {
     const ss = getDbSpreadsheet();
     if (!ss) return appData;
-    const sheet = ss.getSheetByName('Students_Master');
+    const sheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
     if (!sheet) return appData;
+    SpreadsheetApp.flush();
     const values = sheet.getDataRange().getValues();
     // 0 rows = truly empty sheet (likely transient read) → leave data alone.
     // 1 row that looks like the header = ALL data rows deleted by the user →
@@ -2460,8 +2507,11 @@ function apiGetInitialData() {
     return isDemoDisabled ? stripDummyData_(appData) : appData;
   } catch (err) {
     Logger.log('apiGetInitialData error: ' + err.toString());
+    try {
+      const saved = dbLoadAll();
+      if (saved && (saved.students || saved.batches)) return saved;
+    } catch (loadErr) { }
     const seed = getDefaultSeedData();
-    dbSaveAll(seed);
     return seed;
   }
 }
