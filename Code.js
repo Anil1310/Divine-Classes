@@ -2790,17 +2790,16 @@ function apiAuthenticatePortalUser(identifier, password, rememberMe) {
   const token = Utilities.getUuid() + Utilities.getUuid();
   const sessionKey = PORTAL_SESSION_PROPERTY_PREFIX + token;
   const sessionCache = CacheService.getScriptCache();
-  if (rememberMe === true) {
-    removeExpiredRememberedPortalSessions_();
-    const expiresAt = Date.now() + PORTAL_REMEMBERED_SESSION_TTL_MS;
-    PropertiesService.getScriptProperties().setProperty(sessionKey, JSON.stringify({
-      session: session,
-      expiresAt: expiresAt
-    }));
-    sessionCache.put(sessionKey, JSON.stringify(session), 21600);
-  } else {
-    sessionCache.put(sessionKey, JSON.stringify(session), 21600);
-  }
+  removeExpiredRememberedPortalSessions_();
+  const sessionTtlMs = rememberMe === true
+    ? PORTAL_REMEMBERED_SESSION_TTL_MS
+    : 6 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + sessionTtlMs;
+  PropertiesService.getScriptProperties().setProperty(sessionKey, JSON.stringify({
+    session: session,
+    expiresAt: expiresAt
+  }));
+  sessionCache.put(sessionKey, JSON.stringify(session), Math.min(21600, Math.ceil(sessionTtlMs / 1000)));
   return {
     success: true,
     token: token,

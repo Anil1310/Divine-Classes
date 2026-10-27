@@ -10197,6 +10197,16 @@
             });
         }
     };
+
+    window.addEventListener('pageshow', function (event) {
+        if (!event.persisted) return;
+        if (state.isAuthenticated && state.authToken) {
+            loadPortalData(state.authToken);
+            return;
+        }
+        const savedToken = loadAuthSession();
+        if (savedToken) loadPortalData(savedToken);
+    });
 </script>
 </body>
 </html>
