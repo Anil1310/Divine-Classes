@@ -142,7 +142,7 @@
                         <div>
                             <div class="mb-2 flex items-center gap-2 text-indigo-100"><i class="fa-solid fa-calendar-check"></i><span class="text-xs font-semibold uppercase tracking-wide">Daily class register</span></div>
                             <h2 class="text-xl sm:text-2xl font-bold font-heading">Attendance</h2>
-                            <p class="mt-1 text-xs sm:text-sm text-indigo-100">Mark each student's status for the selected class. All records stay in one spreadsheet tab and can be filtered by month.</p>
+                            <p class="mt-1 text-xs sm:text-sm text-indigo-100">Mark student attendance and keep records in the application database, organized by month.</p>
                         </div>
                         <div class="flex flex-wrap gap-3">
                             <label class="text-xs font-semibold text-indigo-100">Month
@@ -204,8 +204,8 @@
                         <div><h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Month-wise register</h3><p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">${escapeHtml(selectedMonthLabel)} · ${escapeHtml(batch ? batch.name : 'No batch selected')}</p></div>
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700">${summaryDays.length} class days · ${totals.total} student records</span>
-                            <button type="button" onclick="syncAttendanceFromSheet()" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200" title="Reload this month from the Attendance sheet">
-                                <i class="fa-solid fa-arrows-rotate mr-1"></i>Sync from Google Sheet
+                            <button type="button" onclick="syncAttendanceFromDatabase()" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200" title="Reload this month from the application database">
+                                <i class="fa-solid fa-arrows-rotate mr-1"></i>Sync from Database
                             </button>
                         </div>
                     </div>
@@ -279,12 +279,12 @@
         );
     }
 
-    function syncAttendanceFromSheet() {
+    function syncAttendanceFromDatabase() {
         if (!state.attendanceMonth) return;
         state.attendanceLoadedMonth = '';
-        showToast('Syncing attendance from Google Sheet…', 'info');
+        showToast('Syncing attendance from database…', 'info');
         loadAttendanceMonth(state.attendanceMonth, function () {
-            showToast('Attendance refreshed from Google Sheet.', 'success');
+            showToast('Attendance refreshed from database.', 'success');
         });
     }
 

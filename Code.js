@@ -2853,103 +2853,178 @@ function apiGetInitialData(token) {
   return safeData;
 }
 
-const ATTENDANCE_HEADERS_ = ['Date', 'Batch ID', 'Batch Name', 'Student ID', 'Roll No', 'Student Name', 'Status', 'Marked By', 'Updated At'];
+const ATTENDANCE_DB_PREFIX_ = 'DB_attendance_';
+const ATTENDANCE_DB_CHUNK_SIZE_ = 7800;
+const ATTENDANCE_SHEET_MIGRATION_KEY_ = 'DB_attendance_sheet_migration_v1';
 
-function formatAttendanceHeader_(sheet) {
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS_.length).setValues([ATTENDANCE_HEADERS_]);
-  }
-  sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS_.length)
-    .setFontFamily('Calibri')
-    .setFontSize(10)
-    .setFontWeight('bold')
-    .setBackground('#4f46e5')
-    .setFontColor('#ffffff');
-  sheet.setFrozenRows(1);
-  sheet.setTabColor('#4f46e5');
-  sheet.setRowHeight(1, 28);
+function attendanceDatabaseManifestKey_(month) {
+  return ATTENDANCE_DB_PREFIX_ + month + '_manifest';
 }
 
-function attendanceRowKey_(row) {
-  let date = row[0];
-  if (date instanceof Date) {
-    date = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  } else {
-    date = String(date || '').trim();
-  }
-  const batchId = String(row[1] || '').trim();
-  const studentId = String(row[3] || '').trim();
-  return date && batchId && studentId ? [date, batchId, studentId].join('|') : '';
+function attendanceDatabaseRecordKey_(record) {
+  return [record.date, record.batchId, record.studentId].join('|');
 }
 
-function getAttendanceSheet_(spreadsheet) {
-  let sheet = spreadsheet.getSheetByName('Attendance');
-  if (!sheet) {
-    const legacySheets = spreadsheet.getSheets().filter(function (candidate) {
-      return /^Attendance_\d{4}_\d{2}$/.test(candidate.getName());
-    });
-    if (legacySheets.length) {
-      sheet = legacySheets.shift();
-      sheet.setName('Attendance');
-    } else {
-      sheet = spreadsheet.insertSheet('Attendance');
+function getAttendanceDatabaseRecords_(month) {
+  const properties = PropertiesService.getScriptProperties();
+  const rawManifest = properties.getProperty(attendanceDatabaseManifestKey_(month));
+  if (!rawManifest) return [];
+
+  let manifest;
+  try {
+    manifest = JSON.parse(rawManifest);
+  } catch (error) {
+    throw new Error('Attendance database manifest is invalid for ' + month + '.');
+  }
+  if (!manifest || typeof manifest.revision !== 'string' ||
+      !Number.isInteger(manifest.chunks) || manifest.chunks < 0) {
+    throw new Error('Attendance database manifest is incomplete for ' + month + '.');
+  }
+  if (manifest.chunks === 0) return [];
+
+  const records = [];
+  for (let i = 0; i < manifest.chunks; i++) {
+    const chunk = properties.getProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + manifest.revision + '_' + i);
+    if (chunk === null) throw new Error('Attendance database chunk is missing for ' + month + '.');
+    let rows;
+    try {
+      rows = JSON.parse(chunk);
+    } catch (error) {
+      throw new Error('Attendance database chunk is invalid for ' + month + '.');
     }
+    if (!Array.isArray(rows)) throw new Error('Attendance database chunk has an invalid format for ' + month + '.');
+    Array.prototype.push.apply(records, rows);
   }
+  return records;
+}
 
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS_.length).setValues([ATTENDANCE_HEADERS_]);
-  }
-  formatAttendanceHeader_(sheet);
-
-  const lastRow = sheet.getLastRow();
-  const existingRows = lastRow > 1
-    ? sheet.getRange(2, 1, lastRow - 1, ATTENDANCE_HEADERS_.length).getValues()
-    : [];
-  const seen = {};
-  existingRows.forEach(function (row) {
-    const key = attendanceRowKey_(row);
-    if (key) seen[key] = true;
+function saveAttendanceDatabaseRecords_(month, records) {
+  const properties = PropertiesService.getScriptProperties();
+  const serializedRecords = records.map(function (record) { return JSON.stringify(record); });
+  const chunks = [];
+  let current = [];
+  let currentSize = 2;
+  serializedRecords.forEach(function (serialized) {
+    const recordSize = Utilities.newBlob(serialized).getBytes().length;
+    const nextSize = currentSize + recordSize + (current.length ? 1 : 0);
+    if (nextSize > ATTENDANCE_DB_CHUNK_SIZE_ && current.length) {
+      chunks.push('[' + current.join(',') + ']');
+      current = [];
+      currentSize = 2;
+    }
+    if (Utilities.newBlob(serialized).getBytes().length + 2 > ATTENDANCE_DB_CHUNK_SIZE_) {
+      throw new Error('An attendance record exceeds the database storage limit.');
+    }
+    if (current.length) currentSize++;
+    current.push(serialized);
+    currentSize += recordSize;
   });
+  if (current.length) chunks.push('[' + current.join(',') + ']');
 
-  spreadsheet.getSheets().slice().forEach(function (legacySheet) {
-    if (!/^Attendance_\d{4}_\d{2}$/.test(legacySheet.getName())) return;
-    const legacyLastRow = legacySheet.getLastRow();
-    const header = legacySheet.getRange(1, 1, 1, ATTENDANCE_HEADERS_.length).getValues()[0];
-    const compatible = ATTENDANCE_HEADERS_.every(function (value, index) {
-      return String(header[index] || '').trim() === value;
-    });
-    if (!compatible) {
-      Logger.log('Attendance migration skipped for ' + legacySheet.getName() + ': unexpected columns.');
-      return;
+  const previousRaw = properties.getProperty(attendanceDatabaseManifestKey_(month));
+  let previousManifest = null;
+  if (previousRaw) {
+    try {
+      previousManifest = JSON.parse(previousRaw);
+    } catch (error) {
+      throw new Error('Attendance database manifest is invalid for ' + month + '.');
     }
-    if (legacyLastRow > 1) {
-      const legacyRows = legacySheet.getRange(2, 1, legacyLastRow - 1, ATTENDANCE_HEADERS_.length).getValues();
-      const appendRows = legacyRows.filter(function (row) {
-        const key = attendanceRowKey_(row);
-        if (!key || seen[key]) return false;
-        seen[key] = true;
-        return true;
-      });
-      if (appendRows.length) {
-        sheet.getRange(sheet.getLastRow() + 1, 1, appendRows.length, ATTENDANCE_HEADERS_.length).setValues(appendRows);
+  }
+  if (chunks.length === 0) {
+    properties.deleteProperty(attendanceDatabaseManifestKey_(month));
+    if (previousManifest && typeof previousManifest.revision === 'string') {
+      for (let i = 0; i < previousManifest.chunks; i++) {
+        properties.deleteProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + previousManifest.revision + '_' + i);
       }
     }
-    spreadsheet.deleteSheet(legacySheet);
+    return;
+  }
+  const revision = Date.now().toString(36) + Math.floor(Math.random() * 1000000).toString(36);
+  chunks.forEach(function (chunk, index) {
+    properties.setProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + revision + '_' + index, chunk);
   });
+  properties.setProperty(attendanceDatabaseManifestKey_(month), JSON.stringify({
+    revision: revision,
+    chunks: chunks.length
+  }));
 
-  sheet.autoResizeColumns(1, ATTENDANCE_HEADERS_.length);
-  return sheet;
+  if (previousManifest && typeof previousManifest.revision === 'string') {
+    for (let i = 0; i < previousManifest.chunks; i++) {
+      properties.deleteProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + previousManifest.revision + '_' + i);
+    }
+  }
 }
 
-function createCurrentMonthAttendanceSheet() {
-  const spreadsheet = getDbSpreadsheet();
-  if (!spreadsheet) throw new Error('Could not open the attendance spreadsheet.');
-  const sheet = getAttendanceSheet_(spreadsheet);
-  return {
-    success: true,
-    sheetName: sheet.getName(),
-    spreadsheetUrl: spreadsheet.getUrl()
-  };
+function migrateAttendanceSheetToDatabase_() {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(ATTENDANCE_SHEET_MIGRATION_KEY_) === 'complete') return;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (properties.getProperty(ATTENDANCE_SHEET_MIGRATION_KEY_) === 'complete') return;
+    const spreadsheet = getDbSpreadsheet();
+    if (!spreadsheet) throw new Error('Could not open the legacy attendance sheet for its one-time database import.');
+
+    const sheets = spreadsheet.getSheets().filter(function (sheet) {
+      return sheet.getName() === 'Attendance' || /^Attendance_\d{4}_\d{2}$/.test(sheet.getName());
+    });
+    const recordsByMonth = {};
+    sheets.forEach(function (sheet) {
+      const values = sheet.getDataRange().getValues();
+      if (values.length < 2) return;
+      const headers = values[0].map(function (value) { return String(value || '').trim(); });
+      const requiredHeaders = ['Date', 'Batch ID', 'Batch Name', 'Student ID', 'Roll No', 'Student Name', 'Status', 'Marked By', 'Updated At'];
+      const indexes = requiredHeaders.map(function (header) { return headers.indexOf(header); });
+      if (indexes.some(function (index) { return index === -1; })) {
+        Logger.log('Attendance database import skipped ' + sheet.getName() + ': unexpected columns.');
+        return;
+      }
+
+      for (let rowIndex = 1; rowIndex < values.length; rowIndex++) {
+        const row = values[rowIndex];
+        const rawDate = row[indexes[0]];
+        const date = rawDate instanceof Date
+          ? Utilities.formatDate(rawDate, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+          : String(rawDate || '').trim();
+        const batchId = String(row[indexes[1]] || '').trim();
+        const studentId = String(row[indexes[3]] || '').trim();
+        const status = String(row[indexes[6]] || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !batchId || !studentId ||
+            ['Present', 'Absent', 'Late', 'Leave'].indexOf(status) === -1) continue;
+
+        const month = date.slice(0, 7);
+        if (!recordsByMonth[month]) recordsByMonth[month] = {};
+        const record = {
+          date: date,
+          batchId: batchId,
+          batchName: String(row[indexes[2]] || ''),
+          studentId: studentId,
+          roll: String(row[indexes[4]] || ''),
+          name: String(row[indexes[5]] || ''),
+          status: status,
+          markedBy: String(row[indexes[7]] || ''),
+          updatedAt: row[indexes[8]] instanceof Date
+            ? row[indexes[8]].toISOString()
+            : String(row[indexes[8]] || '')
+        };
+        recordsByMonth[month][attendanceDatabaseRecordKey_(record)] = record;
+      }
+    });
+
+    Object.keys(recordsByMonth).forEach(function (month) {
+      const existing = getAttendanceDatabaseRecords_(month);
+      const byKey = {};
+      existing.forEach(function (record) { byKey[attendanceDatabaseRecordKey_(record)] = record; });
+      Object.keys(recordsByMonth[month]).forEach(function (key) {
+        if (!byKey[key]) byKey[key] = recordsByMonth[month][key];
+      });
+      saveAttendanceDatabaseRecords_(month, Object.keys(byKey).map(function (key) { return byKey[key]; }));
+    });
+    properties.setProperty(ATTENDANCE_SHEET_MIGRATION_KEY_, 'complete');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiGetMonthlyAttendance(month, token) {
@@ -2962,9 +3037,14 @@ function apiGetMonthlyAttendance(month, token) {
     return { success: false, error: 'A valid attendance month is required.' };
   }
 
-  const spreadsheet = getDbSpreadsheet();
-  if (!spreadsheet) return { success: false, error: 'Could not open the attendance spreadsheet.' };
-  const appData = getFullInitialData_();
+  try {
+    migrateAttendanceSheetToDatabase_();
+  } catch (error) {
+    Logger.log('Attendance database migration error: ' + error.toString());
+    return { success: false, error: 'Could not import existing attendance into the database: ' + error.message };
+  }
+  const appData = dbLoadAll_();
+  if (!appData) return { success: false, error: 'The application database is not initialized.' };
   const roster = {
     students: (Array.isArray(appData.students) ? appData.students : []).map(function (student) {
       return {
@@ -2982,28 +3062,13 @@ function apiGetMonthlyAttendance(month, token) {
       };
     }).filter(function (batch) { return batch.id; })
   };
-  const sheet = getAttendanceSheet_(spreadsheet);
-  if (sheet.getLastRow() < 2) return { success: true, records: [], roster: roster };
-
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, ATTENDANCE_HEADERS_.length).getValues();
-  const records = values.filter(function (row) {
-    const date = row[0] instanceof Date
-      ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'yyyy-MM-dd')
-      : String(row[0] || '');
-    return date.slice(0, 7) === month && row[1] && row[3];
-  }).map(function (row) {
-    return {
-      date: row[0] instanceof Date ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(row[0]),
-      batchId: String(row[1]),
-      batchName: String(row[2] || ''),
-      studentId: String(row[3]),
-      roll: String(row[4] || ''),
-      name: String(row[5] || ''),
-      status: String(row[6] || ''),
-      markedBy: String(row[7] || ''),
-      updatedAt: String(row[8] || '')
-    };
-  });
+  let records;
+  try {
+    records = getAttendanceDatabaseRecords_(month);
+  } catch (error) {
+    Logger.log('Attendance database read error: ' + error.toString());
+    return { success: false, error: 'Could not read attendance from the database: ' + error.message };
+  }
   return { success: true, records: records, roster: roster };
 }
 
@@ -3023,8 +3088,15 @@ function apiSaveDailyAttendance(payload, token) {
     return { success: false, error: 'Select a batch and mark at least one student.' };
   }
 
+  try {
+    migrateAttendanceSheetToDatabase_();
+  } catch (error) {
+    Logger.log('Attendance database migration error: ' + error.toString());
+    return { success: false, error: 'Could not import existing attendance into the database: ' + error.message };
+  }
   const allowedStatuses = ['Present', 'Absent', 'Late', 'Leave'];
-  const appData = getFullInitialData_();
+  const appData = dbLoadAll_();
+  if (!appData) return { success: false, error: 'The application database is not initialized.' };
   const batches = Array.isArray(appData.batches) ? appData.batches : [];
   const students = Array.isArray(appData.students) ? appData.students : [];
   const batch = batches.find(function (record) { return record.id === payload.batchId; });
@@ -3076,41 +3148,38 @@ function apiSaveDailyAttendance(payload, token) {
     ]);
   }
 
-  const spreadsheet = getDbSpreadsheet();
-  if (!spreadsheet) return { success: false, error: 'Could not open the attendance spreadsheet.' };
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    const sheet = getAttendanceSheet_(spreadsheet);
-    const lastRow = sheet.getLastRow();
-    const existing = lastRow > 1
-      ? sheet.getRange(2, 1, lastRow - 1, ATTENDANCE_HEADERS_.length).getValues()
-      : [];
-    const rowByStudent = {};
-    existing.forEach(function (row, index) {
-      const rowDate = row[0] instanceof Date
-        ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'yyyy-MM-dd')
-        : String(row[0] || '');
-      if (rowDate === payload.date && String(row[1]) === batch.id) {
-        rowByStudent[String(row[3])] = index + 2;
-      }
+    const records = getAttendanceDatabaseRecords_(payload.date.slice(0, 7));
+    const recordIndexes = {};
+    records.forEach(function (record, index) {
+      recordIndexes[attendanceDatabaseRecordKey_(record)] = index;
     });
-
-    const appendRows = [];
     validatedRows.forEach(function (row) {
-      const existingRow = rowByStudent[row[3]];
-      if (existingRow) {
-        sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+      const record = {
+        date: row[0],
+        batchId: row[1],
+        batchName: row[2],
+        studentId: row[3],
+        roll: row[4],
+        name: row[5],
+        status: row[6],
+        markedBy: row[7],
+        updatedAt: row[8]
+      };
+      const key = attendanceDatabaseRecordKey_(record);
+      if (recordIndexes[key] !== undefined) {
+        records[recordIndexes[key]] = record;
       } else {
-        appendRows.push(row);
+        recordIndexes[key] = records.length;
+        records.push(record);
       }
     });
-    if (appendRows.length) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, appendRows.length, ATTENDANCE_HEADERS_.length).setValues(appendRows);
-    }
-    sheet.getDataRange().setFontFamily('Calibri').setFontSize(10).setVerticalAlignment('middle');
-    sheet.autoResizeColumns(1, ATTENDANCE_HEADERS_.length);
-    SpreadsheetApp.flush();
+    saveAttendanceDatabaseRecords_(payload.date.slice(0, 7), records);
+  } catch (error) {
+    Logger.log('Attendance database save error: ' + error.toString());
+    return { success: false, error: 'Could not save attendance to the database: ' + error.message };
   } finally {
     lock.releaseLock();
   }
@@ -3414,7 +3483,6 @@ function apiRestructureAllSheets() {
     syncReadableSheets(ss, appData);
 
     // 2. Order tabs in standard intuitive sequence
-    const attendanceSheet = getAttendanceSheet_(ss);
     const tabOrder = [
       'Students_Master',
       'Teachers_Roster',
@@ -3424,8 +3492,7 @@ function apiRestructureAllSheets() {
       'Gallery_Banners',
       'Feedback_Responses',
       'External_Links_Hub',
-      'Settings_Config',
-      attendanceSheet.getName()
+      'Settings_Config'
     ];
 
     for (let i = 0; i < tabOrder.length; i++) {
