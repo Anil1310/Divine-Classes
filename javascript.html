@@ -2251,9 +2251,13 @@
         if (sidebar) sidebar.style.display = '';
         if (!navContainer) return;
 
-        const allowedItems = navItems.filter(item =>
-            item.id !== 'settings' || state.currentRole === 'developer'
-        );
+        const allowedItems = navItems.filter(item => {
+            if (item.id === 'settings') return state.currentRole === 'developer';
+            if (item.id === 'fees' || item.id === 'access') {
+                return state.currentRole === 'admin' || state.currentRole === 'developer';
+            }
+            return true;
+        });
 
         navContainer.innerHTML = allowedItems.map(item => {
             const isActive = state.activeTab === item.id;
