@@ -3766,30 +3766,176 @@
         }
         const file = event.target.files && event.target.files[0];
         if (!file) return;
+        event.target.value = '';
         const stu = state.students.find(s => s.id === studentId);
         if (!stu) return;
 
         try {
             showToast(`Uploading photo for ${stu.name}...`, 'info');
             const photoDataUrl = await processImageUpload(file);
-            stu.photo = photoDataUrl;
-            saveStateLocally();
-            renderMainContent();
-            updateRoleUI();
-            openStudentIdCard(studentId); // Re-open ID card with new photo
+            await saveStudentPhotoToProfile(studentId, photoDataUrl);
+        } catch (err) {
+            console.error('Student photo upload error:', err);
+            showToast('Failed to upload photo: ' + (err.message || err), 'error');
+        }
+    }
 
+    function updateStudentPhotoOnServer(studentId, photoDataUrl) {
+        return new Promise(function (resolve, reject) {
+            const onResult = function (result) {
+                if (!result || typeof result !== 'object') {
+                    reject(new Error('The server returned an invalid photo upload response.'));
+                    return;
+                }
+                resolve(result);
+            };
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
-                    .withSuccessHandler(function () {
-                        showToast(`Photo for ${stu.name} saved in Database!`, 'success');
+                    .withSuccessHandler(onResult)
+                    .withFailureHandler(function (err) {
+                        reject(new Error(err && err.message ? err.message : 'Google Drive photo upload failed.'));
                     })
                     .apiUpdateStudentPhoto(studentId, photoDataUrl, state.authToken);
-            } else {
-                showToast(`Photo for ${stu.name} updated successfully!`, 'success');
+                return;
             }
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'updateStudentPhoto',
+                    studentId: studentId,
+                    photoDataUrl: photoDataUrl,
+                    token: state.authToken
+                })
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Photo upload request failed.');
+                    return response.json();
+                })
+                .then(onResult)
+                .catch(reject);
+        });
+    }
+
+    async function saveStudentPhotoToProfile(studentId, photoDataUrl) {
+        const stu = state.students.find(function (student) { return student.id === studentId; });
+        if (!stu) throw new Error('Student not found.');
+        const result = await updateStudentPhotoOnServer(studentId, photoDataUrl);
+        if (result.photoUrl && (result.success || result.profileSaved)) {
+            stu.photo = result.photoUrl;
+            stu.photoUrl = result.photoUrl;
+            saveStateLocally(true);
+            renderMainContent();
+            updateRoleUI();
+            closeModal();
+            openStudentIdCard(studentId);
+        }
+        if (!result.success) {
+            throw new Error(result.message || 'The photo could not be saved to Google Drive and the student sheet.');
+        }
+        showToast(`Photo for ${stu.name} uploaded to Drive and saved in the student profile and Google Sheet.`, 'success');
+    }
+
+    let activeStudentCameraStream = null;
+    let activeCameraStudentId = '';
+
+    function stopStudentPhotoCamera() {
+        if (activeStudentCameraStream) {
+            activeStudentCameraStream.getTracks().forEach(function (track) { track.stop(); });
+            activeStudentCameraStream = null;
+        }
+        activeCameraStudentId = '';
+    }
+
+    async function openStudentPhotoCamera(studentId) {
+        if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
+            showToast('Access denied: only administrators can update student photos.', 'error');
+            return;
+        }
+        const stu = state.students.find(function (student) { return student.id === studentId; });
+        if (!stu) {
+            showToast('Student not found.', 'error');
+            return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showToast('Live camera is unavailable in this browser. Use Upload Photo instead.', 'error');
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: { facingMode: 'user' }
+            });
+            activeStudentCameraStream = stream;
+            activeCameraStudentId = studentId;
+            openModal(`
+                <div class="space-y-4">
+                    <div class="text-center">
+                        <h3 class="text-base font-bold text-slate-900">Capture ${escapeHtml(stu.name)}'s Photo</h3>
+                        <p class="mt-1 text-xs text-slate-500">Center the student's face, then tap Capture Photo.</p>
+                    </div>
+                    <video id="student-photo-camera-preview" autoplay playsinline class="w-full max-h-[60vh] rounded-2xl bg-slate-950 object-contain"></video>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="cancelStudentPhotoCamera()" class="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-700">Cancel</button>
+                        <button type="button" onclick="captureStudentPhoto()" class="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white"><i class="fa-solid fa-camera mr-1"></i> Capture Photo</button>
+                    </div>
+                </div>
+            `);
+            const preview = document.getElementById('student-photo-camera-preview');
+            if (!preview) throw new Error('Camera preview could not be opened.');
+            preview.srcObject = stream;
+            await preview.play();
         } catch (err) {
-            console.error(err);
-            showToast('Failed to process image: ' + err, 'error');
+            const cameraDialogWasOpened = !!activeStudentCameraStream;
+            stopStudentPhotoCamera();
+            if (cameraDialogWasOpened) {
+                closeModal();
+                openStudentIdCard(studentId);
+            }
+            console.error('Could not start student camera:', err);
+            const message = err && err.name === 'NotAllowedError'
+                ? 'Camera permission was denied. Allow camera access in browser settings and try again.'
+                : 'Could not start the camera: ' + (err.message || err);
+            showToast(message, 'error');
+        }
+    }
+
+    function cancelStudentPhotoCamera() {
+        const studentId = activeCameraStudentId;
+        stopStudentPhotoCamera();
+        closeModal();
+        if (studentId) openStudentIdCard(studentId);
+    }
+
+    async function captureStudentPhoto() {
+        const studentId = activeCameraStudentId;
+        const preview = document.getElementById('student-photo-camera-preview');
+        if (!studentId || !preview || !preview.videoWidth || !preview.videoHeight) {
+            showToast('Camera is not ready yet. Please wait a moment and try again.', 'error');
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 260 / Math.max(preview.videoWidth, preview.videoHeight));
+        canvas.width = Math.max(1, Math.round(preview.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(preview.videoHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) {
+            showToast('Could not capture the camera image.', 'error');
+            return;
+        }
+        context.drawImage(preview, 0, 0, canvas.width, canvas.height);
+        const photoDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        stopStudentPhotoCamera();
+        closeModal();
+        try {
+            const stu = state.students.find(function (student) { return student.id === studentId; });
+            showToast(`Uploading photo for ${stu ? stu.name : 'student'}...`, 'info');
+            await saveStudentPhotoToProfile(studentId, photoDataUrl);
+        } catch (err) {
+            console.error('Student camera capture upload error:', err);
+            openStudentIdCard(studentId);
+            showToast('Photo was captured but could not be saved: ' + (err.message || err), 'error');
         }
     }
 
@@ -4065,6 +4211,7 @@
         const password = document.getElementById('edit-stu-pwd').value.trim();
         const photoVal = document.getElementById('edit-stu-photo-val');
         const photo = photoVal ? photoVal.value : (stu.photo || '');
+        const previousPhoto = stu.photo || stu.photoUrl || '';
 
         stu.name = name;
         stu.roll = roll;
@@ -4087,15 +4234,37 @@
             }
         });
 
-        saveStateLocally();
+        saveStateLocally(true);
         closeModal();
         renderMainContent();
         updateRoleUI();
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function () {
+                .withSuccessHandler(function (result) {
+                    if (!result || !result.success) {
+                        stu.photo = previousPhoto;
+                        stu.photoUrl = previousPhoto;
+                        saveStateLocally(true);
+                        renderMainContent();
+                        showToast((result && result.message) || 'Student changes could not be saved.', 'error');
+                        return;
+                    }
+                    if (result.photoUrl !== undefined) {
+                        stu.photo = result.photoUrl;
+                        stu.photoUrl = result.photoUrl;
+                    }
+                    saveStateLocally(true);
+                    renderMainContent();
                     showToast(`Student ${name} (${roll}) updated in Database!`, 'success');
+                })
+                .withFailureHandler(function (err) {
+                    stu.photo = previousPhoto;
+                    stu.photoUrl = previousPhoto;
+                    saveStateLocally(true);
+                    renderMainContent();
+                    console.error('Student profile save failed:', err);
+                    showToast('Student changes could not be saved: ' + (err && err.message ? err.message : err), 'error');
                 })
                 .apiUpdateStudentProfile(studentId, {
                     name, roll, phone, parentName, batchId, status, admissionDate, monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
@@ -4864,9 +5033,9 @@
     }
 
     /********************************************************************
-     * PNG EXPORT HELPERS (HIGH RESOLUTION)
+     * STUDENT ID CARD FILE EXPORTS
      ********************************************************************/
-    function downloadStudentIdCardAsImage(studentId, format) {
+    function exportStudentIdCard(studentId, format) {
         if (!canViewStudentProfile(studentId)) {
             showToast('Access denied: you can only view your own student ID card.', 'error');
             return;
@@ -4881,9 +5050,98 @@
             showToast('The requested ID card is not currently open.', 'error');
             return;
         }
-        const imageType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const extension = format === 'jpeg' ? 'jpg' : 'png';
-        showToast(`Generating high-resolution ID card ${extension.toUpperCase()}...`, 'info');
+        if (format !== 'jpeg' && format !== 'pdf') {
+            showToast('Unsupported ID card format.', 'error');
+            return;
+        }
+
+        const isMobile = (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) ||
+            /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const previewWindow = isMobile ? window.open('', '_blank') : null;
+        if (previewWindow) {
+            previewWindow.document.write('<!doctype html><title>Preparing ID card...</title><p style="font:16px sans-serif;padding:24px">Preparing your ID card preview...</p>');
+            previewWindow.document.close();
+        }
+        showToast(`Preparing ID card ${format === 'pdf' ? 'PDF' : 'JPG'}...`, 'info');
+
+        function encodeAscii(text) {
+            const bytes = new Uint8Array(text.length);
+            for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+            return bytes;
+        }
+
+        function joinBytes(chunks) {
+            const length = chunks.reduce(function (total, chunk) { return total + chunk.length; }, 0);
+            const result = new Uint8Array(length);
+            let offset = 0;
+            chunks.forEach(function (chunk) {
+                result.set(chunk, offset);
+                offset += chunk.length;
+            });
+            return result;
+        }
+
+        function makePdf(jpegBytes, imageWidth, imageHeight) {
+            const pageWidth = 243;
+            const pageHeight = Math.round(pageWidth * imageHeight / imageWidth * 100) / 100;
+            const content = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Im0 Do\nQ`;
+            const objects = [
+                encodeAscii('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'),
+                encodeAscii('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'),
+                encodeAscii(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`),
+                joinBytes([
+                    encodeAscii(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`),
+                    jpegBytes,
+                    encodeAscii('\nendstream\nendobj\n')
+                ]),
+                encodeAscii(`5 0 obj\n<< /Length ${encodeAscii(content).length} >>\nstream\n${content}\nendstream\nendobj\n`)
+            ];
+            const chunks = [encodeAscii('%PDF-1.4\n')];
+            const offsets = [0];
+            let fileLength = chunks[0].length;
+            objects.forEach(function (objectBytes) {
+                offsets.push(fileLength);
+                chunks.push(objectBytes);
+                fileLength += objectBytes.length;
+            });
+            const xrefOffset = fileLength;
+            let xref = `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+            for (let i = 1; i < offsets.length; i++) {
+                xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+            }
+            xref += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+            chunks.push(encodeAscii(xref));
+            return new Blob([joinBytes(chunks)], { type: 'application/pdf' });
+        }
+
+        function saveAndOpenFile(canvas) {
+            const jpegUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const base64 = jpegUrl.slice(jpegUrl.indexOf(',') + 1);
+            const binary = atob(base64);
+            const jpegBytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) jpegBytes[i] = binary.charCodeAt(i);
+            const fileBlob = format === 'pdf'
+                ? makePdf(jpegBytes, canvas.width, canvas.height)
+                : new Blob([jpegBytes], { type: 'image/jpeg' });
+            const extension = format === 'pdf' ? 'pdf' : 'jpg';
+            const fileName = 'Divine_Classes_ID_Card_' + (stu.roll || stu.id) + '.' + extension;
+            const fileUrl = URL.createObjectURL(fileBlob);
+
+            if (previewWindow && !previewWindow.closed) {
+                previewWindow.location.replace(fileUrl);
+            }
+            const link = document.createElement('a');
+            link.href = fileUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            if (isMobile && !previewWindow) {
+                showToast('File downloaded. Allow pop-ups to open the mobile preview automatically.', 'info');
+            }
+            window.setTimeout(function () { URL.revokeObjectURL(fileUrl); }, 120000);
+            showToast(`ID card ${extension.toUpperCase()} downloaded${isMobile ? ' and opened for preview' : ''}.`, 'success');
+        }
 
         function doDownload() {
             html2canvas(cardEl, {
@@ -4891,17 +5149,12 @@
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff'
-            }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'Divine_Classes_ID_Card_' + (stu.roll || stu.id) + '.' + extension;
-                link.href = canvas.toDataURL(imageType, 0.95);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                showToast(`ID card downloaded as ${extension.toUpperCase()}!`, 'success');
+            }).then(function (canvas) {
+                saveAndOpenFile(canvas);
             }).catch(err => {
                 console.error('ID card export error:', err);
-                showToast(`Could not export ${extension.toUpperCase()}: ` + err, 'error');
+                if (previewWindow && !previewWindow.closed) previewWindow.close();
+                showToast('Could not export ID card: ' + err, 'error');
             });
         }
 
@@ -4909,18 +5162,22 @@
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
             script.onload = doDownload;
+            script.onerror = function () {
+                if (previewWindow && !previewWindow.closed) previewWindow.close();
+                showToast('Could not load the ID card exporter. Please check your connection and try again.', 'error');
+            };
             document.head.appendChild(script);
         } else {
             doDownload();
         }
     }
 
-    function downloadStudentIdCardAsPNG(studentId) {
-        downloadStudentIdCardAsImage(studentId, 'png');
+    function downloadStudentIdCardAsJPG(studentId) {
+        exportStudentIdCard(studentId, 'jpeg');
     }
 
-    function downloadStudentIdCardAsJPG(studentId) {
-        downloadStudentIdCardAsImage(studentId, 'jpeg');
+    function downloadStudentIdCardAsPDF(studentId) {
+        exportStudentIdCard(studentId, 'pdf');
     }
 
     function downloadFeeReceiptAsPNG(studentId, receiptNo) {
@@ -4959,17 +5216,6 @@
             doDownload();
         }
     }
-
-
-    function printStudentIdCard() {
-        const cardEl = document.getElementById('student-id-card-render');
-        if (!cardEl || !canViewStudentProfile(cardEl.dataset.studentId)) {
-            showToast('Access denied: you can only print your own student ID card.', 'error');
-            return;
-        }
-        window.print();
-    }
-
     function sendStudentIdCardOnWhatsApp(studentId) {
         if (!canViewStudentProfile(studentId)) {
             showToast('Access denied: you can only view your own student ID card.', 'error');
@@ -5118,13 +5364,17 @@
                     </div>
                 </div>
 
-                <!-- PHOTO CONTROLS (OUTSIDE CARD RENDER SO THEY NEVER APPEAR ON EXPORTED PNG) -->
+                <!-- Photo controls stay outside the exported card image. -->
                 ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? `
                 <div class="mt-3 flex items-center justify-center gap-2 no-print">
-                    <label class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 transition border border-indigo-200 shadow-2xs">
+                    <button type="button" onclick="openStudentPhotoCamera('${escapeAttr(stu.id)}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 transition shadow-2xs">
                         <i class="fa-solid fa-camera"></i>
                         <span>${stu.photo ? 'Take / Change Photo' : 'Take Photo'}</span>
-                        <input type="file" accept="image/*" capture="user" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${stu.id}')">
+                    </button>
+                    <label class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 transition border border-indigo-200 shadow-2xs">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Upload Photo</span>
+                        <input type="file" accept="image/*" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${escapeAttr(stu.id)}')">
                     </label>
                     ${stu.photo ? `
                         <button onclick="handleRemoveStudentPhoto('${stu.id}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold transition border border-rose-200" title="Remove Photo">
@@ -5134,25 +5384,22 @@
                 </div>
                 ` : ''}
 
-                <!-- ID card download and print controls -->
+                <!-- ID card download controls -->
                 <div class="mt-4 flex flex-wrap items-center justify-center gap-3 no-print">
-                    <button onclick="downloadStudentIdCardAsPNG('${stu.id}')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download ID Card as .PNG image">
-                        <i class="fa-solid fa-download text-sm"></i>
-                        <span>Download PNG</span>
-                    </button>
                     <button onclick="downloadStudentIdCardAsJPG('${stu.id}')" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download ID Card as .JPG image">
                         <i class="fa-solid fa-image text-sm"></i>
                         <span>Download JPG</span>
                     </button>
-                    <button onclick="printStudentIdCard()" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Print or save the ID card as a PDF">
+                    <button onclick="downloadStudentIdCardAsPDF('${stu.id}')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download and open the ID card as a PDF">
                         <i class="fa-solid fa-file-pdf text-sm"></i>
-                        <span>Print / Save PDF</span>
+                        <span>Download PDF</span>
                     </button>
 
                     <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
                         Close
                     </button>
                 </div>
+                <p class="mt-2 text-center text-[11px] text-slate-500 no-print">On mobile, the downloaded file also opens in a new tab for viewing.</p>
             </div>
         `;
         openModal(cardHtml);
@@ -9303,6 +9550,7 @@
 
     function closeModal() {
         window.isEnrollingStudent = false;
+        if (typeof stopStudentPhotoCamera === 'function') stopStudentPhotoCamera();
         if (pendingConfirmResolver) {
             const resolve = pendingConfirmResolver;
             pendingConfirmResolver = null;

@@ -222,6 +222,12 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'updateStudentPhoto') {
+      const result = apiUpdateStudentPhoto(payload.studentId, payload.photoDataUrl, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 1. Upload Assignment / Material to Google Drive and sync to Database
     if (action === 'uploadMaterial') {
       const fileData = payload.fileData || payload.fileBase64 || payload.dataUrl;
@@ -3795,7 +3801,24 @@ function apiUpdateStudentProfile(studentId, profileData, token) {
     if (profileData.dueDate !== undefined) student.dueDate = String(profileData.dueDate).trim();
     if (profileData.status !== undefined) student.status = String(profileData.status).trim();
 
-    if (profileData.photo !== undefined) student.photo = profileData.photo;
+    if (profileData.photo !== undefined) {
+      const photoValue = String(profileData.photo || '').trim();
+      let photoUrl = '';
+      if (photoValue) {
+        if (/^data:image\/(?:jpeg|png|webp);base64,/i.test(photoValue)) {
+          photoUrl = uploadPhotoToDeveloperDrive_(photoValue, 'student_' + (student.roll || student.id), student.name);
+          if (!/^https:\/\/drive\.google\.com\/file\/d\//i.test(photoUrl)) {
+            return { success: false, message: 'The photo could not be uploaded to Google Drive. The profile was not changed.' };
+          }
+        } else if (/^https:\/\/drive\.google\.com\/file\/d\//i.test(photoValue)) {
+          photoUrl = photoValue;
+        } else {
+          return { success: false, message: 'Invalid photo data. Choose or capture a valid image.' };
+        }
+      }
+      student.photo = photoUrl;
+      student.photoUrl = photoUrl;
+    }
 
     // Batch re-assignment if specified
     if (profileData.batchId !== undefined) {
@@ -3807,7 +3830,35 @@ function apiUpdateStudentProfile(studentId, profileData, token) {
       });
     }
   }
-  return syncAllData_(data);
+  const syncResult = syncAllData_(data);
+  if (!syncResult || !syncResult.success) return syncResult;
+  const sheetCheck = student.photo ? verifyStudentPhotoUrlInSheet_(student) : { success: true };
+  if (!sheetCheck.success) {
+    return { success: false, profileSaved: true, photoUrl: student.photo || '', message: sheetCheck.message };
+  }
+  return { success: true, photoUrl: student.photo || '' };
+}
+
+function verifyStudentPhotoUrlInSheet_(student) {
+  try {
+    const spreadsheet = getDbSpreadsheet();
+    const sheet = spreadsheet && spreadsheet.getSheetByName('Students_Master');
+    if (!sheet) {
+      return { success: false, message: 'The photo was uploaded, but the Students_Master sheet could not be verified.' };
+    }
+    const lastRow = sheet.getLastRow();
+    const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 14).getValues() : [];
+    const matchingRow = rows.find(function (row) {
+      return String(row[0] || '').trim() === String(student.roll || '').trim();
+    });
+    if (!matchingRow || String(matchingRow[13] || '').trim() !== String(student.photoUrl || student.photo || '').trim()) {
+      return { success: false, message: 'The photo was uploaded and saved to the profile, but the Google Sheet did not confirm its Drive URL.' };
+    }
+    return { success: true };
+  } catch (sheetErr) {
+    Logger.log('Student photo sheet verification error: ' + sheetErr.toString());
+    return { success: false, message: 'The photo was uploaded and saved to the profile, but the Google Sheet could not be verified.' };
+  }
 }
 
 /**
@@ -3821,13 +3872,35 @@ function apiUpdateStudentPhoto(studentId, photoDataUrl, token) {
   const data = getFullInitialData_();
   const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
-  let finalUrl = photoDataUrl || '';
-  if (photoDataUrl && photoDataUrl.startsWith('data:image')) {
-    finalUrl = uploadPhotoToDeveloperDrive_(photoDataUrl, 'student_' + (student.roll || student.id), student.name);
+  const photoValue = String(photoDataUrl || '').trim();
+  let finalUrl = '';
+  if (photoValue) {
+    if (/^data:image\/(?:jpeg|png|webp);base64,/i.test(photoValue)) {
+      finalUrl = uploadPhotoToDeveloperDrive_(photoValue, 'student_' + (student.roll || student.id), student.name);
+      if (!/^https:\/\/drive\.google\.com\/file\/d\//i.test(finalUrl)) {
+        return { success: false, message: 'The photo could not be uploaded to Google Drive. The profile was not changed.' };
+      }
+    } else if (/^https:\/\/drive\.google\.com\/file\/d\//i.test(photoValue)) {
+      finalUrl = photoValue;
+    } else {
+      return { success: false, message: 'Invalid photo data. Choose or capture a valid image.' };
+    }
   }
   student.photo = finalUrl;
   student.photoUrl = finalUrl;
-  return syncAllData_(data);
+  const syncResult = syncAllData_(data);
+  if (!syncResult || !syncResult.success) {
+    return { success: false, message: (syncResult && syncResult.error) || 'The photo profile update could not be saved.' };
+  }
+
+  if (finalUrl) {
+    const sheetCheck = verifyStudentPhotoUrlInSheet_(student);
+    if (!sheetCheck.success) {
+      return { success: false, profileSaved: true, photoUrl: finalUrl, message: sheetCheck.message };
+    }
+  }
+
+  return { success: true, photoUrl: finalUrl };
 }
 
 /**
