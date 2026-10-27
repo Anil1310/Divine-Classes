@@ -133,11 +133,11 @@
                         </select>
                     </td>
                     <td class="px-3 py-3.5 sm:px-4">${summary.total ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200"><span class="text-emerald-600 dark:text-emerald-400">${summary.Present + summary.Late}/${summary.total}</span><span class="text-slate-400">·</span>${percentage}%</span>` : '<span class="text-xs text-slate-400">No records</span>'}</td>
-                    <td class="px-3 py-3.5 sm:px-4">
-                        <div class="flex flex-wrap gap-1.5">
+                    <td class="whitespace-nowrap px-3 py-3.5 sm:px-4">
+                        <div class="flex flex-nowrap gap-1.5">
+                            <button type="button" data-attendance-save="${escapeAttr(student.id)}" onclick="saveStudentAttendance('${escapeAttr(student.id)}')" class="rounded-lg bg-indigo-600 px-2.5 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Save attendance for ${escapeAttr(student.name || 'student')}"><i class="fa-solid fa-floppy-disk mr-1"></i>Save</button>
                             <button type="button" onclick="viewStudentAttendance('${escapeAttr(student.id)}')" class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700" aria-label="View attendance for ${escapeAttr(student.name || 'student')}"><i class="fa-solid fa-eye mr-1"></i>View</button>
                             <button type="button" data-attendance-edit="${escapeAttr(student.id)}" onclick="editStudentAttendance('${escapeAttr(student.id)}')" class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit</button>
-                            <button type="button" data-attendance-save="${escapeAttr(student.id)}" onclick="saveStudentAttendance('${escapeAttr(student.id)}')" class="rounded-lg bg-indigo-600 px-2.5 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Save attendance for ${escapeAttr(student.name || 'student')}"><i class="fa-solid fa-floppy-disk mr-1"></i>Save</button>
                         </div>
                     </td>
                 </tr>
@@ -218,7 +218,7 @@
                         <span class="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">${state.attendanceLoadedMonth === state.attendanceMonth ? `${students.length} active students` : 'Loading month…'}</span>
                     </div>
                     <div class="overflow-x-auto px-3 pb-3 pt-2 sm:px-4">
-                        <table class="w-full min-w-[760px] border-separate border-spacing-y-1 text-left">
+                        <table class="w-full min-w-[700px] border-separate border-spacing-y-1 text-left">
                             <thead><tr class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500"><th class="w-16 px-4 py-3 sm:px-5">Photo</th><th class="px-3 py-3 sm:px-4">Student</th><th class="px-3 py-3 sm:px-4">Status</th><th class="px-3 py-3 sm:px-4">Month to date</th><th class="px-3 py-3 sm:px-4">Actions</th></tr></thead>
                             <tbody>${studentRows || `<tr><td colspan="5" class="px-4 py-8 text-center text-xs text-slate-500">${batch ? 'No active students are assigned to this batch.' : 'Create a batch before marking attendance.'}</td></tr>`}</tbody>
                         </table>
