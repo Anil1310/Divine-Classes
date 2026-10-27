@@ -2856,6 +2856,18 @@ function getAttendanceSheet_(spreadsheet, month) {
   return sheet;
 }
 
+function createCurrentMonthAttendanceSheet() {
+  const spreadsheet = getDbSpreadsheet();
+  if (!spreadsheet) throw new Error('Could not open the attendance spreadsheet.');
+  const month = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM');
+  const sheet = getAttendanceSheet_(spreadsheet, month);
+  return {
+    success: true,
+    sheetName: sheet.getName(),
+    spreadsheetUrl: spreadsheet.getUrl()
+  };
+}
+
 function apiGetMonthlyAttendance(month, token) {
   const session = getPortalSession_(token);
   if (!session || ['admin', 'developer', 'teacher'].indexOf(session.role) === -1) {
@@ -2868,8 +2880,8 @@ function apiGetMonthlyAttendance(month, token) {
 
   const spreadsheet = getDbSpreadsheet();
   if (!spreadsheet) return { success: false, error: 'Could not open the attendance spreadsheet.' };
-  const sheet = spreadsheet.getSheetByName('Attendance_' + month.replace('-', '_'));
-  if (!sheet || sheet.getLastRow() < 2) return { success: true, records: [] };
+  const sheet = getAttendanceSheet_(spreadsheet, month);
+  if (sheet.getLastRow() < 2) return { success: true, records: [] };
 
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, ATTENDANCE_HEADERS_.length).getValues();
   const records = values.filter(function (row) { return row[0] && row[1] && row[3]; }).map(function (row) {
@@ -3296,6 +3308,8 @@ function apiRestructureAllSheets() {
     syncReadableSheets(ss, appData);
 
     // 2. Order tabs in standard intuitive sequence
+    const attendanceMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM');
+    const attendanceSheet = getAttendanceSheet_(ss, attendanceMonth);
     const tabOrder = [
       'Students_Master',
       'Teachers_Roster',
@@ -3305,7 +3319,8 @@ function apiRestructureAllSheets() {
       'Gallery_Banners',
       'Feedback_Responses',
       'External_Links_Hub',
-      'Settings_Config'
+      'Settings_Config',
+      attendanceSheet.getName()
     ];
 
     for (let i = 0; i < tabOrder.length; i++) {
