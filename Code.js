@@ -2838,6 +2838,7 @@ function apiAuthenticatePortalUser(identifier, password, rememberMe) {
 
   const lowerId = loginId.toLowerCase();
   let session = null;
+  let studentToResolve = null;
   let error = 'Invalid login ID or password.';
 
   const developerIds = ['dev', 'developer', 'developer@divineclasses.in', 'system architect', String(settings.devName || '').toLowerCase()];
@@ -2890,28 +2891,25 @@ function apiAuthenticatePortalUser(identifier, password, rememberMe) {
       if (/inactive/i.test(student.status)) error = 'This student record is inactive.';
       else if (/blocked/i.test(student.status)) error = 'This student account is blocked.';
       else if (student.password && loginPassword === student.password) {
-        let studentId = '';
-        try {
-          const appData = getFullInitialData_();
-          const appStudent = (appData.students || []).find(function (record) {
-            return student.identifier
-              ? String(record.roll || '').trim().toLowerCase() === student.identifier.toLowerCase()
-              : String(record.name || '').trim().toLowerCase() === student.name.toLowerCase();
-          });
-          studentId = appStudent && appStudent.id;
-        } catch (dataError) {
-          Logger.log('Could not resolve Google Sheets student account: ' + dataError.toString());
-        }
-        if (!studentId) {
-          return { success: false, error: 'Your student record could not be loaded. Please contact the institute.' };
-        }
-        session = { role: 'student', userId: studentId, name: student.name, identifier: student.identifier };
+        studentToResolve = student;
+        session = { role: 'student', userId: '', name: student.name, identifier: student.identifier };
       }
     }
   }
 
   if (!session) return { success: false, error: error };
   const data = getFullInitialData_();
+  if (studentToResolve) {
+    const appStudent = (data.students || []).find(function (record) {
+      return studentToResolve.identifier
+        ? String(record.roll || '').trim().toLowerCase() === studentToResolve.identifier.toLowerCase()
+        : String(record.name || '').trim().toLowerCase() === studentToResolve.name.toLowerCase();
+    });
+    if (!appStudent || !appStudent.id) {
+      return { success: false, error: 'Your student record could not be loaded. Please contact the institute.' };
+    }
+    session.userId = appStudent.id;
+  }
   const token = Utilities.getUuid() + Utilities.getUuid();
   const sessionKey = PORTAL_SESSION_PROPERTY_PREFIX + token;
   const sessionCache = CacheService.getScriptCache();
