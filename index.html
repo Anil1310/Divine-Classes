@@ -3445,18 +3445,9 @@
                                                                         ${canViewAllProfiles && stu.status === 'Blocked' ? '<span class="text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-full">Blocked</span>' : ''}
                                                                     </div>
                                                                     <p class="text-[11px] text-slate-400">${canViewAllProfiles ? `${stu.roll} • Parent: ${stu.parentName}` : (state.currentRole === 'student' ? `Student ID: ${stu.roll || stu.id}` : 'Enrolled student')}</p>
-                                                                    ${canViewAllProfiles ? `<p class="mt-1 max-w-[240px] truncate text-[10px] text-slate-500">${escapeHtml(stu.address || 'Address not saved')}</p>` : ''}
                                                                 </div>
                                                             </div>
                                                             <div class="flex items-center gap-1.5">
-                                                                ${canViewAllProfiles ? `
-                                                                <button type="button" onclick="openStudentAddressModal('${escapeAttr(stu.id)}', false)" title="View home address" aria-label="View ${escapeAttr(stu.name)}'s address" class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600">
-                                                                    <i class="fa-solid fa-location-dot"></i>
-                                                                </button>
-                                                                <button type="button" onclick="openStudentAddressModal('${escapeAttr(stu.id)}', true)" title="Edit and save home address" aria-label="Edit ${escapeAttr(stu.name)}'s address" class="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200 text-indigo-600 transition hover:bg-indigo-600 hover:text-white">
-                                                                    <i class="fa-solid fa-pen-to-square"></i>
-                                                                </button>
-                                                                ` : ''}
                                                                 ${canViewAllProfiles || (state.currentRole === 'student' && getCurrentStudent() && getCurrentStudent().id === stu.id) ? `<button onclick="openStudentIdCard('${stu.id}')" title="View & Download Student ID Card" class="text-xs text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg border border-slate-200 transition">
                                                                     <i class="fa-solid fa-id-card"></i>
                                                                 </button>` : ''}
@@ -3594,10 +3585,6 @@
                                 <input type="text" id="new-stu-parent" required placeholder="e.g., Ramesh Deshmukh" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
                             </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Student Home Address</label>
-                            <textarea id="new-stu-address" rows="2" placeholder="Street, area, city, PIN code" class="w-full resize-y px-3 py-2 text-xs border border-slate-200 rounded-xl"></textarea>
-                        </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">Contact Phone *</label>
@@ -3683,7 +3670,6 @@
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const name = (document.getElementById('new-stu-name').value || '').trim();
         const parentName = (document.getElementById('new-stu-parent').value || '').trim();
-        const address = (document.getElementById('new-stu-address').value || '').trim();
         const phone = (document.getElementById('new-stu-phone').value || '').trim();
         const admissionDate = document.getElementById('new-stu-admdate').value || new Date().toISOString().split('T')[0];
         const monthlyFee = parseInt(document.getElementById('new-stu-monthlyfee').value, 10) || 2500;
@@ -3745,7 +3731,6 @@
             roll: nextRoll,
             name: name,
             parentName: parentName,
-            address: address,
             phone: phone,
             admissionDate: admissionDate,
             monthlyFee: monthlyFee,
@@ -4308,95 +4293,6 @@
         }
     }
 
-    function openStudentAddressModal(studentId, editMode) {
-        if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
-            showToast('Only administrators can view or edit student addresses.', 'error');
-            return;
-        }
-        const student = (state.students || []).find(function (record) { return record.id === studentId; });
-        if (!student) {
-            showToast('Student record not found.', 'error');
-            return;
-        }
-        openModal(`
-            <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><i class="fa-solid fa-location-dot"></i></span>
-                    <div>
-                        <h3 class="text-base font-bold text-slate-900 font-heading">Student Home Address</h3>
-                        <p class="mt-1 text-xs text-slate-500">${escapeHtml(student.name)} · ${escapeHtml(student.roll || student.id)}</p>
-                    </div>
-                </div>
-                <button type="button" onclick="closeModal()" aria-label="Close address" class="p-1 text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form onsubmit="saveStudentAddress(event, '${escapeAttr(student.id)}')" class="space-y-4 pt-4">
-                <label for="student-address-value" class="block text-xs font-semibold text-slate-700">Home address</label>
-                <textarea id="student-address-value" rows="4" ${editMode ? '' : 'readonly'} placeholder="Street, area, city, PIN code" class="w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none ${editMode ? '' : 'bg-slate-50'}">${escapeHtml(student.address || '')}</textarea>
-                <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeModal()" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">${editMode ? 'Cancel' : 'Close'}</button>
-                    ${editMode ? '<button id="save-student-address-button" type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"><i class="fa-solid fa-floppy-disk mr-1"></i>Save address</button>' : `<button type="button" onclick="openStudentAddressModal('${escapeAttr(student.id)}', true)" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit address</button>`}
-                </div>
-            </form>
-        `);
-    }
-
-    function saveStudentAddress(event, studentId) {
-        event.preventDefault();
-        const student = (state.students || []).find(function (record) { return record.id === studentId; });
-        const addressInput = document.getElementById('student-address-value');
-        const saveButton = document.getElementById('save-student-address-button');
-        if (!student || !addressInput) {
-            showToast('Could not read the student address. Please reopen the form.', 'error');
-            return;
-        }
-        const address = addressInput.value.trim();
-        if (saveButton) {
-            saveButton.disabled = true;
-            saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Saving...';
-        }
-        const handleResult = function (result) {
-            if (!result || !result.success) {
-                if (saveButton) {
-                    saveButton.disabled = false;
-                    saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i>Save address';
-                }
-                showToast((result && result.message) || 'Student address could not be saved.', 'error');
-                return;
-            }
-            student.address = result.address;
-            saveStateLocally(true);
-            closeModal();
-            renderMainContent();
-            showToast(`Address saved for ${student.name}.`, 'success');
-        };
-        const handleFailure = function (error) {
-            console.error('Student address save failed:', error);
-            if (saveButton) {
-                saveButton.disabled = false;
-                saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i>Save address';
-            }
-            showToast('Student address could not be saved: ' + ((error && error.message) || error), 'error');
-        };
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run
-                .withSuccessHandler(handleResult)
-                .withFailureHandler(handleFailure)
-                .apiUpdateStudentAddress(studentId, address, state.authToken);
-            return;
-        }
-        fetch(GAS_WEBAPP_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'saveStudentAddress', studentId: studentId, address: address, token: state.authToken })
-        })
-            .then(function (response) {
-                if (!response.ok) throw new Error('Address save request failed.');
-                return response.json();
-            })
-            .then(handleResult)
-            .catch(handleFailure);
-    }
-
     function openEditStudentModal(studentId) {
         if (state.currentRole !== 'admin') {
             showToast('Only Admin can edit student records.', 'error');
@@ -4468,11 +4364,6 @@
                             <input type="text" id="edit-stu-parent" value="${escapeAttr(stu.parentName || '')}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-medium">
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Student Home Address</label>
-                        <textarea id="edit-stu-address" rows="2" placeholder="Street, area, city, PIN code" class="w-full resize-y px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">${escapeHtml(stu.address || '')}</textarea>
-                    </div>
-
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Batch Assignment</label>
@@ -4544,7 +4435,6 @@
         const roll = document.getElementById('edit-stu-roll').value.trim();
         const phone = document.getElementById('edit-stu-phone').value.trim();
         const parentName = document.getElementById('edit-stu-parent').value.trim();
-        const address = document.getElementById('edit-stu-address').value.trim();
         const batchId = document.getElementById('edit-stu-batch').value;
         const status = document.getElementById('edit-stu-status').value;
         const admissionDate = document.getElementById('edit-stu-admdate').value.trim() || '2026-10-10';
@@ -4560,7 +4450,6 @@
         stu.roll = roll;
         stu.phone = phone;
         stu.parentName = parentName;
-        stu.address = address;
         stu.status = status;
         stu.admissionDate = admissionDate;
         stu.monthlyFee = monthlyFee;
@@ -4611,7 +4500,7 @@
                     showToast('Student changes could not be saved: ' + (err && err.message ? err.message : err), 'error');
                 })
                 .apiUpdateStudentProfile(studentId, {
-                    name, roll, phone, parentName, address, batchId, status, admissionDate, monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
+                    name, roll, phone, parentName, batchId, status, admissionDate, monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
                 }, state.authToken);
         } else {
             showToast(`Student ${name} updated successfully!`, 'success');
@@ -8618,7 +8507,6 @@
                                         <th class="py-3 px-4">ID</th>
                                         <th class="py-3 px-4">Student & Roll No</th>
                                         <th class="py-3 px-4">Contact Phone</th>
-                                        <th class="py-3 px-4">Home Address</th>
                                         <th class="py-3 px-4">Login Password</th>
                                         <th class="py-3 px-4">Access Status</th>
                                         <th class="py-3 px-4 text-right">Actions</th>
@@ -8627,7 +8515,7 @@
                                 <tbody class="divide-y divide-slate-100">
                                     ${list.length === 0 ? `
                                         <tr>
-                                            <td colspan="7" class="py-8 text-center text-slate-400">${showInactive ? 'No inactive / removed students in archive.' : 'No students matching your filter.'}</td>
+                                            <td colspan="6" class="py-8 text-center text-slate-400">${showInactive ? 'No inactive / removed students in archive.' : 'No students matching your filter.'}</td>
                                         </tr>
                                     ` : list.map((s, index) => {
             const isRevealed = !!window.revealedPasswords['stu_' + s.id];
@@ -8646,9 +8534,6 @@
                                                     </div>
                                                 </td>
                                                 <td class="py-3 px-4 font-mono text-slate-700">${s.phone}</td>
-                                                <td class="max-w-64 py-3 px-4 text-slate-600">
-                                                    <span title="${escapeAttr(s.address || 'Address not saved')}" class="block max-w-64 truncate">${escapeHtml(s.address || 'Address not saved')}</span>
-                                                </td>
                                                 <td class="py-3 px-4">
                                                     <div class="flex items-center gap-2">
                                                         <span class="font-mono font-semibold text-slate-800 ${isRevealed ? 'bg-slate-100 px-2 py-0.5 rounded' : ''}">
@@ -8682,12 +8567,6 @@
                                                 </td>
                                                 <td class="py-3 px-4 text-right">
                                                     <div class="flex items-center justify-end gap-1.5">
-                                                        <button type="button" onclick="openStudentAddressModal('${escapeAttr(s.id)}', false)" title="View home address" aria-label="View ${escapeAttr(s.name)}'s address" class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600">
-                                                            <i class="fa-solid fa-location-dot"></i>
-                                                        </button>
-                                                        <button type="button" onclick="openStudentAddressModal('${escapeAttr(s.id)}', true)" title="Edit and save home address" aria-label="Edit ${escapeAttr(s.name)}'s address" class="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200 text-indigo-600 transition hover:bg-indigo-600 hover:text-white">
-                                                            <i class="fa-solid fa-pen-to-square"></i>
-                                                        </button>
                                                         <button onclick="openEditStudentModal('${s.id}')" title="Edit Student Record (Admin)" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 transition flex items-center gap-1 border border-indigo-200">
                                                             <i class="fa-solid fa-pen-to-square"></i>
                                                             <span>Edit</span>
