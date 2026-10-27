@@ -2312,7 +2312,44 @@
         const bd = document.getElementById('sidebar-backdrop');
         if (sb) sb.classList.toggle('-translate-x-full');
         if (bd) bd.classList.toggle('hidden');
+        updateSidebarToggleButton();
     }
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+            const isCollapsed = sidebar.classList.contains('lg:w-0');
+            sidebar.classList.toggle('lg:w-0', !isCollapsed);
+            sidebar.classList.toggle('lg:w-72', isCollapsed);
+            sidebar.classList.toggle('lg:border-r-0', !isCollapsed);
+            sidebar.classList.toggle('lg:shadow-none', !isCollapsed);
+            updateSidebarToggleButton();
+            return;
+        }
+        toggleMobileSidebar();
+    }
+
+    function updateSidebarToggleButton() {
+        const sidebar = document.getElementById('sidebar');
+        const button = document.getElementById('sidebar-toggle');
+        const icon = button && button.querySelector('i');
+        if (!sidebar || !button || !icon) return;
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+            const isCollapsed = sidebar.classList.contains('lg:w-0');
+            icon.className = 'fa-solid ' + (isCollapsed ? 'fa-angles-right' : 'fa-angles-left') + ' text-lg';
+            button.title = isCollapsed ? 'Show sidebar' : 'Hide sidebar';
+            button.setAttribute('aria-label', button.title);
+            button.setAttribute('aria-expanded', String(!isCollapsed));
+            return;
+        }
+        const isOpen = !sidebar.classList.contains('-translate-x-full');
+        icon.className = 'fa-solid ' + (isOpen ? 'fa-xmark' : 'fa-bars') + ' text-lg';
+        button.title = isOpen ? 'Close sidebar' : 'Open sidebar';
+        button.setAttribute('aria-label', button.title);
+        button.setAttribute('aria-expanded', String(isOpen));
+    }
+    window.addEventListener('resize', updateSidebarToggleButton);
 
     function toggleSidebarGroup(group) {
         collapsedSidebarGroups[group] = !collapsedSidebarGroups[group];
