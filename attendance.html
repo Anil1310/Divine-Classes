@@ -143,7 +143,12 @@
                 <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:bg-slate-800 dark:border-slate-700">
                     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-4 dark:border-slate-700">
                         <div><h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Month-wise register</h3><p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">${escapeHtml(selectedMonthLabel)} · ${escapeHtml(batch ? batch.name : 'No batch selected')}</p></div>
-                        <span class="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700">${summaryDays.length} class days · ${totals.total} student records</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700">${summaryDays.length} class days · ${totals.total} student records</span>
+                            <button type="button" onclick="syncAttendanceFromSheet()" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200" title="Reload this month from the Attendance sheet">
+                                <i class="fa-solid fa-arrows-rotate mr-1"></i>Sync from Google Sheet
+                            </button>
+                        </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[600px] text-left">
@@ -179,7 +184,7 @@
         renderMainContent();
     }
 
-    function loadAttendanceMonth(month) {
+    function loadAttendanceMonth(month, onSuccess) {
         if (!month || !state.authToken) return;
         const handleResult = function (result) {
             if (!result || result.success !== true || !Array.isArray(result.records)) {
@@ -189,6 +194,7 @@
             state.attendanceRecords = result.records;
             state.attendanceLoadedMonth = month;
             if (state.activeTab === 'attendance') renderMainContent();
+            if (typeof onSuccess === 'function') onSuccess(result);
         };
         const handleFailure = function (error) {
             console.error('Attendance load failed:', error);
@@ -208,6 +214,15 @@
             })
             .then(handleResult)
             .catch(handleFailure);
+    }
+
+    function syncAttendanceFromSheet() {
+        if (!state.attendanceMonth) return;
+        state.attendanceLoadedMonth = '';
+        showToast('Syncing attendance from Google Sheet…', 'info');
+        loadAttendanceMonth(state.attendanceMonth, function () {
+            showToast('Attendance refreshed from Google Sheet.', 'success');
+        });
     }
 
     function setAttendanceForAll(status) {
