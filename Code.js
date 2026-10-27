@@ -2465,6 +2465,7 @@ function getFullInitialData_() {
   try {
     // 1. Primary Source: Cloud Database (PropertiesService)
     let appData = dbLoadAll_();
+    const hasCloudDatabase = !!appData;
 
     // 2. Fallback: If database is not initialized yet, check sheet DB_JSON or seed data
     if (!appData) {
@@ -2494,6 +2495,7 @@ function getFullInitialData_() {
         appData = getDefaultSeedData();
       }
     }
+    const initialDataJson = JSON.stringify(appData);
 
     // 2b. Dynamically merge records added/edited/deleted directly in Database tables
     appData = mergeStudentsFromSheet_(appData);
@@ -2542,20 +2544,21 @@ function getFullInitialData_() {
       stripDummyData_(appData);
     }
 
-    // Persist verified state in the Cloud Database
-    dbSaveAll_(appData);
-
-    // Auto-restructure Database tables with Calibri size 10
-    try {
-      const ss = getDbSpreadsheet();
-      if (ss) {
-        const sheetData = isDemoDisabled
-          ? stripDummyData_(JSON.parse(JSON.stringify(appData)))
-          : appData;
-        syncReadableSheets(ss, sheetData);
+    // Keep sheet-imported changes in sync, but avoid rewriting every sheet for an unchanged read.
+    const dataChanged = !hasCloudDatabase || JSON.stringify(appData) !== initialDataJson;
+    if (dataChanged) {
+      dbSaveAll_(appData);
+      try {
+        const ss = getDbSpreadsheet();
+        if (ss) {
+          const sheetData = isDemoDisabled
+            ? stripDummyData_(JSON.parse(JSON.stringify(appData)))
+            : appData;
+          syncReadableSheets(ss, sheetData);
+        }
+      } catch (sheetSyncErr) {
+        Logger.log('Sheet sync after imported data change: ' + sheetSyncErr.toString());
       }
-    } catch (sheetSyncErr) {
-      Logger.log('Sheet sync in apiGetInitialData: ' + sheetSyncErr.toString());
     }
 
     // Developer toggle: hide seed/demo records from clients (DB keeps clean state)

@@ -1458,6 +1458,7 @@
     }
 
     let autoSyncTimer = null;
+    let lastPortalDataRefreshAt = 0;
 
     function updateSyncBadge(text, status) {
         const btn = document.getElementById('btn-sync');
@@ -1582,6 +1583,7 @@
         });
         saveStateLocally(true); // pass skipSync to avoid loop
         updateRoleUI();
+        renderSidebar();
         updateNotificationBadge();
         updateSocialLinksUI();
         renderMainContent();
@@ -1812,6 +1814,9 @@
                 };
                 state.activeStudentId = session.role === 'student' ? session.userId : '';
                 state.activeTeacherId = session.role === 'teacher' ? session.userId : '';
+                lastPortalDataRefreshAt = Date.now();
+                updateRoleUI();
+                renderSidebar();
             } else {
                 clearPortalState();
                 if (token) {
@@ -8471,6 +8476,9 @@
         };
         state.activeStudentId = session.role === 'student' ? session.userId : '';
         state.activeTeacherId = session.role === 'teacher' ? session.userId : '';
+        lastPortalDataRefreshAt = Date.now();
+        updateRoleUI();
+        renderSidebar();
         saveAuthSession(rememberMe);
         closeModal();
         mergeRemoteData(result.data);
@@ -8481,6 +8489,8 @@
 
     function handleAuthLogin(e) {
         e.preventDefault();
+        const submitButton = e.currentTarget.querySelector('button[type="submit"]');
+        if (submitButton && submitButton.disabled) return;
         const pwdInput = document.getElementById('login-password');
         const password = pwdInput ? pwdInput.value.trim() : '';
         const rememberInput = document.getElementById('login-remember');
@@ -8492,8 +8502,22 @@
             return;
         }
 
+        const originalButtonHtml = submitButton ? submitButton.innerHTML : '';
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Signing in...</span>';
+            submitButton.classList.add('opacity-75');
+        }
+        const restoreSubmitButton = function () {
+            if (!submitButton) return;
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonHtml;
+            submitButton.classList.remove('opacity-75');
+        };
         const onResult = function (result) {
+            const loginSucceeded = !!(result && result.success && result.session && result.data);
             finishPortalLogin(result, rememberMe);
+            if (!loginSucceeded) restoreSubmitButton();
         };
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
@@ -8501,6 +8525,7 @@
                 .withFailureHandler(function (err) {
                     console.error('Secure sign-in failed:', err);
                     showToast('Secure sign-in is unavailable. Please try again.', 'error');
+                    restoreSubmitButton();
                 })
                 .apiAuthenticatePortalUser(identifier, password, rememberMe);
             return;
@@ -8524,6 +8549,7 @@
             .catch(function (err) {
                 console.error('Secure sign-in failed:', err);
                 showToast('Secure sign-in is unavailable. Please try again.', 'error');
+                restoreSubmitButton();
             });
     }
 
@@ -9693,11 +9719,14 @@
         renderMainContent();
         updateNotificationBadge();
         startNotificationPoller();
-        loadPortalData(loadAuthSession());
+        const savedToken = loadAuthSession();
+        if (savedToken) loadPortalData(savedToken);
 
         // Quiet background sync check when returning to window/tab
         window.addEventListener('focus', function () {
-            loadPortalData(state.authToken || '');
+            if (state.isAuthenticated && Date.now() - lastPortalDataRefreshAt >= 60000) {
+                loadPortalData(state.authToken);
+            }
         });
         // Ensure root window and app container never retain unexpected focus-scroll offset
         window.addEventListener('scroll', function () {
