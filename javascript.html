@@ -1295,8 +1295,13 @@
                     expiresAt: expiresAt
                 });
                 if (rememberMe) {
-                    localStorage.setItem('Divine_Classes_AUTH_SESSION', sessionData);
-                    sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
+                    try {
+                        localStorage.setItem('Divine_Classes_AUTH_SESSION', sessionData);
+                        sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
+                    } catch (storageError) {
+                        sessionStorage.setItem('Divine_Classes_AUTH_SESSION', sessionData);
+                        console.warn('Could not persist auth session across browser restarts', storageError);
+                    }
                 } else {
                     sessionStorage.setItem('Divine_Classes_AUTH_SESSION', sessionData);
                     localStorage.removeItem('Divine_Classes_AUTH_SESSION');
@@ -1309,12 +1314,14 @@
     }
 
     function loadAuthSession() {
-        try {
-            const storageKeys = [
-                [sessionStorage, 'Divine_Classes_AUTH_SESSION'],
-                [localStorage, 'Divine_Classes_AUTH_SESSION']
-            ];
-            for (const [storage, key] of storageKeys) {
+        const storageKeys = [
+            ['sessionStorage', function () { return window.sessionStorage; }],
+            ['localStorage', function () { return window.localStorage; }]
+        ];
+        for (const [storageName, getStorage] of storageKeys) {
+            try {
+                const storage = getStorage();
+                const key = 'Divine_Classes_AUTH_SESSION';
                 const saved = storage.getItem(key);
                 if (!saved) continue;
                 try {
@@ -1326,12 +1333,11 @@
                     console.warn('Could not parse saved auth session', e);
                 }
                 storage.removeItem(key);
+            } catch (e) {
+                console.warn('Could not access ' + storageName + ' for auth session', e);
             }
-            return '';
-        } catch (e) {
-            console.warn('Could not load auth session', e);
-            return '';
         }
+        return '';
     }
 
     function escapeHtml(str) {
@@ -1829,11 +1835,9 @@
 
         function handleLoadError(err) {
             console.error('Could not load secure portal data:', err);
-            clearPortalState();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            showToast('Could not securely load portal data. Please refresh and try again.', 'error');
+            showToast(state.isAuthenticated
+                ? 'Could not refresh portal data. You are still signed in; please try again.'
+                : 'Could not securely load portal data. Please refresh and try again.', 'error');
         }
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
