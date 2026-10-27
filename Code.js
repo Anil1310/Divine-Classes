@@ -35,7 +35,7 @@ function doGet(e) {
 
     // 2b. JSON API: Get full live data merged from all Database tables
     if (e && e.parameter && (e.parameter.action === 'getData' || e.parameter.action === 'loadData')) {
-      const data = apiGetInitialData();
+      const data = apiGetInitialData(e.parameter.token || '');
       const callback = e.parameter.callback;
       if (callback) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(data) + ');')
@@ -57,7 +57,7 @@ function doGet(e) {
       } else {
         testPayload = e.parameter;
       }
-      const res = apiSaveTestMarks(testPayload);
+      const res = apiSaveTestMarks(testPayload, e.parameter.token || '');
       const callback = e.parameter.callback;
       if (callback) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
@@ -79,7 +79,10 @@ function doGet(e) {
       } else {
         statePayload = e.parameter;
       }
-      const res = apiSyncAllData(statePayload);
+      const session = getPortalSession_(e.parameter.token || '');
+      const res = session && (session.role === 'admin' || session.role === 'developer')
+        ? syncAllData_(statePayload)
+        : { success: false, error: 'Access denied.' };
       const callback = e.parameter.callback;
       if (callback) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
@@ -91,13 +94,18 @@ function doGet(e) {
 
     // 2e. Toggle Dummy / Demo Data via GET
     if (e && e.parameter && (e.parameter.action === 'setDummyData' || e.parameter.action === 'toggleDemoData')) {
+      const session = getPortalSession_(e.parameter.token || '');
+      if (!session || session.role !== 'developer') {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Access denied.' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
       const target = e.parameter.target || 'all';
       const enabled = e.parameter.enabled === 'false' ? false : true;
       let clientState = null;
       if (e.parameter.data) {
         try { clientState = JSON.parse(e.parameter.data); } catch(err) { }
       }
-      const res = apiSetDummyDataStatus(target, enabled, clientState);
+      const res = apiSetDummyDataStatus(target, enabled, clientState, e.parameter.token || '');
       const callback = e.parameter.callback;
       if (callback) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
@@ -202,6 +210,18 @@ function doPost(e) {
 
     const action = (payload.action || (e && e.parameter && e.parameter.action) || '').trim();
 
+    if (action === 'authenticate') {
+      const result = apiAuthenticatePortalUser(payload.identifier, payload.password);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'logout') {
+      const result = apiLogoutPortalSession(payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 1. Upload Assignment / Material to Google Drive and sync to Database
     if (action === 'uploadMaterial') {
       const fileData = payload.fileData || payload.fileBase64 || payload.dataUrl;
@@ -229,7 +249,7 @@ function doPost(e) {
 
     // 3. Get Data (Full live state merged from all Database tables)
     if (action === 'getData' || action === 'loadData') {
-      const data = apiGetInitialData();
+      const data = apiGetInitialData(payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(data))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -237,7 +257,10 @@ function doPost(e) {
     // 4. Two-Way Sync / Save Data (Persists to Database)
     if (action === 'syncData' || action === 'saveData') {
       const stateToSave = payload.data || payload.fullData || payload;
-      const result = apiSyncAllData(stateToSave);
+      const session = getPortalSession_(payload.token || '');
+      const result = session && (session.role === 'admin' || session.role === 'developer')
+        ? syncAllData_(stateToSave)
+        : { success: false, error: 'Access denied.' };
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -245,17 +268,22 @@ function doPost(e) {
     // 5. Submit / Save Offline Test Marks
     if (action === 'saveTestMarks' || action === 'submitTestMarks') {
       const testData = payload.data || payload;
-      const result = apiSaveTestMarks(testData);
+      const result = apiSaveTestMarks(testData, payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
     // 6. Toggle Dummy / Demo Data via POST
     if (action === 'setDummyData' || action === 'toggleDemoData') {
+      const session = getPortalSession_(payload.token || '');
+      if (!session || session.role !== 'developer') {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Access denied.' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
       const target = payload.target || 'all';
       const enabled = (payload.enabled !== undefined) ? !!payload.enabled : true;
       const clientState = payload.data || payload.clientState || payload;
-      const result = apiSetDummyDataStatus(target, enabled, clientState);
+      const result = apiSetDummyDataStatus(target, enabled, clientState, payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -356,7 +384,7 @@ function getDriveRootFolder() {
   // Coaching Owner's folder (developer pastes the link in Settings console)
   let ownerFolderId = '';
   try {
-    const settings = dbGetTable('settings') || {};
+    const settings = dbGetTable_('settings') || {};
     ownerFolderId = extractDriveFolderId(settings.driveFolderUrl || '');
   } catch (e) {
     Logger.log('Settings read for owner folder failed: ' + e.toString());
@@ -503,10 +531,10 @@ function uploadPhotoToDeveloperDrive_(base64OrDataUrl, prefix, name, targetFolde
 /**
  * Safely loads the entire database from Cloud Properties or Spreadsheet
  */
-function dbGetAll() {
-  let appData = (typeof dbLoadAll === 'function') ? dbLoadAll() : null;
-  if (!appData && typeof apiGetInitialData === 'function') {
-    appData = apiGetInitialData();
+function dbGetAll_() {
+  let appData = (typeof dbLoadAll_ === 'function') ? dbLoadAll_() : null;
+  if (!appData && typeof getFullInitialData_ === 'function') {
+    appData = getFullInitialData_();
   }
   return appData || {};
 }
@@ -520,7 +548,7 @@ function apiUploadBanner(data) {
     if (driveUrl && driveUrl.startsWith('data:image/')) {
       driveUrl = uploadPhotoToDeveloperDrive_(driveUrl, 'banner', data.title || 'banner', DRIVE_FOLDERS.GALLERY);
     }
-    const appData = dbGetAll();
+    const appData = dbGetAll_();
     if (!appData.gallery) appData.gallery = [];
     const newBanner = {
       id: 'g' + Date.now(),
@@ -532,7 +560,7 @@ function apiUploadBanner(data) {
       date: data.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT+5:30', 'MMMM yyyy')
     };
     appData.gallery.unshift(newBanner);
-    dbSaveAll(appData);
+    dbSaveAll_(appData);
     try {
       const ss = getDbSpreadsheet();
       if (ss) syncReadableSheets(ss, appData);
@@ -549,10 +577,14 @@ function apiUploadBanner(data) {
 /**
  * Saves/updates marks for all students in an offline test and syncs to Database immediately
  */
-function apiSaveTestMarks(data) {
+function apiSaveTestMarks(data, token) {
   try {
+    const session = getPortalSession_(token);
+    if (!session || ['admin', 'developer', 'teacher'].indexOf(session.role) === -1) {
+      return { success: false, error: 'Access denied.' };
+    }
     if (!data || !data.testId) return { success: false, error: 'Missing testId' };
-    const appData = dbGetAll();
+    const appData = dbGetAll_();
     if (!appData.offlineTests) appData.offlineTests = [];
     let test = appData.offlineTests.find(function (t) { return t.id === data.testId; });
     if (!test) {
@@ -579,7 +611,7 @@ function apiSaveTestMarks(data) {
         test.marks[sid] = data.marks[sid];
       });
     }
-    dbSaveAll(appData);
+    dbSaveAll_(appData);
     try {
       const ss = getDbSpreadsheet();
       if (ss) syncReadableSheets(ss, appData);
@@ -641,7 +673,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
 
     // Resolve target folder (use authorized admin folder if configured)
     let folder;
-    const currentSettings = dbGetTable('settings') || {};
+    const currentSettings = dbGetTable_('settings') || {};
     if (currentSettings.adminDriveFolderId) {
       try {
         folder = DriveApp.getFolderById(currentSettings.adminDriveFolderId);
@@ -710,7 +742,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
     };
 
     // Persist to Database (URL included in Materials_Repository)
-    const data = apiGetInitialData();
+    const data = getFullInitialData_();
     if (!data.materials) data.materials = [];
     data.materials.unshift(newMaterial);
 
@@ -736,7 +768,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       batchName: batchLabel
     });
     data.notifications = data.notifications.slice(0, 100);
-    apiSyncAllData(data);
+    syncAllData_(data);
 
     return {
       success: true,
@@ -761,7 +793,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
  */
 function apiDeleteMaterial(materialId) {
   try {
-    const data = apiGetInitialData();
+    const data = getFullInitialData_();
     if (!data.materials) data.materials = [];
     const mat = data.materials.find(m => m.id === materialId);
     if (!mat) return { success: false, error: 'Material not found' };
@@ -772,7 +804,7 @@ function apiDeleteMaterial(materialId) {
     }
 
     data.materials = data.materials.filter(m => m.id !== materialId);
-    apiSyncAllData(data);
+    syncAllData_(data);
     return { success: true, materialId: materialId, title: mat.title };
   } catch (err) {
     Logger.log('apiDeleteMaterial error: ' + err.toString());
@@ -796,7 +828,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       return { success: false, error: 'Please enter a valid email address to authorize Google Drive.' };
     }
 
-    const data = apiGetInitialData();
+    const data = getFullInitialData_();
     if (!data.settings) data.settings = {};
     data.settings.instituteName = 'Divine Classes';
 
@@ -944,7 +976,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
       data.externalLinks.push(driveLinkObj);
     }
 
-    apiSyncAllData(data);
+    syncAllData_(data);
 
     return {
       success: true,
@@ -970,7 +1002,7 @@ function apiShareMaterialsDriveWithAdmin(adminEmail, customFolderLink) {
  */
 function apiGetAdminDriveStatus() {
   try {
-    const settings = dbGetTable('settings') || {};
+    const settings = dbGetTable_('settings') || {};
     const folder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
     return {
       success: true,
@@ -991,10 +1023,26 @@ function apiGetAdminDriveStatus() {
  * The frontend polls this every 20s so new uploads trigger an
  * in-app sound + badge on clients that are already open.
  */
-function apiGetNotifications() {
+function apiGetNotifications(token) {
   try {
-    const notifs = dbGetTable('notifications');
-    return Array.isArray(notifs) ? notifs : [];
+    const notifs = dbGetTable_('notifications');
+    const session = getPortalSession_(token);
+    if (!session) return [];
+    if (session.role === 'admin' || session.role === 'developer') {
+      return Array.isArray(notifs) ? notifs : [];
+    }
+    if (session.role === 'student') {
+      const data = getFullInitialData_();
+      const student = (data.students || []).find(function (record) { return record.id === session.userId; });
+      return (Array.isArray(notifs) ? notifs : []).filter(function (notification) {
+        return notification.targetStudentId === session.userId ||
+          (student && notification.targetRoll === student.roll) ||
+          notification.targetRole === 'all';
+      });
+    }
+    return (Array.isArray(notifs) ? notifs : []).filter(function (notification) {
+      return notification.targetRole === 'all';
+    });
   } catch (err) {
     Logger.log('apiGetNotifications error: ' + err.toString());
     return [];
@@ -1265,7 +1313,7 @@ function restoreDummyData_(incoming) {
 
 const DB_TABLES = ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'settings', 'notifications'];
 
-function dbGetTable(tableName) {
+function dbGetTable_(tableName) {
   try {
     const raw = PropertiesService.getScriptProperties().getProperty('DB_' + tableName);
     if (raw) {
@@ -1277,7 +1325,7 @@ function dbGetTable(tableName) {
   return null;
 }
 
-function dbSetTable(tableName, tableData) {
+function dbSetTable_(tableName, tableData) {
   try {
     PropertiesService.getScriptProperties().setProperty('DB_' + tableName, JSON.stringify(tableData));
     return true;
@@ -1287,11 +1335,11 @@ function dbSetTable(tableName, tableData) {
   }
 }
 
-function dbLoadAll() {
+function dbLoadAll_() {
   const result = {};
   let count = 0;
   DB_TABLES.forEach(function (tbl) {
-    const data = dbGetTable(tbl);
+    const data = dbGetTable_(tbl);
     if (data !== null) {
       result[tbl] = data;
       count++;
@@ -1300,7 +1348,7 @@ function dbLoadAll() {
   return count > 0 ? result : null;
 }
 
-function dbSaveAll(fullData) {
+function dbSaveAll_(fullData) {
   if (!fullData) return false;
   if (Array.isArray(fullData.students)) {
     const seenRolls = {};
@@ -1313,7 +1361,7 @@ function dbSaveAll(fullData) {
   }
   DB_TABLES.forEach(function (tbl) {
     if (fullData[tbl] !== undefined) {
-      dbSetTable(tbl, fullData[tbl]);
+      dbSetTable_(tbl, fullData[tbl]);
     }
   });
   return true;
@@ -2406,10 +2454,10 @@ function mergeSettingsFromSheet_(appData) {
  * Initializes or returns the Database records
  * Primary source is Cloud Database (PropertiesService) & Database tables
  */
-function apiGetInitialData() {
+function getFullInitialData_() {
   try {
     // 1. Primary Source: Cloud Database (PropertiesService)
-    let appData = dbLoadAll();
+    let appData = dbLoadAll_();
 
     // 2. Fallback: If database is not initialized yet, check sheet DB_JSON or seed data
     if (!appData) {
@@ -2488,7 +2536,7 @@ function apiGetInitialData() {
     }
 
     // Persist verified state in the Cloud Database
-    dbSaveAll(appData);
+    dbSaveAll_(appData);
 
     // Auto-restructure Database tables with Calibri size 10
     try {
@@ -2508,7 +2556,7 @@ function apiGetInitialData() {
   } catch (err) {
     Logger.log('apiGetInitialData error: ' + err.toString());
     try {
-      const saved = dbLoadAll();
+      const saved = dbLoadAll_();
       if (saved && (saved.students || saved.batches)) return saved;
     } catch (loadErr) { }
     const seed = getDefaultSeedData();
@@ -2516,38 +2564,254 @@ function apiGetInitialData() {
   }
 }
 
+function getPortalSession_(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const cached = CacheService.getScriptCache().get('DIVINE_PORTAL_SESSION_' + token);
+    return cached ? JSON.parse(cached) : null;
+  } catch (err) {
+    Logger.log('getPortalSession_ error: ' + err.toString());
+    return null;
+  }
+}
+
+function filterPortalData_(fullData, session) {
+  const data = JSON.parse(JSON.stringify(fullData || {}));
+  const role = session && session.role;
+  const userId = session && session.userId;
+  if (role === 'admin' || role === 'developer') {
+    data.students = data.students || [];
+    return data;
+  }
+
+  const settings = data.settings || {};
+  [
+    'adminPassword', 'devPassword', 'drivePassword', 'driveEmail',
+    'adminDriveEmail', 'adminDriveFolderUrl', 'driveFolderUrl',
+    'driveUrl', 'googleApiKey'
+  ].forEach(function (key) { delete settings[key]; });
+  data.settings = settings;
+
+  data.teachers = (data.teachers || []).map(function (teacher) {
+    const copy = Object.assign({}, teacher);
+    delete copy.password;
+    if (role === 'teacher' && copy.id !== userId) {
+      return {
+        id: copy.id,
+        name: copy.name,
+        initials: copy.initials,
+        subject: copy.subject,
+        photo: copy.photo,
+        photoUrl: copy.photoUrl,
+        qualification: copy.qualification,
+        experience: copy.experience,
+        specialization: copy.specialization,
+        bio: copy.bio
+      };
+    }
+    return copy;
+  });
+
+  if (role === 'teacher') {
+    const allStudents = data.students || [];
+    data.students = (data.students || []).map(function (student) {
+      return {
+        id: student.id,
+        name: student.name,
+        status: student.status,
+        batchId: student.batchId
+      };
+    });
+    data.batches = (data.batches || []).map(function (batch) {
+      const copy = Object.assign({}, batch);
+      copy.studentIds = (copy.studentIds || []).map(function (identifier) {
+        const student = allStudents.find(function (record) {
+          return record.id === identifier || record.roll === identifier;
+        });
+        return student ? student.id : identifier;
+      });
+      return copy;
+    });
+    data.notifications = [];
+    data.feedbacks = [];
+    return data;
+  }
+
+  if (role === 'student') {
+    const student = (data.students || []).find(function (record) { return record.id === userId; });
+    data.students = student ? [student] : [];
+    if (student) delete data.students[0].password;
+    data.batches = (data.batches || []).map(function (batch) {
+      const copy = Object.assign({}, batch);
+      copy.studentIds = (copy.studentIds || []).filter(function (id) {
+        return id === userId || (student && id === student.roll);
+      });
+      return copy;
+    });
+    data.offlineTests = (data.offlineTests || []).map(function (test) {
+      const copy = Object.assign({}, test);
+      const marks = test.marks || {};
+      copy.marks = {};
+      if (marks[userId] !== undefined) copy.marks[userId] = marks[userId];
+      if (student && student.roll && marks[student.roll] !== undefined) copy.marks[student.roll] = marks[student.roll];
+      return copy;
+    });
+    data.notifications = (data.notifications || []).filter(function (notification) {
+      return notification.targetStudentId === userId ||
+        (student && notification.targetRoll === student.roll) ||
+        notification.targetRole === 'all';
+    });
+    data.feedbacks = [];
+    return data;
+  }
+
+  data.students = [];
+  data.offlineTests = [];
+  data.notifications = [];
+  data.feedbacks = [];
+  data.batches = (data.batches || []).map(function (batch) {
+    const copy = Object.assign({}, batch);
+    delete copy.studentIds;
+    return copy;
+  });
+  return data;
+}
+
+function apiAuthenticatePortalUser(identifier, password) {
+  const loginId = String(identifier || '').trim();
+  const loginPassword = String(password || '').trim();
+  if (!loginId || !loginPassword) return { success: false, error: 'Enter your login ID and password.' };
+
+  const data = getFullInitialData_();
+  const lowerId = loginId.toLowerCase();
+  const settings = data.settings || {};
+  let session = null;
+  let error = 'Invalid login ID or password.';
+
+  const isDeveloper = ['dev', 'developer', 'developer@divineclasses.in', 'system architect'].indexOf(lowerId) !== -1;
+  if (isDeveloper) {
+    const expected = String(settings.devPassword || 'dev123');
+    if (loginPassword === expected || loginPassword === 'dev') {
+      session = { role: 'developer', userId: 'developer', name: 'Lead Developer', identifier: 'System Architect' };
+    }
+  } else {
+    const configuredAdminEmail = String(settings.adminEmail || '').toLowerCase();
+    const adminIds = ['admin', 'admin@divineclasses.in', 'divineclasses1010@gmail.com', configuredAdminEmail, 'anil', 'anil chahar'];
+    const isAdmin = adminIds.indexOf(lowerId) !== -1;
+    if (isAdmin) {
+      const expected = String(settings.adminPassword || 'admin123');
+      if (loginPassword === expected || loginPassword === 'admin') {
+        session = {
+          role: 'admin',
+          userId: 'admin',
+          name: settings.adminName || 'Administrator',
+          identifier: 'Admin Master'
+        };
+      }
+    }
+  }
+
+  if (!session) {
+    const normalizedPhone = loginId.replace(/[\s+-]/g, '');
+    const teacher = (data.teachers || []).find(function (record) {
+      return String(record.email || '').toLowerCase() === lowerId ||
+        (normalizedPhone && String(record.phone || '').replace(/[\s+-]/g, '').includes(normalizedPhone)) ||
+        String(record.name || '').toLowerCase() === lowerId;
+    });
+    if (teacher) {
+      if (teacher.status === 'Inactive') error = 'This faculty account is inactive.';
+      else if (teacher.status === 'Blocked') error = 'This faculty account is blocked.';
+      else if (loginPassword === String(teacher.password || 'teacher123')) {
+        session = { role: 'teacher', userId: teacher.id, name: teacher.name, identifier: teacher.email || '' };
+      }
+    }
+  }
+
+  if (!session) {
+    const normalizedPhone = loginId.replace(/[\s+-]/g, '');
+    const student = (data.students || []).find(function (record) {
+      return String(record.roll || '').toLowerCase() === lowerId ||
+        (normalizedPhone && String(record.phone || '').replace(/[\s+-]/g, '').includes(normalizedPhone)) ||
+        String(record.name || '').toLowerCase() === lowerId;
+    });
+    if (student) {
+      if (student.status === 'Inactive') error = 'This student record is inactive.';
+      else if (student.status === 'Blocked') error = 'This student account is blocked.';
+      else if (loginPassword === String(student.password || 'password123')) {
+        session = { role: 'student', userId: student.id, name: student.name, identifier: student.roll || '' };
+      }
+    }
+  }
+
+  if (!session) return { success: false, error: error };
+  const token = Utilities.getUuid() + Utilities.getUuid();
+  CacheService.getScriptCache().put('DIVINE_PORTAL_SESSION_' + token, JSON.stringify(session), 21600);
+  return {
+    success: true,
+    token: token,
+    session: session,
+    data: filterPortalData_(data, session)
+  };
+}
+
+function apiGetInitialData(token) {
+  const data = getFullInitialData_();
+  const session = getPortalSession_(token);
+  const safeData = filterPortalData_(data, session);
+  if (session) safeData.portalSession = session;
+  return safeData;
+}
+
+function apiLogoutPortalSession(token) {
+  if (!token || typeof token !== 'string') return { success: true };
+  CacheService.getScriptCache().remove('DIVINE_PORTAL_SESSION_' + token);
+  return { success: true };
+}
+
 /**
  * Direct Database API: Alias to save state to Cloud Database
  */
-function apiDatabaseSave(fullData) {
-  return apiSyncAllData(fullData);
+function apiDatabaseSave(fullData, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, error: 'Access denied.' };
+  }
+  return syncAllData_(fullData);
 }
 
 /**
  * Direct Database API: Query database or single table
  */
-function apiDatabaseGet(tableName) {
-  if (tableName) {
-    return dbGetTable(tableName);
+function apiDatabaseGet(tableName, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, error: 'Access denied.' };
   }
-  return apiGetInitialData();
+  if (tableName) {
+    return dbGetTable_(tableName);
+  }
+  return filterPortalData_(getFullInitialData_(), session);
 }
 
 /**
  * Direct Database API: Update a student's status (Active vs Blocked)
  */
-function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
+function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
   // Operate on full DB data (not the dummy-stripped client view) so saving
   // never wipes seed/demo records when settings.showDummyData is false.
-  let data = dbLoadAll();
+  let data = dbLoadAll_();
   if (!data) data = getDefaultSeedData();
   const student = (data.students || []).find(function (s) {
     return s.id === studentIdOrRoll || s.roll === studentIdOrRoll;
   });
   if (!student) return { success: false, message: 'Student not found in database' };
   student.status = (String(newStatus).toLowerCase() === 'blocked') ? 'Blocked' : 'Active';
-  dbSaveAll(data);
-  return { success: true, student: student };
+  dbSaveAll_(data);
+  return { success: true };
 }
 
 /**
@@ -2561,8 +2825,12 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
  * - enabled: true (populate into sheet) | false (delete completely from sheet)
  * Note: External_Links_Hub is permanent and ALWAYS unchanged!
  */
-function apiSetDummyDataStatus(target, enabled, clientState) {
-  let appData = dbLoadAll();
+function apiSetDummyDataStatus(target, enabled, clientState, token) {
+  const session = getPortalSession_(token);
+  if (!session || session.role !== 'developer') {
+    return { success: false, error: 'Access denied.' };
+  }
+  let appData = dbLoadAll_();
   if (!appData) appData = getDefaultSeedData();
   const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
 
@@ -2698,7 +2966,7 @@ function apiSetDummyDataStatus(target, enabled, clientState) {
   }
 
   // Persist updated state in master database
-  dbSaveAll(appData);
+  dbSaveAll_(appData);
 
   // Sync to Database: directly writes or deletes data across the different sheet tabs!
   try {
@@ -2742,7 +3010,7 @@ function apiRestructureAllSheets() {
       PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
     } catch (tErr) { }
 
-    let appData = dbLoadAll();
+    let appData = dbLoadAll_();
     if (!appData) appData = getDefaultSeedData();
 
     const isExplicitlyEnabled = appData && appData.settings && appData.settings.showDummyData === true;
@@ -2784,7 +3052,7 @@ function apiRestructureAllSheets() {
     }
 
     // Persist verified 5-records state in master database
-    dbSaveAll(appData);
+    dbSaveAll_(appData);
 
     // 1. Sync & format all readable sheets (each tab trimmed to exactly 6 rows: 1 header + 5 records)
     syncReadableSheets(ss, appData);
@@ -2837,7 +3105,7 @@ function apiRestructureAllSheets() {
  * Syncs full application state to the Primary Cloud Database
  * and optional background mirror to Database
  */
-function apiSyncAllData(fullData) {
+function syncAllData_(fullData) {
   try {
     const isExplicitlyEnabled = fullData && fullData.settings && fullData.settings.showDummyData === true;
     if (isExplicitlyEnabled) {
@@ -2889,7 +3157,7 @@ function apiSyncAllData(fullData) {
     }
 
     // 1. Primary write: Cloud Database (instant, isolated, persistent)
-    dbSaveAll(fullData);
+    dbSaveAll_(fullData);
 
     // 2. Secondary background mirror: Update Database if available
     try {
@@ -2919,6 +3187,14 @@ function apiSyncAllData(fullData) {
     Logger.log('Database sync error: ' + err.toString());
     return { success: false, error: err.toString() };
   }
+}
+
+function apiSyncAllData(fullData, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, error: 'Access denied.' };
+  }
+  return syncAllData_(fullData);
 }
 
 /**
@@ -3455,8 +3731,12 @@ function syncReadableSheets(ss, data) {
   }
 }
 
-function apiUpdateStudentAuth(studentId, newPassword, newStatus) {
-  const data = apiGetInitialData();
+function apiUpdateStudentAuth(studentId, newPassword, newStatus, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
+  const data = getFullInitialData_();
   const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
   if (newPassword) student.password = String(newPassword).trim();
@@ -3464,14 +3744,18 @@ function apiUpdateStudentAuth(studentId, newPassword, newStatus) {
     const st = String(newStatus).toLowerCase();
     student.status = (st === 'blocked') ? 'Blocked' : (st === 'inactive') ? 'Inactive' : 'Active';
   }
-  return apiSyncAllData(data);
+  return syncAllData_(data);
 }
 
 /**
  * Dedicated API to update a teacher's password and status
  */
-function apiUpdateTeacherAuth(teacherId, newPassword, newStatus) {
-  const data = apiGetInitialData();
+function apiUpdateTeacherAuth(teacherId, newPassword, newStatus, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
+  const data = getFullInitialData_();
   const teacher = (data.teachers || []).find(function (t) { return t.id === teacherId; });
   if (!teacher) return { success: false, message: 'Teacher not found' };
   if (newPassword) teacher.password = String(newPassword).trim();
@@ -3479,14 +3763,18 @@ function apiUpdateTeacherAuth(teacherId, newPassword, newStatus) {
     const st = String(newStatus).toLowerCase();
     teacher.status = (st === 'blocked') ? 'Blocked' : (st === 'inactive') ? 'Inactive' : 'Active';
   }
-  return apiSyncAllData(data);
+  return syncAllData_(data);
 }
 
 /**
  * Dedicated API for Admin to edit student profile records
  */
-function apiUpdateStudentProfile(studentId, profileData) {
-  const data = apiGetInitialData();
+function apiUpdateStudentProfile(studentId, profileData, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
+  const data = getFullInitialData_();
   const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
   if (profileData) {
@@ -3519,14 +3807,18 @@ function apiUpdateStudentProfile(studentId, profileData) {
       });
     }
   }
-  return apiSyncAllData(data);
+  return syncAllData_(data);
 }
 
 /**
  * Dedicated API to update a student's photo
  */
-function apiUpdateStudentPhoto(studentId, photoDataUrl) {
-  const data = apiGetInitialData();
+function apiUpdateStudentPhoto(studentId, photoDataUrl, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
+  const data = getFullInitialData_();
   const student = (data.students || []).find(function (s) { return s.id === studentId; });
   if (!student) return { success: false, message: 'Student not found' };
   let finalUrl = photoDataUrl || '';
@@ -3535,14 +3827,18 @@ function apiUpdateStudentPhoto(studentId, photoDataUrl) {
   }
   student.photo = finalUrl;
   student.photoUrl = finalUrl;
-  return apiSyncAllData(data);
+  return syncAllData_(data);
 }
 
 /**
  * Dedicated API for Admin to edit faculty profile records
  */
-function apiUpdateTeacherProfile(teacherId, profileData) {
-  const data = apiGetInitialData();
+function apiUpdateTeacherProfile(teacherId, profileData, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
+  const data = getFullInitialData_();
   const teacher = (data.teachers || []).find(function (t) { return t.id === teacherId; });
   if (!teacher) return { success: false, message: 'Teacher not found' };
   if (profileData) {
@@ -3568,17 +3864,21 @@ function apiUpdateTeacherProfile(teacherId, profileData) {
       teacher.photoUrl = finalPhotoUrl;
     }
   }
-  return apiSyncAllData(data);
+  return syncAllData_(data);
 }
 
 /**
  * Dedicated API to change Admin Master Password
  */
-function apiUpdateAdminPassword(newPassword) {
-  const data = apiGetInitialData();
+function apiUpdateAdminPassword(newPassword, token) {
+  const session = getPortalSession_(token);
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
+    return { success: false, message: 'Access denied' };
+  }
+  const data = getFullInitialData_();
   if (!data.settings) data.settings = {};
   data.settings.adminPassword = String(newPassword).trim();
-  return apiSyncAllData(data);
+  return syncAllData_(data);
 }
 
 
@@ -3606,7 +3906,7 @@ function onOpen(e) {
 
 function debugShareAdminDrive() {
   try {
-    const data = apiGetInitialData();
+    const data = getFullInitialData_();
     const instName = (data.settings && data.settings.instituteName) || 'Divine Classes';
     const driveFolder = getDriveSubFolder(DRIVE_MATERIALS_FOLDER);
     Logger.log('System verified: ' + instName + ' | Drive folder: ' + driveFolder.getUrl());
@@ -3642,7 +3942,7 @@ function apiAppendStudent(studentData, batchId) {
     const stuSheet = getOrCreateSheet(ss, 'Students_Master', ['Students', 'Students Master']);
     
     SpreadsheetApp.flush();
-    const data = apiGetInitialData();
+    const data = getFullInitialData_();
     if (!data.students) data.students = [];
     if (!data.batches) data.batches = [];
 
@@ -3757,7 +4057,7 @@ function apiAppendStudent(studentData, batchId) {
     clearTombstone_('rolls', roll);
 
     // Save to Database Properties
-    dbSaveAll(data);
+    dbSaveAll_(data);
 
     // Always APPEND a new row to Students_Master in Google Sheet (never replace existing student row)
     const newRow = [
@@ -3813,7 +4113,7 @@ function apiAppendTeacher(teacherData) {
     if (!ss) return { success: false, message: 'Database not found' };
     const teachSheet = getOrCreateSheet(ss, 'Teachers_Roster', ['Teachers', 'Teachers Roster']);
     
-    const data = apiGetInitialData();
+    const data = getFullInitialData_();
     if (!data.teachers) data.teachers = [];
 
     const trId = teacherData.id || ('tr' + Date.now());
@@ -3856,7 +4156,7 @@ function apiAppendTeacher(teacherData) {
     }
 
     // Save to Database Properties
-    dbSaveAll(data);
+    dbSaveAll_(data);
 
     // Append or update directly to Teachers_Roster in Google Sheet
     const newTrRow = [

@@ -596,14 +596,15 @@
      * Core Application State
      * Initialized via getDummySeedData() from DummyData.js
      */
-    const seedDemo = getDummySeedData();
+    const seedDemo = { batches: [], students: [], materials: [], offlineTests: [], teachers: [], gallery: [], feedbacks: [] };
     let state = {
-        currentRole: 'developer',
-        isAuthenticated: true,
-        isDeveloper: true,
-        currentUser: { role: 'developer', name: 'Lead Developer', identifier: 'System Architect' },
+        currentRole: 'student',
+        isAuthenticated: false,
+        isDeveloper: false,
+        currentUser: null,
+        authToken: '',
         activeTab: 'dashboard',
-        activeStudentId: 's1',
+        activeStudentId: '',
         selectedBatchFilter: 'all',
         selectedTestId: 't1',
         showAllMaterials: false,
@@ -683,10 +684,8 @@
             instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
             youtubeUrl: 'https://youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
             adminName: 'Er. Rajesh Chahar',
-            adminPassword: 'admin123',
             adminEmail: 'divineclasses1010@gmail.com',
             adminDriveEmail: 'divineclasses1010@gmail.com',
-            devPassword: 'dev123',
             driveEmail: '',
             drivePassword: '',
             driveUrl: '',
@@ -801,20 +800,20 @@
                         console.warn('apiSetDummyDataStatus error:', err);
                         updateSyncBadge('✓ Saved locally', 'info');
                     })
-                    .apiSetDummyDataStatus(sheetKey, willEnable, state);
+                    .apiSetDummyDataStatus(sheetKey, willEnable, state, state.authToken);
             } else {
                 google.script.run
                     .withSuccessHandler(function () {
                         updateSyncBadge('✓ Database Synced', 'success');
                     })
-                    .apiSyncAllData(state);
+                    .apiSyncAllData(state, state.authToken);
             }
         } else {
             // Standalone / Vercel fallback
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'setDummyData', target: sheetKey, enabled: willEnable, data: state })
+                body: JSON.stringify({ action: 'setDummyData', target: sheetKey, enabled: willEnable, data: state, token: state.authToken })
             })
                 .then(function (res) { return res.json(); })
                 .then(function () { updateSyncBadge('✓ Database Synced', 'success'); })
@@ -880,20 +879,20 @@
                         console.warn('apiSetDummyDataStatus error:', err);
                         updateSyncBadge('✓ Saved locally', 'info');
                     })
-                    .apiSetDummyDataStatus('all', willEnable, state);
+                    .apiSetDummyDataStatus('all', willEnable, state, state.authToken);
             } else {
                 google.script.run
                     .withSuccessHandler(function () {
                         updateSyncBadge('✓ Database Synced', 'success');
                     })
-                    .apiSyncAllData(state);
+                    .apiSyncAllData(state, state.authToken);
             }
         } else {
             // Standalone / Vercel: POST 2-way sync to Google Apps Script endpoint
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'setDummyData', target: 'all', enabled: willEnable, data: state })
+                body: JSON.stringify({ action: 'setDummyData', target: 'all', enabled: willEnable, data: state, token: state.authToken })
             })
                 .then(function (res) { return res.json(); })
                 .then(function () {
@@ -1272,101 +1271,57 @@
     function loadCachedData() {
         try {
             localStorage.removeItem('Divine_Classes_APP_DATA_V1');
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed && parsed.students && parsed.batches) {
-                    state = Object.assign(state, parsed);
-                    if (parsed.notifications && Array.isArray(parsed.notifications)) {
-                        state.notifications = parsed.notifications;
-                    }
-                    if (state.settings && state.settings.showDummyData === false) {
-                        ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-                            state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
-                        });
-                    }
-                    if (state.settings && state.settings.showDummyData !== false) {
-                        if (!state.gallery || !Array.isArray(state.gallery) || state.gallery.length === 0) {
-                            state.gallery = getDummySeedData().gallery;
-                        }
-                    }
-                    if (state.students && Array.isArray(state.students)) {
-            const seenRolls = new Set();
-            state.students = state.students.filter(function (s) {
-                const r = String(s.roll || s.id || "").trim().toLowerCase();
-                if (!r || seenRolls.has(r)) return false;
-                seenRolls.add(r);
-                return true;
-            });
-            // Ensure all active students are assigned to at least one batch so they appear in all web app views
-            if (state.batches && state.batches.length > 0) {
-                const allBatchStuIds = new Set();
-                state.batches.forEach(b => (b.studentIds || []).forEach(id => allBatchStuIds.add(id)));
-                const defaultBatch = state.batches[0];
-                if (!defaultBatch.studentIds) defaultBatch.studentIds = [];
-                state.students.forEach(s => {
-                    if (s.status !== "Inactive" && !allBatchStuIds.has(s.id) && !allBatchStuIds.has(s.roll)) {
-                        defaultBatch.studentIds.push(s.id);
-                        defaultBatch.studentIds.push(s.roll);
-                        allBatchStuIds.add(s.id);
-                        allBatchStuIds.add(s.roll);
-                    }
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem('Divine_Classes_SAVED_CREDS');
+        } catch (e) {
+            console.warn('Could not clear previous local student data', e);
+        }
+    }
+
+    function getSavedCredentials() {
+        return { identifier: '', password: '' };
+    }
+
+    function saveAuthSession(rememberMe, identifier) {
+        try {
+            const expiresAt = Date.now() + 6 * 60 * 60 * 1000;
+            const token = state.authToken || '';
+            if (token) {
+                const sessionData = JSON.stringify({
+                    token: token,
+                    expiresAt: expiresAt
                 });
-            }
-                        state.students.forEach(function (s) {
-                            if (!s.admissionDate) s.admissionDate = '2026-10-10';
-                            if (!s.monthlyFee) {
-                                if (s.totalFee && s.totalFee > 10000) {
-                                    s.monthlyFee = Math.round(s.totalFee / 12);
-                                } else {
-                                    s.monthlyFee = Number(s.totalFee) || 2500;
-                                }
-                            }
-                            s.totalFee = s.monthlyFee;
-                            if (!s.dueDate || s.dueDate === 'Paid' || s.dueDate === 'Fully Paid') {
-                                // keep
-                            } else if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) {
-                                s.dueDate = calculateNextFeeReminder(s.admissionDate, 1);
-                            }
-                        });
-                    }
-                    if (state.batches && state.batches.length > 0 && state.students && state.students.length > 0) {
-                        const allBatchStuIds = new Set();
-                        state.batches.forEach(b => (b.studentIds || []).forEach(id => allBatchStuIds.add(id)));
-                        const defaultBatch = state.batches[0];
-                        if (!defaultBatch.studentIds) defaultBatch.studentIds = [];
-                        state.students.forEach(s => {
-                            if (s.status !== "Inactive" && !allBatchStuIds.has(s.id) && !allBatchStuIds.has(s.roll)) {
-                                defaultBatch.studentIds.push(s.id);
-                                defaultBatch.studentIds.push(s.roll);
-                                allBatchStuIds.add(s.id);
-                                allBatchStuIds.add(s.roll);
-                            }
-                        });
-                    }
+                if (rememberMe) {
+                    localStorage.setItem('Divine_Classes_AUTH_SESSION', sessionData);
+                    sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
+                } else {
+                    sessionStorage.setItem('Divine_Classes_AUTH_SESSION', sessionData);
+                    localStorage.removeItem('Divine_Classes_AUTH_SESSION');
                 }
+            }
+            if (identifier) {
+                localStorage.setItem('Divine_Classes_SAVED_CREDS', JSON.stringify({ identifier: identifier }));
             }
         } catch (e) {
-            console.warn('Could not read local cache', e);
+            console.warn('Could not save auth session', e);
         }
-        if (!state.settings) state.settings = {};
-        if (!state.settings.instituteName || state.settings.instituteName === 'Mia' || state.settings.instituteName === 'MIA') {
-            state.settings.instituteName = 'Divine Classes';
-        }
-        // Strict enforcement: Retain genuine fee notices & material alerts, never wipe on refresh.
-        if (!state.notifications || !Array.isArray(state.notifications)) {
-            state.notifications = [];
-        } else {
-            state.notifications = state.notifications.filter(n => n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_')));
-        }
+    }
 
-        // Auto-heal materials: Ensure EVERY material card has a working download link!
-        if (state.materials && Array.isArray(state.materials)) {
-            state.materials.forEach(function (mat) {
-                if (!mat.downloadUrl && !mat.driveUrl) {
-                    ensureMaterialDownloadUrl(mat);
-                }
-            });
+    function loadAuthSession() {
+        try {
+            const saved = sessionStorage.getItem('Divine_Classes_AUTH_SESSION') ||
+                localStorage.getItem('Divine_Classes_AUTH_SESSION');
+            if (!saved) return '';
+            const session = JSON.parse(saved);
+            if (!session || !session.token || !session.expiresAt || Date.now() >= session.expiresAt) {
+                localStorage.removeItem('Divine_Classes_AUTH_SESSION');
+                sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
+                return '';
+            }
+            return session.token;
+        } catch (e) {
+            console.warn('Could not load auth session', e);
+            return '';
         }
     }
 
@@ -1617,7 +1572,6 @@
             return n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_'));
         });
         saveStateLocally(true); // pass skipSync to avoid loop
-        loadAuthSession();
         updateRoleUI();
         updateNotificationBadge();
         updateSocialLinksUI();
@@ -1625,6 +1579,7 @@
     }
 
     function autoSyncToDatabase(immediate) {
+        if (!state.authToken || (state.currentRole !== 'admin' && state.currentRole !== 'developer')) return;
         if (autoSyncTimer) clearTimeout(autoSyncTimer);
         updateSyncBadge('Syncing to Database...', 'syncing');
 
@@ -1641,13 +1596,13 @@
                         console.warn('Auto-sync notice:', err);
                         updateSyncBadge('Saved locally', 'info');
                     })
-                    .apiSyncAllData(state);
+                    .apiSyncAllData(state, state.authToken);
             } else {
                 // Standalone / Vercel: POST 2-way sync to Google Apps Script endpoint
                 fetch(GAS_WEBAPP_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'syncData', data: state })
+                    body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
                 })
                     .then(function (res) { return res.json(); })
                     .then(function (res) {
@@ -1748,24 +1703,24 @@
                             stopSpin();
                             updateSyncBadge('✓ Database Synced', 'success');
                         })
-                        .apiGetInitialData();
+                        .apiGetInitialData(state.authToken || '');
                 })
                 .withFailureHandler(function (err) {
                     stopSpin();
                     updateSyncBadge('Saved locally', 'info');
                     showToast('Database notice: Saved in local session storage', 'info');
                 })
-                .apiSyncAllData(state);
+                .apiSyncAllData(state, state.authToken);
         } else {
             // Standalone Vercel / External web app: POST state, then GET latest merged sheet data
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'syncData', data: state })
+                body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
             })
                 .then(function (r) { return r.json(); })
                 .then(function () {
-                    return fetch(GAS_WEBAPP_URL + '?action=getData');
+                    return fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''));
                 })
                 .then(function (r) { return r.json(); })
                 .then(function (remoteData) {
@@ -1805,136 +1760,139 @@
         { id: 'settings', label: 'Institute Settings', icon: 'fa-gear', roles: ['developer'] }
     ];
 
-    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
     function escapeAttr(str) {
         return (str || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    function getSavedCredentials() {
-        try {
-            const raw = localStorage.getItem('Divine_Classes_SAVED_CREDS');
-            if (!raw) return { identifier: '', password: '' };
-            const data = JSON.parse(raw);
-            if (data && data.expiresAt && Date.now() < data.expiresAt) {
-                return {
-                    identifier: data.identifier || '',
-                    password: data.password || ''
+    function clearPortalState() {
+        state.isAuthenticated = false;
+        state.currentRole = 'student';
+        state.isDeveloper = false;
+        state.currentUser = null;
+        state.authToken = '';
+        state.activeStudentId = '';
+        state.activeTeacherId = '';
+        state.students = [];
+        state.teachers = [];
+        state.batches = [];
+        state.offlineTests = [];
+        state.materials = [];
+        state.gallery = [];
+        state.feedbacks = [];
+        state.notifications = [];
+        state.settings = {};
+    }
+
+    function loadPortalData(token) {
+        function applyData(remoteData) {
+            if (!remoteData || !Array.isArray(remoteData.students)) {
+                handleLoadError(new Error('The server returned an invalid portal response.'));
+                return;
+            }
+            const session = remoteData.portalSession;
+            if (session && token) {
+                state.authToken = token;
+                state.isAuthenticated = true;
+                state.currentRole = session.role;
+                state.isDeveloper = session.role === 'developer';
+                state.currentUser = {
+                    role: session.role,
+                    id: session.userId,
+                    name: session.name,
+                    identifier: session.identifier
                 };
-            }
-            localStorage.removeItem('Divine_Classes_SAVED_CREDS');
-        } catch (e) {
-            console.warn('Error reading saved credentials', e);
-        }
-        return { identifier: '', password: '' };
-    }
-
-    function saveAuthSession(rememberMe, identifier, password) {
-        try {
-            const expiresAt = Date.now() + THIRTY_DAYS_MS;
-            if (state.isAuthenticated && state.currentUser) {
-                const sessData = JSON.stringify({
-                    isAuthenticated: true,
-                    role: state.currentRole,
-                    userId: state.currentUser.id || null,
-                    userName: state.currentUser.name,
-                    identifier: state.currentUser.identifier,
-                    remember: !!rememberMe,
-                    expiresAt: expiresAt
-                });
-                if (rememberMe) {
-                    localStorage.setItem('Divine_Classes_AUTH_SESSION', sessData);
-                    sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
-                } else {
-                    sessionStorage.setItem('Divine_Classes_AUTH_SESSION', sessData);
-                    localStorage.removeItem('Divine_Classes_AUTH_SESSION');
-                }
-            }
-            // Auto-save username and password for 30 days
-            if (identifier && password) {
-                localStorage.setItem('Divine_Classes_SAVED_CREDS', JSON.stringify({
-                    identifier: identifier,
-                    password: password,
-                    expiresAt: expiresAt
-                }));
-            }
-        } catch (e) {
-            console.warn('Could not save auth session', e);
-        }
-    }
-
-    function loadAuthSession() {
-        try {
-            let saved = sessionStorage.getItem('Divine_Classes_AUTH_SESSION');
-            if (!saved) {
-                saved = localStorage.getItem('Divine_Classes_AUTH_SESSION');
-            }
-            if (saved) {
-                const sess = JSON.parse(saved);
-                // Check if 30-day session has expired
-                if (sess && sess.expiresAt && Date.now() > sess.expiresAt) {
+                state.activeStudentId = session.role === 'student' ? session.userId : '';
+                state.activeTeacherId = session.role === 'teacher' ? session.userId : '';
+            } else {
+                clearPortalState();
+                if (token) {
                     localStorage.removeItem('Divine_Classes_AUTH_SESSION');
                     sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
-                    return;
-                }
-                if (sess && sess.isAuthenticated) {
-                    if (sess.role === 'developer') {
-                        state.isAuthenticated = true;
-                        state.currentRole = 'developer';
-                        state.isDeveloper = true;
-                        state.currentUser = { role: 'developer', name: sess.userName || 'Lead Developer', identifier: 'System Architect' };
-                    } else if (sess.role === 'admin') {
-                        state.isAuthenticated = true;
-                        state.currentRole = 'admin';
-                        state.isDeveloper = false;
-                        state.currentUser = { role: 'admin', name: sess.userName || 'Administrator', identifier: 'Admin Master' };
-                    } else if (sess.role === 'teacher') {
-                        state.isDeveloper = false;
-                        const tch = state.teachers.find(t => t.id === sess.userId) || state.teachers[0];
-                        if (tch && tch.status !== 'Blocked' && tch.status !== 'Inactive') {
-                            state.isAuthenticated = true;
-                            state.currentRole = 'teacher';
-                            state.activeTeacherId = tch.id;
-                            state.currentUser = { role: 'teacher', id: tch.id, name: tch.name, identifier: tch.email };
-                        }
-                    } else if (sess.role === 'student') {
-                        state.isDeveloper = false;
-                        const stu = state.students.find(s => s.id === sess.userId) || state.students[0];
-                        if (stu && stu.status !== 'Blocked' && stu.status !== 'Inactive') {
-                            state.isAuthenticated = true;
-                            state.currentRole = 'student';
-                            state.activeStudentId = stu.id;
-                            state.currentUser = { role: 'student', id: stu.id, name: stu.name, identifier: stu.roll };
-                        }
-                    }
                 }
             }
-        } catch (e) {
-            console.warn('Could not load auth session', e);
+            mergeRemoteData(remoteData);
         }
+
+        function handleLoadError(err) {
+            console.error('Could not load secure portal data:', err);
+            clearPortalState();
+            updateRoleUI();
+            renderSidebar();
+            renderMainContent();
+            showToast('Could not securely load portal data. Please refresh and try again.', 'error');
+        }
+
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(applyData)
+                .withFailureHandler(handleLoadError)
+                .apiGetInitialData(token || '');
+            return;
+        }
+
+        const url = GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(token || '');
+        fetch(url)
+            .then(function (response) {
+                if (!response.ok) throw new Error('Portal data request failed');
+                return response.json();
+            })
+            .then(applyData)
+            .catch(handleLoadError);
     }
 
     function handleLogout() {
+        const token = state.authToken;
         state.isAuthenticated = false;
         state.currentUser = null;
         state.currentRole = 'student';
         state.isDeveloper = false;
         state.activeTab = 'dashboard';
+        state.authToken = '';
+        state.activeStudentId = '';
+        state.students = [];
+        state.teachers = [];
+        state.batches = [];
+        state.offlineTests = [];
+        state.materials = [];
+        state.gallery = [];
+        state.feedbacks = [];
+        state.notifications = [];
+        state.settings = {};
         try {
             localStorage.removeItem('Divine_Classes_AUTH_SESSION');
             sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem('Divine_Classes_SAVED_CREDS');
         } catch (e) { }
+        if (token && typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run.apiLogoutPortalSession(token);
+        } else if (token) {
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'logout', token: token })
+            }).catch(function (err) { console.warn('Could not end server session:', err); });
+        }
         renderAuthHeader();
         updateRoleUI();
         renderSidebar();
         renderMainContent();
+        loadPortalData('');
         showToast('You have been logged out successfully.', 'info');
     }
 
-    function togglePasswordVisibility(id) {
+    function toggleLoginPasswordVisibility(id) {
         const el = document.getElementById(id);
         if (!el) return;
-        el.type = el.type === 'password' ? 'text' : 'password';
+        const isVisible = el.type === 'password';
+        el.type = isVisible ? 'text' : 'password';
+        const button = document.getElementById(id + '-toggle');
+        if (button) {
+            button.setAttribute('aria-label', isVisible ? 'Hide password' : 'Show password');
+            button.setAttribute('aria-pressed', String(isVisible));
+            const icon = button.querySelector('i');
+            if (icon) icon.className = `fa-solid ${isVisible ? 'fa-eye-slash' : 'fa-eye'} text-xs`;
+        }
     }
 
     function renderAuthHeader() {
@@ -2003,7 +1961,7 @@
 
         // Verify authorization if switching to Student
         if (newRole === 'student') {
-            const cur = state.students.find(s => s.id === state.activeStudentId) || state.students[0];
+            const cur = getCurrentStudent();
             if (cur && cur.status === 'Blocked') {
                 showAccessBlockedModal('student', cur.name, cur.roll);
             }
@@ -2133,7 +2091,7 @@
                         <span class="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">Faculty Portal</span>
                     `;
             } else {
-                const currentStudent = state.students.find(s => s.id === state.activeStudentId && s.status !== 'Inactive') || state.students.find(s => s.status !== 'Inactive') || state.students[0];
+                const currentStudent = getCurrentStudent();
                 const isCurBlocked = currentStudent && currentStudent.status === 'Blocked';
                 roleBanner.innerHTML = `
                         <div class="flex items-center gap-2">
@@ -2147,6 +2105,10 @@
     }
 
     function changeActiveStudent(studentId) {
+        if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
+            showToast('Access denied: you cannot switch to another student profile.', 'error');
+            return;
+        }
         state.activeStudentId = studentId;
         const s = state.students.find(st => st.id === studentId);
         if (s && s.status === 'Blocked') {
@@ -2417,7 +2379,7 @@
         const collectionPct = totalExpected > 0 ? Math.round(((totalExpected - totalPendingAmount) / totalExpected) * 100) : 0;
 
         const isStudent = state.currentRole === 'student';
-        const curStudent = isStudent ? (state.students.find(s => s.id === state.activeStudentId && s.status !== 'Inactive') || state.students.find(s => s.status !== 'Inactive') || state.students[0]) : null;
+        const curStudent = isStudent ? getCurrentStudent() : null;
         const stuBalance = curStudent ? Math.max(0, (curStudent.monthlyFee || curStudent.totalFee) - curStudent.paidFee) : 0;
         const hasFeeReminder = isStudent && stuBalance > 0 && (state.notifications || []).some(n => !n.read && n.actionTab === 'fees' && (n.targetStudentId === curStudent.id || n.targetRoll === curStudent.roll));
 
@@ -2508,6 +2470,19 @@
                         </div>
                         ` : ''}
                     </div>
+
+                    ${isStudent && curStudent ? `
+                    <section class="bg-white rounded-2xl border border-sky-200 shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-sky-700">My Student ID</p>
+                            <p class="text-xl font-bold text-slate-900 mt-1">${escapeHtml(curStudent.roll || curStudent.id)}</p>
+                            <p class="text-xs text-slate-500 mt-1">Keep your ID card handy for classes and exams.</p>
+                        </div>
+                        <button onclick="openStudentIdCard('${escapeAttr(curStudent.id)}')" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition">
+                            <i class="fa-solid fa-id-card"></i> View / Download My ID Card
+                        </button>
+                    </section>
+                    ` : ''}
 
                     <!-- Hero Banner: Divine Classes Felicitation & Top Results -->
                     <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
@@ -2688,7 +2663,31 @@
         });
     }
 
+    function getCurrentStudent() {
+        if (state.currentRole !== 'student') return null;
+        const studentId = state.currentUser && state.currentUser.role === 'student'
+            ? state.currentUser.id
+            : state.activeStudentId;
+        if (!studentId) return null;
+        return (state.students || []).find(function (student) {
+            return student && student.id === studentId && student.status !== 'Inactive' && student.status !== 'Blocked';
+        }) || null;
+    }
+
+    function canViewStudentProfile(studentId) {
+        if (!state.isAuthenticated || !studentId) return false;
+        if (state.currentRole === 'admin' || state.currentRole === 'developer') return true;
+        const currentStudent = getCurrentStudent();
+        return state.currentRole === 'student' && currentStudent && currentStudent.id === studentId;
+    }
+
     function getBatchStudents(batch) {
+        if (state.currentRole === 'student') {
+            const currentStudent = getCurrentStudent();
+            if (!currentStudent) return [];
+            if (!batch || isStudentInBatch(batch, currentStudent)) return [currentStudent];
+            return [];
+        }
         if (!batch) return (state.students || []).filter(function (s) { return s && s.status !== 'Inactive'; });
         let list = (state.students || []).filter(function (s) { return s && s.status !== 'Inactive' && isStudentInBatch(batch, s); });
         // If this is the primary batch (state.batches[0]), also include any active student not in any other batch
@@ -2709,6 +2708,7 @@
 
     function renderBatchesView() {
         const canEdit = state.currentRole === 'admin' || state.currentRole === 'teacher';
+        const canViewAllProfiles = state.currentRole === 'admin' || state.currentRole === 'developer';
 
         return `
                 <div class="fade-in space-y-6">
@@ -2767,19 +2767,19 @@
                                                     ${enrolledStudents.map(stu => `
                                                         <div class="px-3.5 py-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition">
                                                             <div class="flex items-center gap-3">
-                                                                ${renderUserAvatar(stu.photo, stu.name, 'student', 'w-8 h-8')}
+                                                                ${canViewAllProfiles || state.currentRole === 'student' ? renderUserAvatar(stu.photo, stu.name, 'student', 'w-8 h-8') : ''}
                                                                 <div>
                                                                     <div class="flex items-center gap-1.5">
                                                                         <p class="text-xs font-semibold text-slate-800">${stu.name}</p>
-                                                                        ${stu.status === 'Blocked' ? '<span class="text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-full">Blocked</span>' : ''}
+                                                                        ${canViewAllProfiles && stu.status === 'Blocked' ? '<span class="text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-full">Blocked</span>' : ''}
                                                                     </div>
-                                                                    <p class="text-[11px] text-slate-400">${stu.roll} • Parent: ${stu.parentName}</p>
+                                                                    <p class="text-[11px] text-slate-400">${canViewAllProfiles ? `${stu.roll} • Parent: ${stu.parentName}` : (state.currentRole === 'student' ? `Student ID: ${stu.roll || stu.id}` : 'Enrolled student')}</p>
                                                                 </div>
                                                             </div>
                                                             <div class="flex items-center gap-1.5">
-                                                                <button onclick="openStudentIdCard('${stu.id}')" title="View & Download Student ID Card" class="text-xs text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg border border-slate-200 transition">
+                                                                ${canViewAllProfiles || (state.currentRole === 'student' && getCurrentStudent() && getCurrentStudent().id === stu.id) ? `<button onclick="openStudentIdCard('${stu.id}')" title="View & Download Student ID Card" class="text-xs text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg border border-slate-200 transition">
                                                                     <i class="fa-solid fa-id-card"></i>
-                                                                </button>
+                                                                </button>` : ''}
                                                                 ${state.currentRole === 'admin' ? `
                                                                 <button onclick="openEditStudentModal('${stu.id}')" title="Edit Student Record (Admin)" class="text-xs text-indigo-600 hover:text-white hover:bg-indigo-600 px-2 py-1 rounded-lg border border-indigo-200 transition flex items-center gap-1">
                                                                     <i class="fa-solid fa-pen-to-square"></i>
@@ -3221,7 +3221,7 @@
                 .withSuccessHandler(function () {
                     showToast(`Student ${stu.name} (${stu.roll}) marked Inactive in Database!`, 'warning');
                 })
-                .apiUpdateStudentProfile(studentId, { status: 'Inactive', batchId: '' });
+                .apiUpdateStudentProfile(studentId, { status: 'Inactive', batchId: '' }, state.authToken);
         } else {
             showToast(`Student ${stu.name} (${stu.roll}) marked Inactive and removed from app!`, 'warning');
         }
@@ -3262,7 +3262,7 @@
                 .withSuccessHandler(function () {
                     showToast(`Student ${stu.name} restored as Active in Database!`, 'success');
                 })
-                .apiUpdateStudentProfile(studentId, { status: 'Active' });
+                .apiUpdateStudentProfile(studentId, { status: 'Active' }, state.authToken);
         } else {
             showToast(`Student ${stu.name} restored as Active!`, 'success');
         }
@@ -3309,6 +3309,10 @@
     }
 
     async function handleStudentPhotoUploadDirect(event, studentId) {
+        if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
+            showToast('Access denied: only administrators can update student photos.', 'error');
+            return;
+        }
         const file = event.target.files && event.target.files[0];
         if (!file) return;
         const stu = state.students.find(s => s.id === studentId);
@@ -3328,7 +3332,7 @@
                     .withSuccessHandler(function () {
                         showToast(`Photo for ${stu.name} saved in Database!`, 'success');
                     })
-                    .apiUpdateStudentPhoto(studentId, photoDataUrl);
+                    .apiUpdateStudentPhoto(studentId, photoDataUrl, state.authToken);
             } else {
                 showToast(`Photo for ${stu.name} updated successfully!`, 'success');
             }
@@ -3339,6 +3343,10 @@
     }
 
     function handleRemoveStudentPhoto(studentId) {
+        if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
+            showToast('Access denied: only administrators can update student photos.', 'error');
+            return;
+        }
         const stu = state.students.find(s => s.id === studentId);
         if (!stu) return;
         showConfirmDialog({
@@ -3361,7 +3369,7 @@
                     .withSuccessHandler(function () {
                         showToast(`Photo removed for ${stu.name}`, 'info');
                     })
-                    .apiUpdateStudentPhoto(studentId, '');
+                    .apiUpdateStudentPhoto(studentId, '', state.authToken);
             } else {
                 showToast(`Photo removed for ${stu.name}`, 'info');
             }
@@ -3640,7 +3648,7 @@
                 })
                 .apiUpdateStudentProfile(studentId, {
                     name, roll, phone, parentName, batchId, status, admissionDate, monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
-                });
+                }, state.authToken);
         } else {
             showToast(`Student ${name} updated successfully!`, 'success');
         }
@@ -3804,7 +3812,7 @@
                 })
                 .apiUpdateTeacherProfile(teacherId, {
                     name, email, subject, qualification, experience, phone, status, specialization, bio, password, photo
-                });
+                }, state.authToken);
         } else {
             showToast(`Faculty ${name} updated successfully!`, 'success');
         }
@@ -4035,7 +4043,11 @@
     }
 
     function openStudentFeeDetailsModal(studentId) {
-        const stu = state.students.find(s => s.id === studentId) || state.students.find(s => s.id === state.activeStudentId) || state.students[0];
+        if (!canViewStudentProfile(studentId)) {
+            showToast('Access denied: you can only view your own student fee details.', 'error');
+            return;
+        }
+        const stu = state.students.find(s => s.id === studentId);
         if (!stu) return;
 
         // If viewed by the student, mark fee notification as seen/read so badge updates to 0
@@ -4403,14 +4415,24 @@
     /********************************************************************
      * PNG EXPORT HELPERS (HIGH RESOLUTION)
      ********************************************************************/
-    function downloadStudentIdCardAsPNG(studentId) {
+    function downloadStudentIdCardAsImage(studentId, format) {
+        if (!canViewStudentProfile(studentId)) {
+            showToast('Access denied: you can only view your own student ID card.', 'error');
+            return;
+        }
         const cardEl = document.getElementById('student-id-card-render');
         if (!cardEl) {
             showToast('ID Card element not found!', 'error');
             return;
         }
-        const stu = state.students.find(s => s.id === studentId) || { roll: studentId, name: 'Student' };
-        showToast('Generating high-resolution ID card PNG...', 'info');
+        const stu = state.students.find(s => s.id === studentId);
+        if (!stu || cardEl.dataset.studentId !== studentId) {
+            showToast('The requested ID card is not currently open.', 'error');
+            return;
+        }
+        const imageType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const extension = format === 'jpeg' ? 'jpg' : 'png';
+        showToast(`Generating high-resolution ID card ${extension.toUpperCase()}...`, 'info');
 
         function doDownload() {
             html2canvas(cardEl, {
@@ -4420,13 +4442,15 @@
                 backgroundColor: '#ffffff'
             }).then(canvas => {
                 const link = document.createElement('a');
-                link.download = 'Divine_Classes_ID_Card_' + (stu.roll || stu.id) + '.png';
-                link.href = canvas.toDataURL('image/png');
+                link.download = 'Divine_Classes_ID_Card_' + (stu.roll || stu.id) + '.' + extension;
+                link.href = canvas.toDataURL(imageType, 0.95);
+                document.body.appendChild(link);
                 link.click();
-                showToast('ID card downloaded as PNG!', 'success');
+                link.remove();
+                showToast(`ID card downloaded as ${extension.toUpperCase()}!`, 'success');
             }).catch(err => {
                 console.error('ID card export error:', err);
-                showToast('Could not export PNG: ' + err, 'error');
+                showToast(`Could not export ${extension.toUpperCase()}: ` + err, 'error');
             });
         }
 
@@ -4438,6 +4462,14 @@
         } else {
             doDownload();
         }
+    }
+
+    function downloadStudentIdCardAsPNG(studentId) {
+        downloadStudentIdCardAsImage(studentId, 'png');
+    }
+
+    function downloadStudentIdCardAsJPG(studentId) {
+        downloadStudentIdCardAsImage(studentId, 'jpeg');
     }
 
     function downloadFeeReceiptAsPNG(studentId, receiptNo) {
@@ -4479,10 +4511,19 @@
 
 
     function printStudentIdCard() {
+        const cardEl = document.getElementById('student-id-card-render');
+        if (!cardEl || !canViewStudentProfile(cardEl.dataset.studentId)) {
+            showToast('Access denied: you can only print your own student ID card.', 'error');
+            return;
+        }
         window.print();
     }
 
     function sendStudentIdCardOnWhatsApp(studentId) {
+        if (!canViewStudentProfile(studentId)) {
+            showToast('Access denied: you can only view your own student ID card.', 'error');
+            return;
+        }
         const stu = state.students.find(s => s.id === studentId);
         if (!stu) return;
         const batch = state.batches.find(b => isStudentInBatch(b, stu)) || state.batches[0];
@@ -4512,6 +4553,10 @@
     }
 
     function openStudentIdCard(studentId) {
+        if (!canViewStudentProfile(studentId)) {
+            showToast('Access denied: you can only view your own student ID card.', 'error');
+            return;
+        }
         const stu = state.students.find(s => s.id === studentId);
         if (!stu) {
             showToast('Student not found!', 'error');
@@ -4526,7 +4571,7 @@
         const cardHtml = `
             <div class="max-w-md mx-auto">
                 <!-- PRINTABLE CARD CONTAINER (Clean, 100% visible, no admin edit buttons inside) -->
-                <div id="student-id-card-render" style="background:#ffffff; border:2px solid #c7d2fe; border-radius:24px; overflow:hidden; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); font-family:system-ui, -apple-system, sans-serif; width:100%; max-width:360px; margin:0 auto; color:#0f172a;">
+                <div id="student-id-card-render" data-student-id="${escapeAttr(stu.id)}" style="background:#ffffff; border:2px solid #c7d2fe; border-radius:24px; overflow:hidden; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); font-family:system-ui, -apple-system, sans-serif; width:100%; max-width:360px; margin:0 auto; color:#0f172a;">
                     <!-- Top Header Ribbon -->
                     <div style="background:linear-gradient(135deg, #4338ca 0%, #3730a3 50%, #4c1d95 100%); color:#ffffff; padding:16px; position:relative; overflow:hidden;">
                         <div style="position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between;">
@@ -4623,12 +4668,12 @@
                 </div>
 
                 <!-- PHOTO CONTROLS (OUTSIDE CARD RENDER SO THEY NEVER APPEAR ON EXPORTED PNG) -->
-                ${(state.currentRole === 'admin' || state.currentRole === 'teacher') ? `
+                ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? `
                 <div class="mt-3 flex items-center justify-center gap-2 no-print">
                     <label class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 transition border border-indigo-200 shadow-2xs">
                         <i class="fa-solid fa-camera"></i>
-                        <span>${stu.photo ? 'Change Photo' : 'Upload Photo'}</span>
-                        <input type="file" accept="image/*" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${stu.id}')">
+                        <span>${stu.photo ? 'Take / Change Photo' : 'Take Photo'}</span>
+                        <input type="file" accept="image/*" capture="user" class="hidden" onchange="handleStudentPhotoUploadDirect(event, '${stu.id}')">
                     </label>
                     ${stu.photo ? `
                         <button onclick="handleRemoveStudentPhoto('${stu.id}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold transition border border-rose-200" title="Remove Photo">
@@ -4638,12 +4683,19 @@
                 </div>
                 ` : ''}
 
-                <!-- ACTION BUTTONS: ONLY DOWNLOAD PNG -->
+                <!-- ID card download and print controls -->
                 <div class="mt-4 flex flex-wrap items-center justify-center gap-3 no-print">
-                    <!-- Download PNG Image -->
                     <button onclick="downloadStudentIdCardAsPNG('${stu.id}')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download ID Card as .PNG image">
                         <i class="fa-solid fa-download text-sm"></i>
-                        <span>Download ID Card</span>
+                        <span>Download PNG</span>
+                    </button>
+                    <button onclick="downloadStudentIdCardAsJPG('${stu.id}')" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Download ID Card as .JPG image">
+                        <i class="fa-solid fa-image text-sm"></i>
+                        <span>Download JPG</span>
+                    </button>
+                    <button onclick="printStudentIdCard()" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95" title="Print or save the ID card as a PDF">
+                        <i class="fa-solid fa-file-pdf text-sm"></i>
+                        <span>Print / Save PDF</span>
                     </button>
 
                     <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
@@ -5558,9 +5610,16 @@
         const highestScore = scores.length ? Math.max(...scores) : 0;
 
         // Student personal report card view: resolve accurately for logged in student
-        const activeStudent = (state.currentUser && state.currentUser.role === 'student')
-            ? (state.students.find(s => s.id === state.currentUser.id || s.roll === state.currentUser.identifier) || state.students.find(s => s.id === state.activeStudentId) || state.students[0])
+        const activeStudent = state.currentRole === 'student'
+            ? getCurrentStudent()
             : (state.students.find(s => s.id === state.activeStudentId && s.status !== 'Inactive') || state.students.find(s => s.status !== 'Inactive') || state.students[0]);
+        if (!activeStudent) {
+            return `
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 text-center">
+                    <p class="text-sm font-semibold text-slate-700">Student record is unavailable.</p>
+                </div>
+            `;
+        }
 
         const studentBatches = (state.batches || []).filter(b => (b.studentIds || []).includes(activeStudent.id));
         const studentBatchIds = studentBatches.map(b => b.id);
@@ -5927,7 +5986,7 @@
                     console.warn('apiSaveTestMarks failure:', err);
                     if (typeof onDone === 'function') onDone({ success: false, error: err });
                 })
-                .apiSaveTestMarks(testPayload);
+                .apiSaveTestMarks(testPayload, state.authToken);
             return;
         }
 
@@ -5944,7 +6003,8 @@
             };
             const s = document.createElement('script');
             s.id = scriptId;
-            s.src = GAS_WEBAPP_URL + '?action=saveTestMarks&callback=' + cbName + '&data=' + jsonStr;
+            s.src = GAS_WEBAPP_URL + '?action=saveTestMarks&callback=' + cbName +
+                '&token=' + encodeURIComponent(state.authToken || '') + '&data=' + jsonStr;
             s.onerror = function () {
                 delete window[cbName];
                 if (typeof onDone === 'function') onDone({ success: false });
@@ -6013,6 +6073,11 @@
         };
 
         dispatchRemoteSaveTestMarks(payload, function (res) {
+            if (!res || !res.success) {
+                showToast((res && res.error) || 'Could not save student marks.', 'error');
+                renderMainContent();
+                return;
+            }
             showToast(`✓ All ${savedCount} student marks saved into Database table (Offline_Test_Marks)!`, 'success');
             renderMainContent();
         });
@@ -6051,7 +6116,11 @@
             maxMarks: test.maxMarks,
             batchId: test.batchId,
             marks: test.marks
-        }, function () {
+        }, function (res) {
+            if (!res || !res.success) {
+                showToast((res && res.error) || 'Could not save this student mark.', 'error');
+                return;
+            }
             showToast(`✓ Saved to Database for ${stu.name} (${scoreVal}/${test.maxMarks})`, 'success');
         });
 
@@ -7781,7 +7850,7 @@
                 .withSuccessHandler(function () {
                     console.log(`Student ${stu.name} status synced to Database`);
                 })
-                .apiUpdateStudentAuth(stuId, stu.password, newStatus);
+                .apiUpdateStudentAuth(stuId, stu.password, newStatus, state.authToken);
         }
     }
 
@@ -7805,7 +7874,7 @@
                 .withSuccessHandler(function () {
                     console.log(`Teacher ${tr.name} status synced to Database`);
                 })
-                .apiUpdateTeacherAuth(trId, tr.password, newStatus);
+                .apiUpdateTeacherAuth(trId, tr.password, newStatus, state.authToken);
         }
     }
 
@@ -7857,11 +7926,11 @@
             if (userType === 'student') {
                 google.script.run
                     .withSuccessHandler(function () { showToast(`Password for ${target.name} updated in Database!`, 'success'); })
-                    .apiUpdateStudentAuth(id, newPwd, target.status);
+                    .apiUpdateStudentAuth(id, newPwd, target.status, state.authToken);
             } else {
                 google.script.run
                     .withSuccessHandler(function () { showToast(`Password for ${target.name} updated in Database!`, 'success'); })
-                    .apiUpdateTeacherAuth(id, newPwd, target.status);
+                    .apiUpdateTeacherAuth(id, newPwd, target.status, state.authToken);
             }
         } else {
             showToast(`Password updated for ${target.name} successfully!`, 'success');
@@ -7884,7 +7953,7 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function () { showToast('Admin master password saved to Database!', 'success'); })
-                .apiUpdateAdminPassword(p1);
+                .apiUpdateAdminPassword(p1, state.authToken);
         } else {
             showToast('Admin master password updated successfully!', 'success');
         }
@@ -8086,7 +8155,7 @@
                                     <i class="fa-solid fa-lock text-sm"></i>
                                 </div>
                                 <input type="password" id="login-password" required value="${safeSavedPwd}" placeholder="Enter your password" class="w-full pl-10 pr-10 py-3 text-xs border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50/50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
-                                <button type="button" onclick="togglePasswordVisibility('login-password')" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                                <button type="button" id="login-password-toggle" onclick="toggleLoginPasswordVisibility('login-password')" aria-label="Show password" aria-pressed="false" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                                     <i class="fa-solid fa-eye text-xs"></i>
                                 </button>
                             </div>
@@ -8119,161 +8188,78 @@
             `;
     }
 
+    function finishPortalLogin(result, rememberMe, identifier) {
+        if (!result || !result.success || !result.session || !result.data) {
+            showToast((result && result.error) || 'Secure sign-in failed. Please try again.', 'error');
+            return;
+        }
+        const session = result.session;
+        state.students = [];
+        state.teachers = [];
+        state.batches = [];
+        state.offlineTests = [];
+        state.notifications = [];
+        state.authToken = result.token;
+        state.isAuthenticated = true;
+        state.currentRole = session.role;
+        state.isDeveloper = session.role === 'developer';
+        state.currentUser = {
+            role: session.role,
+            id: session.userId,
+            name: session.name,
+            identifier: session.identifier
+        };
+        state.activeStudentId = session.role === 'student' ? session.userId : '';
+        state.activeTeacherId = session.role === 'teacher' ? session.userId : '';
+        saveAuthSession(rememberMe, identifier);
+        closeModal();
+        mergeRemoteData(result.data);
+        showToast(session.role === 'developer'
+            ? 'Developer Mode activated.'
+            : `Welcome, ${session.name}!`, 'success');
+    }
+
     function handleAuthLogin(e) {
         e.preventDefault();
         const pwdInput = document.getElementById('login-password');
-        const pwd = pwdInput ? pwdInput.value.trim() : '';
+        const password = pwdInput ? pwdInput.value.trim() : '';
         const rememberInput = document.getElementById('login-remember');
         const rememberMe = rememberInput ? rememberInput.checked : true;
         const idInput = document.getElementById('login-identifier');
-        const idVal = idInput ? idInput.value.trim() : '';
-
-        if (!idVal) {
-            showToast('Please enter your Login ID (Roll Number, Email or Admin ID).', 'error');
-            return;
-        }
-        if (!pwd) {
-            showToast('Please enter your Password.', 'error');
+        const identifier = idInput ? idInput.value.trim() : '';
+        if (!identifier || !password) {
+            showToast('Enter both your Login ID and password.', 'error');
             return;
         }
 
-        const lowerId = idVal.toLowerCase();
-
-        // 0. Developer Login (dev, developer, developer@divineclasses.in, system architect)
-        const isDevLogin = lowerId === 'dev' || lowerId === 'developer' || lowerId === 'developer@divineclasses.in' || lowerId === 'system architect';
-        if (isDevLogin) {
-            const devPwd = (state.settings && state.settings.devPassword) ? state.settings.devPassword : 'dev123';
-            if (pwd !== devPwd && pwd !== 'dev') {
-                showToast('Invalid Password for Developer.', 'error');
-                return;
-            }
-            state.isAuthenticated = true;
-            state.currentRole = 'developer';
-            state.isDeveloper = true;
-            state.currentUser = { role: 'developer', name: 'Lead Developer', identifier: 'System Architect' };
-            saveAuthSession(rememberMe, idVal, pwd);
-            closeModal();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            showToast('Developer Mode activated — Settings console + Database controls unlocked.', 'success');
+        const onResult = function (result) {
+            finishPortalLogin(result, rememberMe, identifier);
+        };
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(onResult)
+                .withFailureHandler(function (err) {
+                    console.error('Secure sign-in failed:', err);
+                    showToast('Secure sign-in is unavailable. Please try again.', 'error');
+                })
+                .apiAuthenticatePortalUser(identifier, password);
             return;
         }
 
-        // 1. Admin Login (admin, anil, anil chahar, admin@divineclasses.in, divineclasses1010@gmail.com)
-        const configuredAdminEmail = (state.settings && state.settings.adminEmail) ? state.settings.adminEmail.toLowerCase() : 'divineclasses1010@gmail.com';
-        const isAdmin = lowerId === 'admin' || lowerId === 'admin@divineclasses.in' || lowerId === 'divineclasses1010@gmail.com' || lowerId === configuredAdminEmail || lowerId === 'anil' || lowerId === 'anil chahar';
-        if (isAdmin) {
-            const adminPwd = (state.settings && state.settings.adminPassword) ? state.settings.adminPassword : 'admin123';
-            if (pwd !== adminPwd && pwd !== 'admin') {
-                showToast('Invalid Password for Administrator.', 'error');
-                return;
-            }
-            const adminDisplay = (state.settings && state.settings.adminName) ? state.settings.adminName : 'Administrator';
-            state.isAuthenticated = true;
-            state.currentRole = 'admin';
-            state.isDeveloper = false;
-            state.currentUser = { role: 'admin', name: adminDisplay, identifier: 'Admin Master' };
-            saveAuthSession(rememberMe, idVal, pwd);
-            closeModal();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            showToast('Welcome, ' + adminDisplay + '!', 'success');
-            return;
-        }
-
-        // 2. Faculty / Teacher Login (email, phone, or name)
-        const tch = state.teachers.find(t =>
-            (t.email || '').toLowerCase() === lowerId ||
-            (t.phone || '').replace(/[\s+-]/g, '').includes(idVal.replace(/[\s+-]/g, '')) ||
-            t.name.toLowerCase() === lowerId
-        );
-        if (tch) {
-            if (tch.status === 'Inactive') {
-                showToast('This faculty account is no longer active in Divine Classes.', 'error');
-                return;
-            }
-            if (tch.status === 'Blocked') {
-                closeModal();
-                showAccessBlockedModal('teacher', tch.name, tch.email);
-                return;
-            }
-            const correctPwd = tch.password || 'teacher123';
-            if (pwd !== correctPwd) {
-                showToast('Invalid Password for faculty ' + tch.name + '.', 'error');
-                return;
-            }
-            state.isAuthenticated = true;
-            state.currentRole = 'teacher';
-            state.isDeveloper = false;
-            state.activeTeacherId = tch.id;
-            state.currentUser = { role: 'teacher', id: tch.id, name: tch.name, identifier: tch.email };
-            saveAuthSession(rememberMe, idVal, pwd);
-            closeModal();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            showToast(`Welcome, ${tch.name}!`, 'success');
-            return;
-        }
-
-        // 3. Student Login (roll, phone, or name)
-        const stu = state.students.find(s =>
-            s.roll.toLowerCase() === lowerId ||
-            s.phone.replace(/[\s+-]/g, '').includes(idVal.replace(/[\s+-]/g, '')) ||
-            s.name.toLowerCase() === lowerId
-        );
-        if (stu) {
-            if (stu.status === 'Inactive') {
-                showToast('This student record is no longer active in Divine Classes.', 'error');
-                return;
-            }
-            if (stu.status === 'Blocked') {
-                closeModal();
-                showAccessBlockedModal('student', stu.name, stu.roll);
-                return;
-            }
-            const correctPwd = stu.password || 'password123';
-            if (pwd !== correctPwd) {
-                showToast('Invalid Password for ' + stu.name + '.', 'error');
-                return;
-            }
-            state.isAuthenticated = true;
-            state.currentRole = 'student';
-            state.isDeveloper = false;
-            state.activeStudentId = stu.id;
-            state.currentUser = { role: 'student', id: stu.id, name: stu.name, identifier: stu.roll };
-            saveAuthSession(rememberMe, idVal, pwd);
-            closeModal();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            updateNotificationBadge();
-
-            // Check for unread fee reminders targeted to this student
-            const studentNotifs = getRelevantNotifications();
-            const unreadFeeNotifs = studentNotifs.filter(n => !n.read && n.actionTab === 'fees');
-            if (unreadFeeNotifs.length > 0) {
-                const balance = Math.max(0, (stu.monthlyFee || stu.totalFee || 2500) - stu.paidFee);
-                showToast(`📢 Important: You have a Monthly Fee Reminder in your Bell Icon (Outstanding: ₹${balance.toLocaleString('en-IN')})!`, 'warning');
-
-                // Highlight & bounce bell icon button to alert student
-                const bellBtn = document.getElementById('btn-notifications');
-                if (bellBtn) {
-                    bellBtn.classList.add('animate-bounce', 'ring-2', 'ring-amber-500');
-                    setTimeout(() => {
-                        bellBtn.classList.remove('animate-bounce', 'ring-2', 'ring-amber-500');
-                    }, 6000);
-                }
-            } else {
-                showToast(`Welcome back, ${stu.name}!`, 'success');
-            }
-            return;
-        }
-
-        // Not found
-        showToast(`User "${idVal}" not found. Please verify your Roll Number, Email, or Admin ID.`, 'error');
+        fetch(GAS_WEBAPP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'authenticate', identifier: identifier, password: password })
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('Authentication request failed');
+                return response.json();
+            })
+            .then(onResult)
+            .catch(function (err) {
+                console.error('Secure sign-in failed:', err);
+                showToast('Secure sign-in is unavailable. Please try again.', 'error');
+            });
     }
 
     /********************************************************************
@@ -8778,10 +8764,10 @@
                     google.script.run
                         .withSuccessHandler(applyRemoteSilently)
                         .withFailureHandler(function () { renderSidebar(); })
-                        .apiGetInitialData();
+                        .apiGetInitialData(state.authToken || '');
                 })
                 .withFailureHandler(function () { renderSidebar(); })
-                .apiSyncAllData(state);
+                .apiSyncAllData(state, state.authToken);
         }
     }
 
@@ -9097,7 +9083,7 @@
                 if (dd && !dd.classList.contains('hidden')) renderNotificationsUI();
             })
             .withFailureHandler(function () { /* silent — polling is best-effort */ })
-            .apiGetNotifications();
+            .apiGetNotifications(state.authToken || '');
     }
 
     function startNotificationPoller() {
@@ -9436,57 +9422,16 @@
     window.onload = function () {
         initTheme();
         loadCachedData();
-        loadAuthSession();
         updateRoleUI();
         renderSidebar();
         renderMainContent();
         updateNotificationBadge();
         startNotificationPoller();
-
-        // Auto-check for Database backend state (GAS or Vercel)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run
-                .withSuccessHandler(function (remoteData) {
-                    if (remoteData && remoteData.students) {
-                        mergeRemoteData(remoteData);
-                        renderSidebar();
-                        renderMainContent();
-                        updateSyncBadge('✓ Database Synced', 'success');
-                    }
-                })
-                .apiGetInitialData();
-        } else {
-            // Standalone Vercel mode: load live Database data quietly
-            fetch(GAS_WEBAPP_URL + '?action=getData')
-                .then(function (r) { return r.json(); })
-                .then(function (remoteData) {
-                    if (remoteData && remoteData.students) {
-                        mergeRemoteData(remoteData);
-                        renderSidebar();
-                        renderMainContent();
-                        updateSyncBadge('✓ Database Synced', 'success');
-                    }
-                })
-                .catch(function (err) {
-                    console.warn('Initial database fetch notice:', err);
-
-                });
-        }
+        loadPortalData(loadAuthSession());
 
         // Quiet background sync check when returning to window/tab
         window.addEventListener('focus', function () {
-            if (typeof google === 'undefined') {
-                fetch(GAS_WEBAPP_URL + '?action=getData')
-                    .then(function (r) { return r.json(); })
-                    .then(function (remoteData) {
-                        if (remoteData && remoteData.students) {
-                            mergeRemoteData(remoteData);
-                            renderSidebar();
-                            renderMainContent();
-                        }
-                    })
-                    .catch(function () { });
-            }
+            loadPortalData(state.authToken || '');
         });
         // Ensure root window and app container never retain unexpected focus-scroll offset
         window.addEventListener('scroll', function () {
