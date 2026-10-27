@@ -2816,9 +2816,19 @@
                 container.innerHTML = renderBatchesView();
                 break;
             case 'attendance':
-                container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher')
-                    ? renderAttendanceView()
-                    : renderAccessDeniedView('Daily Attendance', 'Admin, Developer or Teacher');
+                if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
+                    container.innerHTML = renderAccessDeniedView('Daily Attendance', 'Admin, Developer or Teacher');
+                } else if (typeof renderAttendanceView === 'function') {
+                    container.innerHTML = renderAttendanceView();
+                } else {
+                    container.innerHTML = '<div class="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Loading attendance page…</div>';
+                    attendanceSourceReady.then(function () {
+                        if (state.activeTab === 'attendance') renderMainContent();
+                    }).catch(function (error) {
+                        console.error('Could not load attendance page:', error);
+                        showToast('Could not load the attendance page. Please refresh and try again.', 'error');
+                    });
+                }
                 break;
             case 'fees':
                 container.innerHTML = (state.currentRole === 'admin' || state.currentRole === 'developer')
@@ -2859,7 +2869,28 @@
         }
     }
 
-    <?!= include('attendance'); ?>
+    const ATTENDANCE_EMBEDDED_SOURCE = String.raw`<?!= JSON.stringify(include('attendance')) ?>`;
+
+    function installAttendanceSource(source) {
+        const attendanceScript = document.createElement('script');
+        attendanceScript.textContent = source;
+        document.head.appendChild(attendanceScript);
+    }
+
+    const attendanceSourceReady = (function () {
+        try {
+            const embeddedSource = JSON.parse(ATTENDANCE_EMBEDDED_SOURCE);
+            installAttendanceSource(embeddedSource);
+            return Promise.resolve();
+        } catch (templateNotProcessed) {
+            return fetch(new URL('attendance.html', document.baseURI).toString())
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Attendance source request failed.');
+                    return response.text();
+                })
+                .then(installAttendanceSource);
+        }
+    })();
 
     /********************************************************************
      * VIEW: OVERVIEW DASHBOARD
