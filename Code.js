@@ -125,7 +125,7 @@ function doGet(e) {
     // 2e. Toggle Dummy / Demo Data via GET
     if (e && e.parameter && (e.parameter.action === 'setDummyData' || e.parameter.action === 'toggleDemoData')) {
       const session = getPortalSession_(e.parameter.token || '');
-      if (!session || session.role !== 'developer') {
+      if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Access denied.' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
@@ -325,7 +325,7 @@ function doPost(e) {
     // 6. Toggle Dummy / Demo Data via POST
     if (action === 'setDummyData' || action === 'toggleDemoData') {
       const session = getPortalSession_(payload.token || '');
-      if (!session || session.role !== 'developer') {
+      if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Access denied.' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
@@ -1260,7 +1260,7 @@ function isDummyRecord_(rec) {
   if (!rec) return false;
   // External links (l1..l5) are PERMANENT institute assets — NEVER dummy!
   if (rec.id && String(rec.id).startsWith('l')) return false;
-  if (rec.isDummy === true) return true;
+  if (rec.isDemo === true || rec.isDummy === true) return true;
   if (typeof DUMMY_SEED_ID_SET !== 'undefined' && DUMMY_SEED_ID_SET && DUMMY_SEED_ID_SET[rec.id] === true) return true;
   var fallbackIds = {
     'b1': true, 'b2': true, 'b3': true, 'b4': true, 'b5': true,
@@ -1485,6 +1485,65 @@ function applyTombstones_(appData) {
     });
   }
   return appData;
+}
+
+const DELETED_DEMO_IDS_KEY_ = 'DB_deleted_demo_ids_v1';
+const DELETED_DEMO_BATCHES_KEY_ = 'DB_deleted_demo_batches_v1';
+const DEMO_TABLES_ = ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'];
+
+function getDeletedDemoIds_() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty(DELETED_DEMO_IDS_KEY_) || '{}') || {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveDeletedDemoIds_(ids) {
+  PropertiesService.getScriptProperties().setProperty(DELETED_DEMO_IDS_KEY_, JSON.stringify(ids || {}));
+}
+
+function getDeletedDemoBatches_() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty(DELETED_DEMO_BATCHES_KEY_) || '{}') || {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveDeletedDemoBatches_(batches) {
+  PropertiesService.getScriptProperties().setProperty(DELETED_DEMO_BATCHES_KEY_, JSON.stringify(batches || {}));
+}
+
+function applyDeletedDemoIds_(data) {
+  if (!data) return data;
+  const deleted = getDeletedDemoIds_();
+  const deletedBatches = getDeletedDemoBatches_();
+  DEMO_TABLES_.forEach(function (table) {
+    const ids = deleted[table] || [];
+    const batches = deletedBatches[table] || [];
+    if ((ids.length || batches.length) && Array.isArray(data[table])) {
+      const set = {};
+      ids.forEach(function (id) { set[String(id)] = true; });
+      const batchSet = {};
+      batches.forEach(function (id) { batchSet[String(id)] = true; });
+      data[table] = data[table].filter(function (record) {
+        return !(record && ((record.id && set[String(record.id)]) ||
+          (record.demoBatchId && batchSet[String(record.demoBatchId)])));
+      });
+    }
+  });
+  const deletedStudents = {};
+  (deleted.students || []).forEach(function (id) { deletedStudents[String(id)] = true; });
+  (data.batches || []).forEach(function (batch) {
+    if (batch && Array.isArray(batch.studentIds)) {
+      batch.studentIds = batch.studentIds.filter(function (id) { return !deletedStudents[String(id)]; });
+    }
+  });
+  (data.offlineTests || []).forEach(function (test) {
+    if (test && test.marks) Object.keys(deletedStudents).forEach(function (id) { delete test.marks[id]; });
+  });
+  return data;
 }
 
 function calculateNextFeeReminder_(admissionDateStr, monthsCount) {
@@ -2536,8 +2595,7 @@ function getFullInitialData_() {
       }
     }
 
-    const isExplicitlyEnabled = appData && appData.settings && appData.settings.showDummyData === true;
-    const isDemoDisabled = !isExplicitlyEnabled && (
+    const isDemoDisabled = (
       (appData && appData.settings && appData.settings.showDummyData === false) ||
       (appData && appData.settings && appData.settings.demoDataPermanentlyDisabled === true) ||
       PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
@@ -2573,6 +2631,7 @@ function getFullInitialData_() {
 
     // 2d. Strip manually-deleted (tombstoned) records — deletions are forever
     appData = applyTombstones_(appData);
+    appData = applyDeletedDemoIds_(appData);
 
     // 3. Student access (Active/Blocked) and roster membership are controlled
     //    from the app UI and the Students_Master sheet — no forced records.
@@ -3427,7 +3486,7 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus, token) {
  */
 function apiSetDummyDataStatus(target, enabled, clientState, token) {
   const session = getPortalSession_(token);
-  if (!session || session.role !== 'developer') {
+  if (!session || (session.role !== 'admin' && session.role !== 'developer')) {
     return { success: false, error: 'Access denied.' };
   }
   let appData = dbLoadAll_();
@@ -3454,6 +3513,10 @@ function apiSetDummyDataStatus(target, enabled, clientState, token) {
 
   const allTables = ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'];
   const tables = (target === 'all' || !target) ? allTables : [target];
+  const allowedTables = allTables;
+  if (tables.some(function (table) { return allowedTables.indexOf(table) === -1; })) {
+    return { success: false, error: 'Invalid demo data table.' };
+  }
 
   if (enabled) {
     try {
@@ -3473,13 +3536,31 @@ function apiSetDummyDataStatus(target, enabled, clientState, token) {
 
     // 2. CRITICAL: Inject the seed dummy records for the enabled table(s) into appData
     // so they are immediately created in the Database tables!
+    const deletedIds = getDeletedDemoIds_();
+    const deletedBatches = getDeletedDemoBatches_();
     tables.forEach(function (tbl) {
       if (!Array.isArray(appData[tbl])) appData[tbl] = [];
+      deletedBatches[tbl] = (deletedBatches[tbl] || []).filter(function (id) { return String(id) !== 'divine-demo-v1'; });
+      const deletedSet = {};
+      (deletedIds[tbl] || []).forEach(function (id) { deletedSet[String(id)] = true; });
       const have = {};
-      appData[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
+      appData[tbl].forEach(function (r) {
+        if (!r || !r.id) return;
+        have[r.id] = true;
+        if (isDummyRecord_(r)) {
+          r.isDemo = true;
+          r.demoBatchId = r.demoBatchId || 'divine-demo-v1';
+        }
+      });
       (seed[tbl] || []).forEach(function (r) {
-        if (r && r.id && !have[r.id]) {
-          appData[tbl].push(JSON.parse(JSON.stringify(r)));
+        if (r && r.id && isDummyRecord_(r) && !have[r.id]) {
+          const demo = JSON.parse(JSON.stringify(r));
+          demo.isDemo = true;
+          demo.demoBatchId = demo.demoBatchId || 'divine-demo-v1';
+          appData[tbl].push(demo);
+          if (deletedSet[String(r.id)]) {
+            deletedIds[tbl] = (deletedIds[tbl] || []).filter(function (id) { return String(id) !== String(r.id); });
+          }
         }
       });
     });
@@ -3497,27 +3578,34 @@ function apiSetDummyDataStatus(target, enabled, clientState, token) {
       });
     }
 
-    // If clientState was passed, also preserve any newly created real records from client
+    // Accept only explicitly tagged demo records supplied by the signed-in client.
     if (clientState && typeof clientState === 'object') {
       tables.forEach(function (tbl) {
         if (Array.isArray(clientState[tbl])) {
           const existingIds = {};
           (appData[tbl] || []).forEach(function (r) { if (r && r.id) existingIds[r.id] = true; });
           clientState[tbl].forEach(function (cr) {
-            if (cr && cr.id && !existingIds[cr.id]) {
-              appData[tbl].push(JSON.parse(JSON.stringify(cr)));
+            if (cr && cr.id && isDummyRecord_(cr) && !existingIds[cr.id]) {
+              const demo = JSON.parse(JSON.stringify(cr));
+              demo.isDemo = true;
+              demo.demoBatchId = demo.demoBatchId || 'divine-demo-v1';
+              appData[tbl].push(demo);
+              existingIds[cr.id] = true;
+            }
+            if (cr && cr.id && isDummyRecord_(cr)) {
+              deletedIds[tbl] = (deletedIds[tbl] || []).filter(function (id) { return String(id) !== String(cr.id); });
             }
           });
         }
       });
+      saveDeletedDemoIds_(deletedIds);
     }
+    saveDeletedDemoIds_(deletedIds);
+    saveDeletedDemoBatches_(deletedBatches);
   } else {
-    try {
-      PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true');
-    } catch (e) { }
-
     // 1. Disable in config
     if (target === 'all' || !target) {
+      try { PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true'); } catch (e) { }
       appData.settings.showDummyData = false;
       appData.settings.demoDataPermanentlyDisabled = true;
       allTables.forEach(function (tbl) { appData.settings.dummyDataConfig[tbl] = false; });
@@ -3525,36 +3613,38 @@ function apiSetDummyDataStatus(target, enabled, clientState, token) {
       appData.settings.dummyDataConfig[target] = false;
       const anyOn = allTables.some(function (tbl) { return appData.settings.dummyDataConfig[tbl] === true; });
       appData.settings.showDummyData = anyOn;
-      if (!anyOn) appData.settings.demoDataPermanentlyDisabled = true;
+      appData.settings.demoDataPermanentlyDisabled = !anyOn;
+      try {
+        if (anyOn) PropertiesService.getScriptProperties().deleteProperty('DUMMY_DATA_DISABLED');
+        else PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true');
+      } catch (e) { }
     }
 
-    // 2. CRITICAL USER RULE: ONLY delete dummy records (b1..b5, s1..s5, etc.).
-    // ANY client records created while demo was on are 100% PRESERVED and shift to Row 2!
+    // Delete only records identified as demo data; keep every real record untouched.
+    const deletedIds = getDeletedDemoIds_();
+    const deletedBatches = getDeletedDemoBatches_();
     tables.forEach(function (tbl) {
-      appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
-    });
-
-    // If clientState was passed, ensure client's newly created non-dummy records are preserved
-    if (clientState && typeof clientState === 'object') {
-      tables.forEach(function (tbl) {
-        if (Array.isArray(clientState[tbl])) {
-          const existingIds = {};
-          (appData[tbl] || []).forEach(function (r) { if (r && r.id) existingIds[r.id] = true; });
-          clientState[tbl].forEach(function (cr) {
-            if (cr && cr.id && !isDummyRecord_(cr) && !existingIds[cr.id]) {
-              appData[tbl].push(JSON.parse(JSON.stringify(cr)));
-            }
-          });
+      deletedIds[tbl] = deletedIds[tbl] || [];
+      deletedBatches[tbl] = deletedBatches[tbl] || [];
+      (appData[tbl] || []).forEach(function (record) {
+        if (record && isDummyRecord_(record)) {
+          record.isDemo = true;
+          record.demoBatchId = record.demoBatchId || 'divine-demo-v1';
+          if (record.id && deletedIds[tbl].indexOf(String(record.id)) === -1) deletedIds[tbl].push(String(record.id));
+          if (deletedBatches[tbl].indexOf(String(record.demoBatchId)) === -1) deletedBatches[tbl].push(String(record.demoBatchId));
         }
       });
-    }
+      appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
+    });
+    saveDeletedDemoIds_(deletedIds);
+    saveDeletedDemoBatches_(deletedBatches);
 
     if (tables.indexOf('students') !== -1) {
       const dummyStudentIds = {};
-      (seed.students || []).forEach(function (s) { dummyStudentIds[s.id] = true; });
+      (deletedIds.students || []).forEach(function (id) { dummyStudentIds[String(id)] = true; });
       (appData.batches || []).forEach(function (b) {
         if (Array.isArray(b.studentIds)) {
-          b.studentIds = b.studentIds.filter(function (id) { return !dummyStudentIds[id]; });
+          b.studentIds = b.studentIds.filter(function (id) { return !dummyStudentIds[String(id)]; });
         }
       });
       (appData.offlineTests || []).forEach(function (t) {
@@ -3613,42 +3703,18 @@ function apiRestructureAllSheets() {
     let appData = dbLoadAll_();
     if (!appData) appData = getDefaultSeedData();
 
-    const isExplicitlyEnabled = appData && appData.settings && appData.settings.showDummyData === true;
-    const isDemoDisabled = !isExplicitlyEnabled && (
+    const isDemoDisabled = (
       (appData.settings && appData.settings.showDummyData === false) ||
       (appData.settings && appData.settings.demoDataPermanentlyDisabled === true) ||
       PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
     );
 
-    if (!isDemoDisabled) {
-      const seed = (typeof getDummySeedData === 'function') ? getDummySeedData() : getDefaultSeedData();
-      if (!appData.settings) appData.settings = {};
-      appData.settings.showDummyData = true;
-      if (!appData.settings.dummyDataConfig || typeof appData.settings.dummyDataConfig !== 'object') {
-        appData.settings.dummyDataConfig = {};
-      }
-      ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function (tbl) {
-        appData.settings.dummyDataConfig[tbl] = true;
-      });
-
-      // Populate each table with records
-      ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-        if (!Array.isArray(appData[tbl])) appData[tbl] = [];
-        const have = {};
-        appData[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
-        (seed[tbl] || []).slice(0, 5).forEach(function (r) {
-          if (r && r.id && !have[r.id]) {
-            appData[tbl].push(JSON.parse(JSON.stringify(r)));
-          }
-        });
-      });
-    } else {
-      stripDummyData_(appData);
-    }
+    appData = applyDeletedDemoIds_(appData);
+    if (isDemoDisabled) stripDummyData_(appData);
 
     // Ensure externalLinks has exactly all 5 permanent links
     if (!Array.isArray(appData.externalLinks) || appData.externalLinks.length === 0) {
-      appData.externalLinks = seed.externalLinks;
+      appData.externalLinks = OFFICIAL_EXTERNAL_LINKS.slice();
     }
 
     // Persist verified 5-records state in master database
@@ -3707,13 +3773,7 @@ function apiRestructureAllSheets() {
  */
 function syncAllData_(fullData) {
   try {
-    const isExplicitlyEnabled = fullData && fullData.settings && fullData.settings.showDummyData === true;
-    if (isExplicitlyEnabled) {
-      try {
-        PropertiesService.getScriptProperties().deleteProperty('DUMMY_DATA_DISABLED');
-      } catch (e) { }
-    }
-    const isDemoDisabled = !isExplicitlyEnabled && (
+    const isDemoDisabled = (
       (fullData && fullData.settings && fullData.settings.showDummyData === false) ||
       (fullData && fullData.settings && fullData.settings.demoDataPermanentlyDisabled === true) ||
       PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true'
@@ -3727,18 +3787,14 @@ function syncAllData_(fullData) {
         PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_DISABLED', 'true');
       } catch (pErr) { }
       stripDummyData_(fullData);
-    } else {
-      if (!fullData.settings) fullData.settings = {};
-      fullData.settings.showDummyData = true;
-      fullData.settings.demoDataPermanentlyDisabled = false;
-      try { restoreDummyData_(fullData); } catch (dummyErr) {
-        Logger.log('restoreDummyData_ notice: ' + dummyErr.toString());
-      }
     }
 
     // 0b. Deletion safety: strip tombstoned (manually sheet-deleted) records
     try { applyTombstones_(fullData); } catch (tombErr) {
       Logger.log('applyTombstones_ notice: ' + tombErr.toString());
+    }
+    try { applyDeletedDemoIds_(fullData); } catch (demoTombErr) {
+      Logger.log('applyDeletedDemoIds_ notice: ' + demoTombErr.toString());
     }
 
     // 0c. Ensure Gallery Banners and External Links are preserved and merged from sheet
@@ -3746,6 +3802,13 @@ function syncAllData_(fullData) {
       fullData = mergeGalleryFromSheet_(fullData);
       fullData = mergeLinksFromSheet_(fullData);
       fullData = mergeSettingsFromSheet_(fullData);
+      fullData = applyDeletedDemoIds_(fullData);
+      if (PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_DISABLED') === 'true') {
+        if (!fullData.settings) fullData.settings = {};
+        fullData.settings.showDummyData = false;
+        fullData.settings.demoDataPermanentlyDisabled = true;
+        stripDummyData_(fullData);
+      }
       if (!isDemoDisabled && (!Array.isArray(fullData.gallery) || fullData.gallery.length === 0)) {
         fullData.gallery = OFFICIAL_GALLERY_BANNERS.slice();
       }
@@ -4900,3 +4963,4 @@ function apiAppendTeacher(teacherData) {
     return { success: false, message: err.toString() };
   }
 }
+
