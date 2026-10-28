@@ -398,9 +398,9 @@
                         </div>
 
                         <!-- Sync Icon Button (Only Sync Icon) -->
-                        <button onclick="syncWithDatabase()" id="btn-sync" title="Sync with Cloud Database"
+                        <button onclick="syncWithDatabase()" id="btn-sync" title="Load the latest data from the Database"
                             class="p-2 sm:px-2.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition shadow-2xs flex items-center justify-center cursor-pointer"
-                            aria-label="Sync Database">
+                            aria-label="Refresh from Database">
                             <i class="fa-solid fa-arrows-rotate text-sm text-indigo-600 dark:text-indigo-400"
                                 id="sync-icon"></i>
                         </button>
@@ -496,7 +496,7 @@
         if (!rec) return false;
         // External study links (l1..l5) are PERMANENT institute assets — NEVER dummy!
         if (rec.id && String(rec.id).startsWith('l')) return false;
-        if (rec.isDummy === true) return true;
+        if (rec.isDemo === true || rec.isDummy === true) return true;
         if (rec.id && DUMMY_SEED_ID_SET[rec.id] === true) return true;
         return false;
     }
@@ -1199,6 +1199,7 @@
         }
         const currentStatus = state.settings.dummyDataConfig[sheetKey] !== false;
         const willEnable = (enable !== undefined) ? !!enable : !currentStatus;
+        if (!willEnable && !window.confirm('Permanently remove only tagged demo records from this database table? Real records will be kept.')) return;
         state.settings.dummyDataConfig[sheetKey] = willEnable;
 
         const anyOn = Object.keys(state.settings.dummyDataConfig).some(function (k) {
@@ -1234,7 +1235,7 @@
             showToast('Demo data for ' + sheetKey + ' DELETED completely from Database!', 'info');
         }
 
-        saveStateLocally();
+        saveStateLocally(true, true);
         updateRoleUI();
         renderSidebar();
         renderMainContent();
@@ -1279,13 +1280,15 @@
     }
 
     function toggleDemoData(enable) {
-        if (state.currentRole !== 'developer') {
-            showToast('Access Denied: Only Developer can toggle demo data.', 'error');
+        if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
+            showToast('Access Denied: Only Admin or Developer can manage demo data.', 'error');
             return;
         }
         if (!state.settings) state.settings = {};
         const willEnable = (enable !== undefined) ? !!enable : (state.settings.showDummyData === false);
+        if (!willEnable && !window.confirm('Permanently remove only tagged demo records from the database? Real student and institute records will be kept.')) return;
         state.settings.showDummyData = willEnable;
+        state.settings.demoDataPermanentlyDisabled = !willEnable;
         if (!state.settings.dummyDataConfig) state.settings.dummyDataConfig = {};
         ['students', 'teachers', 'batches', 'offlineTests', 'materials', 'gallery', 'feedbacks'].forEach(function (tbl) {
             state.settings.dummyDataConfig[tbl] = willEnable;
@@ -1303,14 +1306,14 @@
                     if (r && r.id && !have[r.id]) state[tbl].push(r);
                 });
             });
-            showToast('All Demo Data Enabled: Demo records restored and synced to Database.', 'success');
+            showToast('Demo records are being created in the database…', 'info');
         } else {
             state.settings.showDummyData = false;
             state.settings.demoDataPermanentlyDisabled = true;
             ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
                 state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
             });
-            showToast('All Demo Data Disabled: Demo records deleted from all tabs except External_Links_Hub & Settings_Config.', 'info');
+            showToast('Demo records are being removed from the database…', 'info');
         }
 
         // Save locally without triggering duplicate async background sync
@@ -1324,39 +1327,43 @@
             openDummyDataManagerModal();
         }
 
-        // Instant Database & Cloud Database Sync
+        function finishDemoUpdate(res) {
+            if (!res || !res.success) {
+                updateSyncBadge('Demo update failed', 'error');
+                showToast((res && res.error) || 'The database did not accept the demo data update.', 'error');
+                return;
+            }
+            updateSyncBadge('✓ Database Synced', 'success');
+            showToast(willEnable ? 'Demo records created. Real records were preserved.' : 'Demo records removed. Real records were preserved.', 'success');
+            loadPortalData(state.authToken);
+        }
+
+        // Only this authenticated endpoint can create or remove demo rows.
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             updateSyncBadge('Updating Database...', 'syncing');
             if (google.script.run.apiSetDummyDataStatus) {
                 google.script.run
-                    .withSuccessHandler(function () {
-                        updateSyncBadge('✓ Database Synced', 'success');
-                    })
+                    .withSuccessHandler(finishDemoUpdate)
                     .withFailureHandler(function (err) {
                         console.warn('apiSetDummyDataStatus error:', err);
-                        updateSyncBadge('✓ Saved locally', 'info');
+                        finishDemoUpdate({ success: false, error: 'Could not reach the database.' });
                     })
                     .apiSetDummyDataStatus('all', willEnable, state, state.authToken);
             } else {
-                google.script.run
-                    .withSuccessHandler(function () {
-                        updateSyncBadge('✓ Database Synced', 'success');
-                    })
-                    .apiSyncAllData(state, state.authToken);
+                finishDemoUpdate({ success: false, error: 'Demo controls are unavailable in this server version.' });
             }
         } else {
-            // Standalone / Vercel: POST 2-way sync to Google Apps Script endpoint
+            // Standalone / Vercel: use the same server-authorized demo action.
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'setDummyData', target: 'all', enabled: willEnable, data: state, token: state.authToken })
             })
                 .then(function (res) { return res.json(); })
-                .then(function () {
-                    updateSyncBadge('✓ Database Synced', 'success');
-                })
+                .then(finishDemoUpdate)
                 .catch(function (err) {
                     console.warn('Remote sync error:', err);
+                    finishDemoUpdate({ success: false, error: 'Could not reach the database.' });
                 });
         }
     }
@@ -1999,56 +2006,24 @@
     function mergeRemoteData(remoteData) {
         if (!remoteData || !remoteData.students) return;
         const notifMap = new Map();
-        (state.notifications || []).forEach(function (n) { if (n && n.id) notifMap.set(n.id, n); });
         if (remoteData.notifications && Array.isArray(remoteData.notifications)) {
             remoteData.notifications.forEach(function (n) {
                 if (n && n.id) {
-                    const local = notifMap.get(n.id);
-                    notifMap.set(n.id, local ? Object.assign({}, n, local) : n);
+                    notifMap.set(n.id, n);
                 }
             });
         }
 
-        // Intelligently union remote students with any non-dummy local students
-        // so real students enrolled on this device are NEVER wiped out by a remote fetch!
+        // The server is authoritative. A stale browser cache must not re-add deleted rows.
         const remoteStudents = Array.isArray(remoteData.students) ? remoteData.students : [];
-        const remoteRollSet = new Set(remoteStudents.map(function (s) {
-            return String((s && s.roll) || (s && s.id) || '').trim().toUpperCase();
-        }));
-        const localUnsyncedStudents = (state.students || []).filter(function (s) {
-            if (!s || isDummyRecord(s)) return false;
-            const r = String(s.roll || '').trim().toUpperCase();
-            const id = String(s.id || '').trim().toUpperCase();
-            return (!r || !remoteRollSet.has(r)) && (!id || !remoteRollSet.has(id));
-        });
-        const combinedStudents = remoteStudents.concat(localUnsyncedStudents);
+        const combinedStudents = remoteStudents;
 
         // Intelligently union faculty / teachers
         const remoteTeachers = Array.isArray(remoteData.teachers) ? remoteData.teachers : [];
-        const remoteTeacherSet = new Set(remoteTeachers.map(function (t) {
-            return String((t && t.id) || (t && t.name) || '').trim().toUpperCase();
-        }));
-        const localUnsyncedTeachers = (state.teachers || []).filter(function (t) {
-            if (!t || isDummyRecord(t)) return false;
-            const tid = String(t.id || '').trim().toUpperCase();
-            const tname = String(t.name || '').trim().toUpperCase();
-            return (!tid || !remoteTeacherSet.has(tid)) && (!tname || !remoteTeacherSet.has(tname));
-        });
-        const combinedTeachers = remoteTeachers.concat(localUnsyncedTeachers);
+        const combinedTeachers = remoteTeachers;
 
         // Intelligently union batches so student IDs in batches are preserved
-        let mergedBatches = remoteData.batches;
-        if (Array.isArray(state.batches) && Array.isArray(remoteData.batches)) {
-            mergedBatches = remoteData.batches.map(function (rb) {
-                const localB = state.batches.find(function (b) { return b.id === rb.id; });
-                if (!localB || !Array.isArray(localB.studentIds)) return rb;
-                const idSet = new Set(rb.studentIds || []);
-                localB.studentIds.forEach(function (id) { idSet.add(id); });
-                const updatedB = Object.assign({}, rb);
-                updatedB.studentIds = Array.from(idSet);
-                return updatedB;
-            });
-        }
+        const mergedBatches = remoteData.batches;
 
         state = Object.assign(state, remoteData);
         state.students = combinedStudents;
@@ -2213,59 +2188,39 @@
             if (btn) btn.disabled = false;
         }
 
+        function applyServerData(remoteData) {
+            if (!remoteData || !Array.isArray(remoteData.students)) {
+                stopSpin();
+                updateSyncBadge('Sync unavailable', 'info');
+                showToast('The server did not return valid data. Local records were not uploaded.', 'error');
+                return;
+            }
+            mergeRemoteData(remoteData);
+            stopSpin();
+            state.lastSyncTime = new Date().toLocaleTimeString();
+            updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+            showToast('Data refreshed from the Database.', 'success');
+            renderMainContent();
+        }
+
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function (res) {
-                    google.script.run
-                        .withSuccessHandler(function (remoteData) {
-                            if (remoteData && remoteData.students) {
-                                mergeRemoteData(remoteData);
-                            }
-                            stopSpin();
-                            state.lastSyncTime = new Date().toLocaleTimeString();
-                            updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
-                            showToast('Data Synced!', 'success');
-                            renderMainContent();
-                        })
-                        .withFailureHandler(function (err) {
-                            stopSpin();
-                            updateSyncBadge('✓ Database Synced', 'success');
-                        })
-                        .apiGetInitialData(state.authToken || '');
-                })
+                .withSuccessHandler(applyServerData)
                 .withFailureHandler(function (err) {
                     stopSpin();
-                    updateSyncBadge('Saved locally', 'info');
-                    showToast('Database notice: Saved in local session storage', 'info');
+                    updateSyncBadge('Sync unavailable', 'info');
+                    showToast('Could not refresh from the Database. Local records were not uploaded.', 'error');
                 })
-                .apiSyncAllData(state, state.authToken);
+                .apiGetInitialData(state.authToken || '');
         } else {
-            // Standalone Vercel / External web app: POST state, then GET latest merged sheet data
-            fetch(GAS_WEBAPP_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
-            })
-                .then(function (r) { return r.json(); })
-                .then(function () {
-                    return fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''));
-                })
-                .then(function (r) { return r.json(); })
-                .then(function (remoteData) {
-                    if (remoteData && remoteData.students) {
-                        mergeRemoteData(remoteData);
-                    }
-                    stopSpin();
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
-                    showToast('Database sync complete! All records updated.', 'success');
-                    renderMainContent();
-                })
+            // Manual Sync is intentionally pull-only so stale browser data cannot undo deletions.
+            fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''))
+                .then(function (r) { if (!r.ok) throw new Error('Database request failed'); return r.json(); })
+                .then(applyServerData)
                 .catch(function (err) {
                     stopSpin();
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                    showToast('State saved locally. Remote sync queued.', 'info');
+                    updateSyncBadge('Sync unavailable', 'info');
+                    showToast('Could not refresh from the Database. Local records were not uploaded.', 'error');
                 });
         }
     }
@@ -2624,10 +2579,16 @@
                     `;
             } else if (state.currentRole === 'admin') {
                 const showReq = isRequirementLabelsEnabled();
+                const dummyOn = state.settings && state.settings.showDummyData !== false;
                 roleBanner.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span><strong>Admin Mode Active:</strong> Student Fees Management & Automated Payment Reminders are active. Batch management, gallery banners, and materials are accessible.</span>
+                        <div class="flex flex-wrap items-center justify-between w-full gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span><strong>Admin Mode Active:</strong> Student Fees Management & Automated Payment Reminders are active. Batch management, gallery banners, and materials are accessible.</span>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                ${dummyOn ? `<button onclick="toggleDemoData(false)" class="px-2.5 py-1 text-xs font-bold rounded-lg border bg-rose-600 hover:bg-rose-700 text-white border-rose-500 transition cursor-pointer" title="Remove only tagged demo records"><i class="fa-solid fa-trash-can mr-1"></i>Remove Demo Data</button>` : `<button onclick="toggleDemoData(true)" class="px-2.5 py-1 text-xs font-bold rounded-lg border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 transition cursor-pointer" title="Create demo records"><i class="fa-solid fa-plus mr-1"></i>Create Demo Data</button>`}
+                            </div>
                         </div>
                         ${showReq ? `<span class="text-[11px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">Req #2 & #5 Enabled</span>` : `<span class="text-[11px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">Admin Portal</span>`}
                     `;
@@ -8365,7 +8326,7 @@
                                 <h2 class="text-xl font-bold font-heading">User Login & Database Authorization Management</h2>
                                 <p class="text-xs text-slate-300 max-w-2xl mt-1 leading-relaxed inline-flex items-center gap-2 flex-wrap">
                                     <span>Manage student and faculty credentials in the persistent Cloud Database, synchronized automatically with Database.</span>
-                                    <button onclick="syncWithDatabase()" id="btn-sync-access-icon" title="Auto-syncs data immediately as records are edited. Click for instant sync." class="w-7 h-7 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition inline-flex items-center justify-center shadow-xs cursor-pointer align-middle shrink-0" aria-label="Auto-Sync Database">
+                                    <button onclick="syncWithDatabase()" id="btn-sync-access-icon" title="Records sync automatically after edits. Click to load the latest Database data." class="w-7 h-7 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition inline-flex items-center justify-center shadow-xs cursor-pointer align-middle shrink-0" aria-label="Refresh from Database">
                                         <i class="fa-solid fa-arrows-rotate text-xs" id="auth-sync-icon"></i>
                                     </button>
                                 </p>
@@ -9362,7 +9323,7 @@
                                     <i class="fa-brands fa-google-drive text-amber-300"></i> Open Drive
                                 </button>
                                 <button type="button" onclick="syncWithDatabase()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition flex items-center gap-1.5">
-                                    <i class="fa-solid fa-rotate"></i> Sync 2-Way Now
+                                    <i class="fa-solid fa-rotate"></i> Refresh from Database
                                 </button>
                             </div>
                         </div>
@@ -9513,7 +9474,7 @@
 
                                     <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
                                         <button type="button" onclick="syncWithDatabase()" class="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5">
-                                            <i class="fa-solid fa-arrows-rotate"></i> Force Instant 2-Way Sync
+                                            <i class="fa-solid fa-arrows-rotate"></i> Refresh from Database
                                         </button>
                                         <button type="button" onclick="reStructureGoogleSheets()" class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 transition cursor-pointer shadow-xs flex items-center gap-1.5">
                                             <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i> Restructure Database Sequence
@@ -9566,16 +9527,20 @@
 
                                     <label class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
                                         <div class="min-w-0">
-                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Master Switch: Show Dummy / Demo Data</p>
-                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = demo records active. <strong>OFF = all demo rows are wiped from Databases</strong> (leaves only real data).</p>
+                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Demo Data Controls</p>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">Use the explicit controls below to create or remove tagged demo rows. Real records are preserved.</p>
                                         </div>
                                         <div class="relative w-11 h-6 shrink-0">
-                                            <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} class="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" aria-label="Show Dummy Demo Data">
+                                            <input type="checkbox" id="set-showDummyData" ${s.showDummyData === false ? '' : 'checked'} disabled class="peer absolute inset-0 w-full h-full opacity-0 cursor-not-allowed z-10 m-0" aria-label="Use the demo controls below">
                                             <span class="w-11 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-purple-600 block pointer-events-none after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
                                         </div>
                                     </label>
 
                                     <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" onclick="toggleDemoData(true)" class="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer"><i class="fa-solid fa-plus mr-1"></i>Create Demo Data</button>
+                                            <button type="button" onclick="toggleDemoData(false)" class="px-3 py-2 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer"><i class="fa-solid fa-trash-can mr-1"></i>Delete Demo Data</button>
+                                        </div>
                                         <button type="button" onclick="openDummyDataManagerModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-xs flex items-center gap-1.5">
                                             <i class="fa-solid fa-database text-amber-300"></i> Open Per-Table Dummy Data Manager
                                         </button>
@@ -9611,7 +9576,7 @@
             return;
         }
         if (!state.settings) state.settings = {};
-        const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'adminDriveEmail', 'adminDriveFolderUrl', 'devPassword', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
+        const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'adminDriveEmail', 'adminDriveFolderUrl', 'devPassword', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
         keys.forEach(function (k) {
             const el = document.getElementById('set-' + k);
             if (el) {
@@ -9636,37 +9601,6 @@
         }
         if (!state.settings.instituteName || /^mia$/i.test(String(state.settings.instituteName).trim())) {
             state.settings.instituteName = 'Divine Classes';
-        }
-
-        // USER RULE: When disabled, only dummy records are removed and client records are preserved.
-        // When enabled, restore dummy records (rows 2 to 6).
-        if (state.settings.showDummyData === false) {
-            state.settings.demoDataPermanentlyDisabled = true;
-            state.settings.showRequirementLabels = false;
-            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-                state[tbl] = (state[tbl] || []).filter(function (r) { return !isDummyRecord(r); });
-            });
-            if (state.settings.dummyDataConfig) {
-                Object.keys(state.settings.dummyDataConfig).forEach(function (dk) {
-                    state.settings.dummyDataConfig[dk] = false;
-                });
-            }
-        } else if (state.settings.showDummyData === true) {
-            state.settings.demoDataPermanentlyDisabled = false;
-            const seed = getDummySeedData();
-            ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-                if (!Array.isArray(state[tbl])) state[tbl] = [];
-                const have = {};
-                state[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
-                (seed[tbl] || []).forEach(function (r) {
-                    if (r && r.id && !have[r.id]) state[tbl].push(r);
-                });
-            });
-            if (state.settings.dummyDataConfig) {
-                Object.keys(state.settings.dummyDataConfig).forEach(function (dk) {
-                    state.settings.dummyDataConfig[dk] = true;
-                });
-            }
         }
 
         // Smooth in-button feedback without re-rendering or screen shaking
@@ -9704,8 +9638,8 @@
                 state.materials = remoteData.materials || [];
                 state.offlineTests = remoteData.offlineTests || [];
                 state.teachers = remoteData.teachers || [];
-                state.gallery = (remoteData.gallery && remoteData.gallery.length > 0) ? remoteData.gallery : (state.gallery && state.gallery.length > 0 ? state.gallery : (state.settings && state.settings.showDummyData === false ? [] : getDummySeedData().gallery));
-                state.externalLinks = (remoteData.externalLinks && remoteData.externalLinks.length > 0) ? remoteData.externalLinks : (state.externalLinks || []);
+                state.gallery = Array.isArray(remoteData.gallery) ? remoteData.gallery : [];
+                state.externalLinks = Array.isArray(remoteData.externalLinks) ? remoteData.externalLinks : [];
                 state.feedbacks = remoteData.feedbacks || [];
                 if (remoteData.settings) state.settings = Object.assign({}, state.settings, remoteData.settings);
                 saveStateLocally();
@@ -10488,3 +10422,4 @@
 </script>
 </body>
 </html>
+
