@@ -470,7 +470,18 @@ function getDummySeedData() {
     ]
   };
 
-  return JSON.parse(JSON.stringify(data));
+  var clone = JSON.parse(JSON.stringify(data));
+  Object.keys(clone).forEach(function(table) {
+    if (Array.isArray(clone[table])) {
+      clone[table].forEach(function(record) {
+        if (record && record.isDummy === true) {
+          record.isDemo = true;
+          record.demoBatchId = 'divine-demo-v1';
+        }
+      });
+    }
+  });
+  return clone;
 }
 
 function isDummyForSheetEnabled(settings, sheetKey) {
@@ -521,3 +532,4 @@ if (typeof module !== 'undefined' && module.exports) {
     stripDummyData: stripDummyData
   };
 }
+
