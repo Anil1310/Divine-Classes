@@ -1998,18 +1998,8 @@
 
     const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
 
-    const SUPABASE_CONFIG = {
-        url: 'https://mbplsboknjvmhfqasuik.supabase.co',
-        anonKey: 'sb_publishable_guNoFhxacWF1ksmUVIjmFw_4cMpk_so'
-    };
+    // Supabase access is server-side only; the authenticated Apps Script API is primary.
     let supabaseClient = null;
-    try {
-        if (typeof window !== 'undefined' && window.supabase && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
-            supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-        }
-    } catch (e) {
-        console.warn('Supabase initialization notice:', e);
-    }
 
     function mapSupabaseToState(dbData) {
         const students = (dbData.students || []).map(function (s) {
@@ -2027,6 +2017,7 @@
                 lastReminder: s.last_reminder,
                 password: s.password,
                 status: s.status || 'Active',
+                photo: s.photo_url || '',
                 photoUrl: s.photo_url,
                 address: s.address
             };
@@ -2059,6 +2050,7 @@
                 initials: t.initials,
                 password: t.password,
                 status: t.status || 'Active',
+                photo: t.photo_url || '',
                 photoUrl: t.photo_url
             };
         });
@@ -2198,7 +2190,12 @@
             const rawData = {};
             let hasAnyData = false;
             tables.forEach(function (t, i) {
-                const d = (results[i] && results[i].data) ? results[i].data : [];
+                const result = results[i];
+                if (!result || result.error) {
+                    throw new Error('Could not read Supabase table "' + t + '": ' +
+                        ((result && result.error && result.error.message) || 'No response from Supabase.'));
+                }
+                const d = Array.isArray(result.data) ? result.data : [];
                 rawData[t] = d;
                 if (d && d.length > 0) hasAnyData = true;
             });
@@ -2219,16 +2216,37 @@
             }
             return mapped;
         } catch (e) {
-            console.warn('Supabase fetch error:', e);
-            return null;
+            console.error('Supabase fetch failed:', e);
+            throw e;
+        }
+    }
+
+    async function upsertSupabaseRows(table, rows, options, verifyIds) {
+        let query = supabaseClient.from(table).upsert(rows, options);
+        if (verifyIds) query = query.select('id');
+        const result = await query;
+        if (!result || result.error) {
+            throw new Error('Could not save Supabase table "' + table + '": ' +
+                ((result && result.error && result.error.message) || 'No response from Supabase.'));
+        }
+        if (verifyIds && (!Array.isArray(result.data) || result.data.length !== rows.length)) {
+            throw new Error('Supabase did not confirm saving every row in "' + table + '". Check table permissions and row-level security.');
         }
     }
 
     async function syncStateToSupabase(state) {
         if (!supabaseClient) return;
         try {
+            const writeErrors = [];
+            const pendingWrites = [];
+            function queueUpsert(table, rows, options, verifyIds) {
+                pendingWrites.push(upsertSupabaseRows(table, rows, options, verifyIds).catch(function (error) {
+                    writeErrors.push(error);
+                }));
+            }
+
             if (state.settings) {
-                await supabaseClient.from('settings').upsert({ id: 1, data: state.settings, updated_at: new Date().toISOString() });
+                queueUpsert('settings', { id: 1, data: state.settings, updated_at: new Date().toISOString() });
             }
             if (Array.isArray(state.students) && state.students.length > 0) {
                 const rows = state.students.map(function (s) {
@@ -2246,11 +2264,11 @@
                         last_reminder: s.lastReminder || 'Never',
                         password: s.password || '',
                         status: s.status || 'Active',
-                        photo_url: s.photoUrl || '',
+                        photo_url: s.photoUrl || s.photo || '',
                         address: s.address || ''
                     };
                 });
-                await supabaseClient.from('students').upsert(rows);
+                queueUpsert('students', rows, undefined, true);
             }
             if (Array.isArray(state.batches) && state.batches.length > 0) {
                 const rows = state.batches.map(function (b) {
@@ -2264,7 +2282,7 @@
                         student_ids: Array.isArray(b.studentIds) ? b.studentIds : []
                     };
                 });
-                await supabaseClient.from('batches').upsert(rows);
+                queueUpsert('batches', rows, undefined, true);
             }
             if (Array.isArray(state.teachers) && state.teachers.length > 0) {
                 const rows = state.teachers.map(function (t) {
@@ -2282,10 +2300,10 @@
                         initials: t.initials || '',
                         password: t.password || '',
                         status: t.status || 'Active',
-                        photo_url: t.photoUrl || ''
+                        photo_url: t.photoUrl || t.photo || ''
                     };
                 });
-                await supabaseClient.from('teachers').upsert(rows);
+                queueUpsert('teachers', rows, undefined, true);
             }
             if (Array.isArray(state.materials) && state.materials.length > 0) {
                 const rows = state.materials.map(function (m) {
@@ -2306,7 +2324,7 @@
                         storage_path: m.storagePath || ''
                     };
                 });
-                await supabaseClient.from('materials').upsert(rows);
+                queueUpsert('materials', rows);
             }
             if (Array.isArray(state.offlineTests) && state.offlineTests.length > 0) {
                 const rows = state.offlineTests.map(function (ot) {
@@ -2319,7 +2337,7 @@
                         max_marks: Number(ot.maxMarks) || 100
                     };
                 });
-                await supabaseClient.from('offline_tests').upsert(rows);
+                queueUpsert('offline_tests', rows);
             }
             if (Array.isArray(state.testMarks) && state.testMarks.length > 0) {
                 const rows = state.testMarks.map(function (tm) {
@@ -2330,7 +2348,7 @@
                         remarks: tm.remarks || ''
                     };
                 });
-                await supabaseClient.from('test_marks').upsert(rows, { onConflict: 'test_id,student_id' });
+                queueUpsert('test_marks', rows, { onConflict: 'test_id,student_id' });
             }
             if (Array.isArray(state.gallery) && state.gallery.length > 0) {
                 const rows = state.gallery.map(function (g) {
@@ -2344,7 +2362,7 @@
                         image_url: g.imageUrl || ''
                     };
                 });
-                await supabaseClient.from('gallery').upsert(rows);
+                queueUpsert('gallery', rows);
             }
             if (Array.isArray(state.feedbacks) && state.feedbacks.length > 0) {
                 const rows = state.feedbacks.map(function (f) {
@@ -2359,7 +2377,7 @@
                         comment: f.comment || ''
                     };
                 });
-                await supabaseClient.from('feedbacks').upsert(rows);
+                queueUpsert('feedbacks', rows);
             }
             if (Array.isArray(state.externalLinks) && state.externalLinks.length > 0) {
                 const rows = state.externalLinks.map(function (l) {
@@ -2375,7 +2393,7 @@
                         clicks: Number(l.clicks) || 0
                     };
                 });
-                await supabaseClient.from('external_links').upsert(rows);
+                queueUpsert('external_links', rows);
             }
             if (Array.isArray(state.notifications) && state.notifications.length > 0) {
                 const rows = state.notifications.map(function (n) {
@@ -2399,12 +2417,17 @@
                         batch_name: n.batchName || null
                     };
                 });
-                await supabaseClient.from('notifications').upsert(rows);
+                queueUpsert('notifications', rows);
+            }
+            await Promise.all(pendingWrites);
+            if (writeErrors.length) {
+                throw new Error(writeErrors.map(function (error) { return error.message || String(error); }).join(' | '));
             }
             state.lastSyncTime = new Date().toLocaleTimeString();
             updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
         } catch (err) {
-            console.warn('Supabase sync notice:', err);
+            console.error('Supabase sync failed:', err);
+            throw err;
         }
     }
 
@@ -2619,38 +2642,67 @@
 
         const delay = immediate ? 0 : 50; // Ultra-fast auto-sync as soon as data is added
 
-        autoSyncTimer = setTimeout(function () {
-            if (supabaseClient) {
-                syncStateToSupabase(state);
-            }
+        autoSyncTimer = setTimeout(async function () {
+            const syncTasks = [];
+            if (supabaseClient) syncTasks.push(syncStateToSupabase(state));
+
             if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
-                    })
-                    .withFailureHandler(function (err) {
-                        console.warn('Auto-sync notice:', err);
-                        updateSyncBadge('Saved locally', 'info');
-                    })
-                    .apiSyncAllData(state, state.authToken);
-            } else {
-                // Standalone / Vercel: POST 2-way sync to Google Apps Script endpoint
-                fetch(GAS_WEBAPP_URL, {
+                syncTasks.push(new Promise(function (resolve, reject) {
+                    google.script.run
+                        .withSuccessHandler(function (result) {
+                            if (!result || !result.success) {
+                                reject(new Error((result && (result.error || result.message)) || 'Apps Script rejected the database sync.'));
+                                return;
+                            }
+                            resolve(result);
+                        })
+                        .withFailureHandler(reject)
+                        .apiSyncAllData(state, state.authToken);
+                }));
+            } else if (!supabaseClient) {
+                syncTasks.push(fetch(GAS_WEBAPP_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
-                })
-                    .then(function (res) { return res.json(); })
-                    .then(function (res) {
-                        state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
-                    })
-                    .catch(function (err) {
-                        console.warn('Remote sync notice:', err);
-                        state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                    });
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('Database sync failed with HTTP ' + response.status);
+                    return response.json();
+                }).then(function (result) {
+                    if (!result || !result.success) {
+                        throw new Error((result && (result.error || result.message)) || 'Apps Script rejected the database sync.');
+                    }
+                    return result;
+                }));
+            }
+
+            try {
+                await Promise.all(syncTasks);
+                const remoteData = await new Promise(function (resolve, reject) {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .apiGetInitialData(state.authToken);
+                        return;
+                    }
+                    fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''))
+                        .then(function (response) {
+                            if (!response.ok) throw new Error('Database refresh failed with HTTP ' + response.status);
+                            return response.json();
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                });
+                if (!remoteData || !Array.isArray(remoteData.students)) {
+                    throw new Error('The server returned invalid portal data.');
+                }
+                mergeRemoteData(remoteData);
+                state.lastSyncTime = new Date().toLocaleTimeString();
+                updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+            } catch (err) {
+                console.error('Automatic database sync failed:', err);
+                updateSyncBadge('Database sync failed', 'error');
+                showToast('Could not sync changes to the database: ' + ((err && err.message) || err || 'Please try again.'), 'error');
             }
         }, delay);
     }
@@ -2725,11 +2777,21 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (res) {
+                    if (!res || res.success !== true) {
+                        stopSpin();
+                        updateSyncBadge('Remote sync failed', 'error');
+                        showToast((res && res.error) || 'Remote database rejected the sync.', 'error');
+                        return;
+                    }
                     google.script.run
                         .withSuccessHandler(function (remoteData) {
-                            if (remoteData && remoteData.students) {
-                                mergeRemoteData(remoteData);
+                            if (!remoteData || !Array.isArray(remoteData.students)) {
+                                stopSpin();
+                                updateSyncBadge('Remote refresh failed', 'error');
+                                showToast('Saved, but the latest database state could not be loaded.', 'error');
+                                return;
                             }
+                            mergeRemoteData(remoteData);
                             stopSpin();
                             state.lastSyncTime = new Date().toLocaleTimeString();
                             updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
@@ -2738,14 +2800,17 @@
                         })
                         .withFailureHandler(function (err) {
                             stopSpin();
-                            updateSyncBadge('✓ Database Synced', 'success');
+                            console.warn('Post-sync refresh failed:', err);
+                            updateSyncBadge('Saved, refresh failed', 'error');
+                            showToast('Saved, but the latest database state could not be loaded.', 'error');
                         })
                         .apiGetInitialData(state.authToken || '');
                 })
                 .withFailureHandler(function (err) {
                     stopSpin();
-                    updateSyncBadge('Saved locally', 'info');
-                    showToast('Database notice: Saved in local session storage', 'info');
+                    console.warn('Manual database sync failed:', err);
+                    updateSyncBadge('Remote sync failed', 'error');
+                    showToast('Remote database sync failed. Your local changes are still on this device.', 'error');
                 })
                 .apiSyncAllData(state, state.authToken);
         } else {
@@ -2755,15 +2820,25 @@
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
             })
-                .then(function (r) { return r.json(); })
-                .then(function () {
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Sync request failed with HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(function (res) {
+                    if (!res || res.success !== true) {
+                        throw new Error((res && res.error) || 'The server rejected the sync request.');
+                    }
                     return fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''));
                 })
-                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Refresh request failed with HTTP ' + response.status);
+                    return response.json();
+                })
                 .then(function (remoteData) {
-                    if (remoteData && remoteData.students) {
-                        mergeRemoteData(remoteData);
+                    if (!remoteData || !Array.isArray(remoteData.students)) {
+                        throw new Error('The server returned invalid portal data.');
                     }
+                    mergeRemoteData(remoteData);
                     stopSpin();
                     state.lastSyncTime = new Date().toLocaleTimeString();
                     updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
@@ -2772,9 +2847,9 @@
                 })
                 .catch(function (err) {
                     stopSpin();
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                    showToast('State saved locally. Remote sync queued.', 'info');
+                    console.warn('Manual remote sync failed:', err);
+                    updateSyncBadge('Remote sync failed', 'error');
+                    showToast('Remote database sync failed. Your local changes are still on this device.', 'error');
                 });
         }
     }
@@ -4192,7 +4267,7 @@
             submitBtn.textContent = 'Saving...';
         }
 
-        function onAddSuccess(result) {
+        async function onAddSuccess(result) {
             if (!result || !result.success) {
                 if (submitBtn) {
                     submitBtn.disabled = false;
@@ -4206,9 +4281,20 @@
                 if (!batch.studentIds.includes(id)) batch.studentIds.push(id);
             });
             saveStateLocally(true);
+            if (supabaseClient) {
+                try {
+                    await syncStateToSupabase(state);
+                } catch (syncError) {
+                    console.error('Batch membership Supabase sync failed:', syncError);
+                    showToast('Student was added in the portal database, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                    updateSyncBadge('Supabase sync failed', 'error');
+                    return;
+                }
+            }
             closeModal();
             renderMainContent();
             showToast(`${stu.name} added to ${batch.name}.`, 'success');
+            updateSyncBadge('✓ Supabase Synced', 'success');
         }
 
         function onAddError(err) {
@@ -4333,49 +4419,73 @@
         renderMainContent();
         showToast(`✓ New student ${name} (${newStu.roll}) registered & added to ${batch ? batch.name : 'Batch'}!`, 'success');
 
-        function onAppendSuccess(res) {
+        async function onAppendSuccess(res) {
             window.isEnrollingStudent = false;
-            if (res && res.success) {
-                if (res.student) {
-                    const idx = state.students.findIndex(s => (s && s.roll === res.student.roll) || (s && s.id === newStu.id) || (s && s.roll === newStu.roll));
-                    if (idx !== -1) {
-                        state.students[idx] = Object.assign({}, state.students[idx], res.student);
-                    } else {
-                        state.students.push(res.student);
-                    }
-                }
-                if (res.batches && Array.isArray(res.batches) && res.batches.length > 0) {
-                    res.batches.forEach(rb => {
-                        const localB = state.batches.find(b => b.id === rb.id);
-                        if (localB && Array.isArray(rb.studentIds)) {
-                            rb.studentIds.forEach(id => {
-                                if (!localB.studentIds.includes(id)) localB.studentIds.push(id);
-                            });
-                        }
-                    });
+            if (!res || !res.success || !res.student) {
+                state.students = state.students.filter(function (student) { return student.id !== newStu.id && student.roll !== newStu.roll; });
+                if (batch) {
+                    batch.studentIds = (batch.studentIds || []).filter(function (id) { return id !== newStu.id && id !== newStu.roll; });
                 }
                 saveStateLocally(true);
                 renderMainContent();
-                showToast(`✓ ${name} (${(res.student && res.student.roll) || newStu.roll}) synced to Database!`, 'success');
-                updateSyncBadge('✓ Database Synced', 'success');
+                showToast((res && res.message) || 'Student could not be saved to the database.', 'error');
+                return;
             }
+            const savedStudent = res.student;
+            const idx = state.students.findIndex(s => (s && s.roll === savedStudent.roll) || (s && s.id === newStu.id) || (s && s.roll === newStu.roll));
+            if (idx !== -1) {
+                state.students[idx] = Object.assign({}, state.students[idx], savedStudent);
+            } else {
+                state.students.push(savedStudent);
+            }
+            if (res.batches && Array.isArray(res.batches) && res.batches.length > 0) {
+                res.batches.forEach(rb => {
+                    const localB = state.batches.find(b => b.id === rb.id);
+                    if (localB && Array.isArray(rb.studentIds)) {
+                        rb.studentIds.forEach(id => {
+                            if (!localB.studentIds.includes(id)) localB.studentIds.push(id);
+                        });
+                    }
+                });
+            }
+            saveStateLocally(true);
+            renderMainContent();
+            if (supabaseClient) {
+                try {
+                    await syncStateToSupabase(state);
+                } catch (syncError) {
+                    console.error('Student Supabase sync failed:', syncError);
+                    showToast('Student was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                    updateSyncBadge('Supabase sync failed', 'error');
+                    return;
+                }
+            }
+            showToast(`✓ ${name} (${savedStudent.roll}) saved to Supabase and the portal database.`, 'success');
+            updateSyncBadge('✓ Supabase Synced', 'success');
         }
 
         function onAppendError(err) {
             window.isEnrollingStudent = false;
-            console.warn('Database append notice:', err);
+            state.students = state.students.filter(function (student) { return student.id !== newStu.id && student.roll !== newStu.roll; });
+            if (batch) {
+                batch.studentIds = (batch.studentIds || []).filter(function (id) { return id !== newStu.id && id !== newStu.roll; });
+            }
+            saveStateLocally(true);
+            renderMainContent();
+            console.error('Database append failed:', err);
+            showToast('Student could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
         }
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(onAppendSuccess)
                 .withFailureHandler(onAppendError)
-                .apiAppendStudent(newStu, batchId);
+                .apiAppendStudent(newStu, batchId, state.authToken);
         } else {
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'appendStudent', studentData: newStu, batchId: batchId })
+                body: JSON.stringify({ action: 'appendStudent', studentData: newStu, batchId: batchId, token: state.authToken })
             })
                 .then(function (res) { return res.json(); })
                 .then(onAppendSuccess)
@@ -4585,9 +4695,6 @@
                 }
                 resolve(result);
             };
-            if (supabaseClient) {
-                syncStateToSupabase(state);
-            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(onResult)
@@ -4632,7 +4739,17 @@
         if (!result.success) {
             throw new Error(result.message || 'The photo could not be saved to Google Drive and the student sheet.');
         }
+        if (supabaseClient) {
+            try {
+                await syncStateToSupabase(state);
+            } catch (syncError) {
+                console.error('Student photo Supabase sync failed:', syncError);
+                updateSyncBadge('Supabase sync failed', 'error');
+                throw new Error('Photo was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError));
+            }
+        }
         showToast(`Photo for ${stu.name} uploaded to Drive and saved in the student profile and Google Sheet.`, 'success');
+        updateSyncBadge('✓ Supabase Synced', 'success');
     }
 
     let activeStudentCameraStream = null;
@@ -4774,9 +4891,6 @@
             updateRoleUI();
             openStudentIdCard(studentId);
 
-            if (supabaseClient) {
-                syncStateToSupabase(state);
-            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function () {
@@ -4862,7 +4976,7 @@
             const photoDataUrl = await processImageUpload(file);
             showToast('Uploading your profile photo...', 'info');
 
-            function onSaveSuccess(result) {
+            async function onSaveSuccess(result) {
                 if (!result || !result.success || !result.photoUrl) {
                     showToast((result && result.message) || 'Your photo could not be saved.', 'error');
                     return;
@@ -4875,8 +4989,19 @@
                     teacher.photoUrl = result.photoUrl;
                 }
                 saveStateLocally(true);
+                if (supabaseClient) {
+                    try {
+                        await syncStateToSupabase(state);
+                    } catch (syncError) {
+                        console.error('Teacher photo Supabase sync failed:', syncError);
+                        showToast('Photo was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                        updateSyncBadge('Supabase sync failed', 'error');
+                        return;
+                    }
+                }
                 renderMainContent();
                 showToast('Your profile photo was saved.', 'success');
+                updateSyncBadge('✓ Supabase Synced', 'success');
             }
 
             function onSaveError(err) {
@@ -5118,38 +5243,72 @@
         renderMainContent();
         updateRoleUI();
 
+        const profileData = {
+            name, roll, phone, parentName, batchId, status, admissionDate,
+            monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
+        };
+
+        async function onStudentProfileSaved(result) {
+            if (!result || !result.success) {
+                stu.photo = previousPhoto;
+                stu.photoUrl = previousPhoto;
+                saveStateLocally(true);
+                renderMainContent();
+                showToast((result && result.message) || 'Student changes could not be saved.', 'error');
+                return;
+            }
+            if (result.photoUrl !== undefined) {
+                stu.photo = result.photoUrl;
+                stu.photoUrl = result.photoUrl;
+            }
+            saveStateLocally(true);
+            if (supabaseClient) {
+                try {
+                    await syncStateToSupabase(state);
+                } catch (syncError) {
+                    console.error('Student profile Supabase sync failed:', syncError);
+                    showToast('Student was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                    updateSyncBadge('Supabase sync failed', 'error');
+                    renderMainContent();
+                    return;
+                }
+            }
+            renderMainContent();
+            showToast(`Student ${name} (${roll}) saved to Supabase and the portal database.`, 'success');
+            updateSyncBadge('✓ Supabase Synced', 'success');
+        }
+
+        function onStudentProfileError(err) {
+            stu.photo = previousPhoto;
+            stu.photoUrl = previousPhoto;
+            saveStateLocally(true);
+            renderMainContent();
+            console.error('Student profile save failed:', err);
+            showToast('Student changes could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
+        }
+
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function (result) {
-                    if (!result || !result.success) {
-                        stu.photo = previousPhoto;
-                        stu.photoUrl = previousPhoto;
-                        saveStateLocally(true);
-                        renderMainContent();
-                        showToast((result && result.message) || 'Student changes could not be saved.', 'error');
-                        return;
-                    }
-                    if (result.photoUrl !== undefined) {
-                        stu.photo = result.photoUrl;
-                        stu.photoUrl = result.photoUrl;
-                    }
-                    saveStateLocally(true);
-                    renderMainContent();
-                    showToast(`Student ${name} (${roll}) updated in Database!`, 'success');
-                })
-                .withFailureHandler(function (err) {
-                    stu.photo = previousPhoto;
-                    stu.photoUrl = previousPhoto;
-                    saveStateLocally(true);
-                    renderMainContent();
-                    console.error('Student profile save failed:', err);
-                    showToast('Student changes could not be saved: ' + (err && err.message ? err.message : err), 'error');
-                })
-                .apiUpdateStudentProfile(studentId, {
-                    name, roll, phone, parentName, batchId, status, admissionDate, monthlyFee, totalFee: monthlyFee, paidFee, dueDate, password, photo
-                }, state.authToken);
+                .withSuccessHandler(onStudentProfileSaved)
+                .withFailureHandler(onStudentProfileError)
+                .apiUpdateStudentProfile(studentId, profileData, state.authToken);
         } else {
-            showToast(`Student ${name} updated successfully!`, 'success');
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'updateStudentProfile',
+                    studentId: studentId,
+                    profileData: profileData,
+                    token: state.authToken
+                })
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Student profile request failed with HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(onStudentProfileSaved)
+                .catch(onStudentProfileError);
         }
     }
 
@@ -5300,7 +5459,7 @@
         closeModal();
         renderMainContent();
 
-        function onSaveSuccess(result) {
+        async function onSaveSuccess(result) {
             if (!result || !result.success) {
                 Object.assign(tch, previousTeacher);
                 saveStateLocally(true);
@@ -5313,8 +5472,20 @@
                 tch.photoUrl = result.photoUrl;
             }
             saveStateLocally(true);
+            if (supabaseClient) {
+                try {
+                    await syncStateToSupabase(state);
+                } catch (syncError) {
+                    console.error('Teacher profile Supabase sync failed:', syncError);
+                    showToast('Teacher was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                    updateSyncBadge('Supabase sync failed', 'error');
+                    renderMainContent();
+                    return;
+                }
+            }
             renderMainContent();
-            showToast(`Faculty ${name} updated in Database!`, 'success');
+            showToast(`Faculty ${name} saved to Supabase and the portal database.`, 'success');
+            updateSyncBadge('✓ Supabase Synced', 'success');
         }
 
         function onSaveError(err) {
@@ -6581,9 +6752,6 @@
         }).then(function (confirmed) {
             if (!confirmed) return;
 
-            if (supabaseClient) {
-                syncStateToSupabase(state);
-            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function (res) {
@@ -6796,9 +6964,6 @@
                 showToast(`"${mat.title}" uploaded to Drive & Database ✓ Download link active!`, 'success');
             };
 
-            if (supabaseClient) {
-                syncStateToSupabase(state);
-            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 // Real upload: file → Google Drive, URL → Cloud DB + Database
                 google.script.run
@@ -8503,7 +8668,7 @@
         // Immediately append to Teachers_Roster in Database (Two-Way Sync)
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function (res) {
+                .withSuccessHandler(async function (res) {
                     if (res && res.success) {
                         if (res.teacher) {
                             newTeacherObj.photo = res.teacher.photo || '';
@@ -8511,7 +8676,18 @@
                             saveStateLocally(true);
                             renderMainContent();
                         }
+                        if (supabaseClient) {
+                            try {
+                                await syncStateToSupabase(state);
+                            } catch (syncError) {
+                                console.error('Teacher Supabase sync failed:', syncError);
+                                showToast('Teacher was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                                updateSyncBadge('Supabase sync failed', 'error');
+                                return;
+                            }
+                        }
                         showToast(`✓ Faculty ${name} added to Faculty Directory in Database!`, 'success');
+                        updateSyncBadge('✓ Supabase Synced', 'success');
                         return;
                     }
                     state.teachers = state.teachers.filter(function (teacher) { return teacher.id !== newTeacherObj.id; });
@@ -8526,18 +8702,18 @@
                     console.error('apiAppendTeacher error:', err);
                     showToast('Faculty profile could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
                 })
-                .apiAppendTeacher(newTeacherObj);
+                .apiAppendTeacher(newTeacherObj, state.authToken);
         } else {
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'appendTeacher', teacherData: newTeacherObj })
+                body: JSON.stringify({ action: 'appendTeacher', teacherData: newTeacherObj, token: state.authToken })
             })
                 .then(function (response) {
                     if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
                     return response.json();
                 })
-                .then(function (res) {
+                .then(async function (res) {
                     if (res && res.success) {
                         if (res.teacher) {
                             newTeacherObj.photo = res.teacher.photo || '';
@@ -8545,7 +8721,18 @@
                             saveStateLocally(true);
                             renderMainContent();
                         }
+                        if (supabaseClient) {
+                            try {
+                                await syncStateToSupabase(state);
+                            } catch (syncError) {
+                                console.error('Teacher Supabase sync failed:', syncError);
+                                showToast('Teacher was saved to Apps Script, but Supabase sync failed: ' + (syncError.message || syncError), 'error');
+                                updateSyncBadge('Supabase sync failed', 'error');
+                                return;
+                            }
+                        }
                         showToast(`✓ Faculty ${name} added to Faculty Directory in Database!`, 'success');
+                        updateSyncBadge('✓ Supabase Synced', 'success');
                         return;
                     }
                     state.teachers = state.teachers.filter(function (teacher) { return teacher.id !== newTeacherObj.id; });
@@ -10242,6 +10429,27 @@
                                         </a>
                                     </div>
 
+                                    <div class="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50/60 dark:bg-sky-950/30 p-4 space-y-3">
+                                        <div>
+                                            <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Supabase Primary Connection</h4>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1">The secret is sent directly to Apps Script and stored server-side. It is never displayed or saved in portal settings.</p>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label for="supabase-project-url" class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Supabase project URL</label>
+                                                <input id="supabase-project-url" type="url" value="https://mbplsboknjvmhfqasuik.supabase.co" autocomplete="url" class="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                            </div>
+                                            <div>
+                                                <label for="supabase-service-role-key" class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Supabase secret/service-role key</label>
+                                                <input id="supabase-service-role-key" type="password" autocomplete="new-password" placeholder="Paste key here" class="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <button type="button" onclick="saveSupabaseConfiguration()" class="px-3.5 py-2 text-xs font-bold rounded-lg bg-sky-700 hover:bg-sky-800 text-white transition">Save &amp; Verify</button>
+                                            <span class="text-[11px] text-slate-500 dark:text-slate-400">Requires a Supabase secret/service-role key, not the database password.</span>
+                                        </div>
+                                    </div>
+
                                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
                                         <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
                                             <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Students_Master</p>
@@ -10356,6 +10564,57 @@
                     </form>
                 </div>
             `;
+    }
+
+    function saveSupabaseConfiguration() {
+        if (state.currentRole !== 'developer') {
+            showToast('Only the Developer can configure Supabase.', 'error');
+            return;
+        }
+        const urlInput = document.getElementById('supabase-project-url');
+        const keyInput = document.getElementById('supabase-service-role-key');
+        const button = document.querySelector('[onclick="saveSupabaseConfiguration()"]');
+        const url = urlInput ? urlInput.value.trim() : '';
+        const serviceRoleKey = keyInput ? keyInput.value.trim() : '';
+        if (!serviceRoleKey) {
+            showToast('Enter the Supabase secret/service-role key.', 'error');
+            return;
+        }
+        if (button) button.disabled = true;
+
+        function finish(result) {
+            if (button) button.disabled = false;
+            if (result && result.success) {
+                if (keyInput) keyInput.value = '';
+                showToast(result.message || 'Supabase connection verified.', 'success');
+                return;
+            }
+            showToast((result && result.error) || 'Supabase configuration failed.', 'error');
+        }
+
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(finish)
+                .withFailureHandler(function (error) {
+                    finish({ success: false, error: (error && error.message) || 'Could not reach Apps Script.' });
+                })
+                .apiConfigureSupabase(url, serviceRoleKey, state.authToken);
+            return;
+        }
+
+        fetch(GAS_WEBAPP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'configureSupabase', url: url, serviceRoleKey: serviceRoleKey, token: state.authToken })
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('Configuration request failed with HTTP ' + response.status);
+                return response.json();
+            })
+            .then(finish)
+            .catch(function (error) {
+                finish({ success: false, error: (error && error.message) || 'Could not reach Apps Script.' });
+            });
     }
 
     function handleSaveSettings(e) {
