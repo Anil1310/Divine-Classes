@@ -259,6 +259,24 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'updateTeacherPhoto') {
+      const result = apiUpdateTeacherPhoto(payload.teacherId, payload.photoDataUrl, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'updateTeacherProfile') {
+      const result = apiUpdateTeacherProfile(payload.teacherId, payload.profileData, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'addStudentToBatch') {
+      const result = apiAddStudentToBatch(payload.studentId, payload.batchId, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === 'saveStudentAddress') {
       const result = apiUpdateStudentAddress(payload.studentId, payload.address, payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(result))
@@ -4520,6 +4538,70 @@ function apiUpdateStudentPhoto(studentId, photoDataUrl, token) {
   return { success: true, photoUrl: finalUrl };
 }
 
+function apiUpdateTeacherPhoto(teacherId, photoDataUrl, token) {
+  const session = getPortalSession_(token);
+  if (!session || session.role !== 'teacher' || String(session.userId) !== String(teacherId)) {
+    return { success: false, message: 'You can only update your own teacher photo.' };
+  }
+  const photoValue = String(photoDataUrl || '').trim();
+  if (!/^data:image\/(?:jpeg|png|webp);base64,/i.test(photoValue)) {
+    return { success: false, message: 'Choose a valid JPEG, PNG, or WebP photo.' };
+  }
+
+  const data = getFullInitialData_();
+  const teacher = (data.teachers || []).find(function (record) {
+    return String(record.id) === String(teacherId);
+  });
+  if (!teacher) return { success: false, message: 'Teacher profile not found.' };
+
+  let photoUrl;
+  try {
+    photoUrl = uploadPhotoToDeveloperDrive_(photoValue, 'teacher_' + teacher.id, teacher.name);
+  } catch (uploadError) {
+    Logger.log('Teacher photo upload error: ' + uploadError.toString());
+    return { success: false, message: 'The photo could not be uploaded to Google Drive.' };
+  }
+  if (!/^https:\/\/drive\.google\.com\/file\/d\//i.test(photoUrl)) {
+    return { success: false, message: 'The photo could not be uploaded to Google Drive.' };
+  }
+
+  teacher.photo = photoUrl;
+  teacher.photoUrl = photoUrl;
+  const result = syncAllData_(data);
+  if (!result || !result.success) {
+    return { success: false, message: (result && (result.error || result.message)) || 'The teacher photo could not be saved.' };
+  }
+  return { success: true, photoUrl: photoUrl };
+}
+
+function apiAddStudentToBatch(studentId, batchId, token) {
+  const session = getPortalSession_(token);
+  if (!session || ['admin', 'developer', 'teacher'].indexOf(session.role) === -1) {
+    return { success: false, message: 'Access denied.' };
+  }
+  const data = getFullInitialData_();
+  const student = (data.students || []).find(function (record) {
+    return String(record.id) === String(studentId);
+  });
+  if (!student || student.status === 'Inactive') {
+    return { success: false, message: 'Active student not found.' };
+  }
+  const batch = (data.batches || []).find(function (record) {
+    return String(record.id) === String(batchId);
+  });
+  if (!batch) return { success: false, message: 'Batch not found.' };
+
+  if (!Array.isArray(batch.studentIds)) batch.studentIds = [];
+  [student.id, student.roll].filter(Boolean).forEach(function (identifier) {
+    if (batch.studentIds.indexOf(identifier) === -1) batch.studentIds.push(identifier);
+  });
+  const result = syncAllData_(data);
+  if (!result || !result.success) {
+    return { success: false, message: (result && (result.error || result.message)) || 'Student could not be added to the batch.' };
+  }
+  return { success: true, batchId: batch.id, studentId: student.id };
+}
+
 /**
  * Dedicated API for Admin to edit faculty profile records
  */
@@ -4546,15 +4628,28 @@ function apiUpdateTeacherProfile(teacherId, profileData, token) {
     if (profileData.password !== undefined) teacher.password = String(profileData.password).trim();
     if (profileData.status !== undefined) teacher.status = String(profileData.status).trim();
     if (profileData.photo !== undefined) {
-      let finalPhotoUrl = profileData.photo || '';
-      if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image')) {
-        finalPhotoUrl = uploadPhotoToDeveloperDrive_(finalPhotoUrl, 'teacher_' + (teacher.id || 'faculty'), teacher.name);
+      const photoValue = String(profileData.photo || '').trim();
+      let finalPhotoUrl = photoValue;
+      if (photoValue && /^data:image\/(?:jpeg|png|webp);base64,/i.test(photoValue)) {
+        try {
+          finalPhotoUrl = uploadPhotoToDeveloperDrive_(photoValue, 'teacher_' + (teacher.id || 'faculty'), teacher.name);
+        } catch (uploadError) {
+          Logger.log('Teacher profile photo upload error: ' + uploadError.toString());
+          return { success: false, message: 'The teacher photo could not be uploaded to Google Drive. The profile was not changed.' };
+        }
+        if (!/^https:\/\/drive\.google\.com\/file\/d\//i.test(finalPhotoUrl)) {
+          return { success: false, message: 'The teacher photo could not be uploaded to Google Drive. The profile was not changed.' };
+        }
+      } else if (photoValue && !/^https?:\/\//i.test(photoValue)) {
+        return { success: false, message: 'Invalid teacher photo URL.' };
       }
       teacher.photo = finalPhotoUrl;
       teacher.photoUrl = finalPhotoUrl;
     }
   }
-  return syncAllData_(data);
+  const result = syncAllData_(data);
+  if (!result || !result.success) return result;
+  return { success: true, photoUrl: teacher.photo || '' };
 }
 
 /**
@@ -4815,11 +4910,15 @@ function apiAppendTeacher(teacherData) {
 
     const trId = teacherData.id || ('tr' + Date.now());
     let pUrl = teacherData.photoUrl || teacherData.photo || '';
-    if (pUrl && pUrl.startsWith('data:image')) {
+    if (pUrl && /^data:image\/(?:jpeg|png|webp);base64,/i.test(pUrl)) {
       try {
         pUrl = uploadPhotoToDeveloperDrive_(pUrl, 'teacher_' + trId, teacherData.name);
       } catch (photoErr) {
         Logger.log('Drive photo upload error for faculty: ' + photoErr.toString());
+        return { success: false, message: 'The teacher photo could not be uploaded to Google Drive. The profile was not saved.' };
+      }
+      if (!/^https:\/\/drive\.google\.com\/file\/d\//i.test(pUrl)) {
+        return { success: false, message: 'The teacher photo could not be uploaded to Google Drive. The profile was not saved.' };
       }
     }
     if (!pUrl) {

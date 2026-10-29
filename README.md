@@ -606,3 +606,20 @@ const NAVIGATION_ITEMS = [
 ### Step 5: Reuse WhatsApp Dispatch for Invoices & Receipts
 
 Adapt `sendReceiptOnWhatsApp` to send appointment confirmations, medical reports, or invoices with 1-click WhatsApp deep-links.
+
+---
+
+## Running the Divine Classes Admin Script on Windows and macOS
+
+The Python admin utility runs locally on Windows or macOS. Open the project folder in VS Code and run this in its terminal (no machine-specific absolute path is needed):
+
+```text
+Windows: py Update_Portal.py
+macOS:   python3 Update_Portal.py
+```
+
+Python is required on both systems. Node.js is required for the “Seed All Initial Institute Data” menu option; Git and the `clasp` CLI are required for deployment. On macOS, install the Xcode Command Line Tools so the script can use Swift to access Keychain.
+
+Use a Supabase secret/service-role key, not a publishable key. Windows stores a supplied key encrypted for the current Windows user with DPAPI. macOS stores it in the current user's login Keychain. The key is never written into the project files. Each computer needs its own local key setup.
+
+The script locates `DummyData.js` and runs Git/Clasp from the directory containing the script, so those operations do not depend on the terminal's current directory.

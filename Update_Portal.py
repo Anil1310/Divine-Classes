@@ -7,23 +7,242 @@ Update anything in your Supabase Database, GitHub, Vercel, and Google Apps Scrip
 directly from this interactive tool.
 
 Usage:
-    Set SUPABASE_SERVICE_ROLE_KEY in the environment before running.
+    Set SUPABASE_SERVICE_ROLE_KEY in the environment, or enter it at the prompt.
     python update_portal.py
 ===============================================================================
 """
 
+import getpass
 import sys
 import os
 import json
 import urllib.request
 import urllib.error
 import subprocess
+from pathlib import Path
 
 # Supabase Credentials
 SUPABASE_URL = "https://mbplsboknjvmhfqasuik.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+PROJECT_DIR = Path(__file__).resolve().parent
+
+
+def _run_powershell(script, input_text=""):
+    """Run a local PowerShell command without placing secrets in its arguments."""
+    return subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ],
+        input=input_text,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+
+
+def _macos_keychain_script(operation):
+    if operation not in {"read", "write"}:
+        raise ValueError("Unsupported macOS Keychain operation.")
+    return """
+import Foundation
+import Security
+import Darwin
+
+let service = "DivineClasses.Supabase"
+let account = NSUserName()
+let operation = "__OPERATION__"
+let query: [String: Any] = [
+    kSecClass as String: kSecClassGenericPassword,
+    kSecAttrService as String: service,
+    kSecAttrAccount as String: account
+]
+
+if operation == "read" {
+    var readQuery = query
+    readQuery[kSecReturnData as String] = true
+    readQuery[kSecMatchLimit as String] = kSecMatchLimitOne
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(readQuery as CFDictionary, &result)
+    if status == errSecItemNotFound {
+        exit(3)
+    }
+    guard status == errSecSuccess, let data = result as? Data else {
+        fputs("macOS Keychain read failed (status \\(status)).\\n", stderr)
+        exit(1)
+    }
+    FileHandle.standardOutput.write(data)
+} else if operation == "write" {
+    guard let key = readLine(), !key.isEmpty else {
+        fputs("No key was provided to macOS Keychain.\\n", stderr)
+        exit(1)
+    }
+    let value = Data(key.utf8)
+    let attributes: [String: Any] = [kSecValueData as String: value]
+    let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    let status: OSStatus
+    if updateStatus == errSecItemNotFound {
+        var addQuery = query
+        addQuery[kSecValueData as String] = value
+        status = SecItemAdd(addQuery as CFDictionary, nil)
+    } else {
+        status = updateStatus
+    }
+    guard status == errSecSuccess else {
+        fputs("macOS Keychain write failed (status \\(status)).\\n", stderr)
+        exit(1)
+    }
+} else {
+    fputs("Unsupported macOS Keychain operation.\\n", stderr)
+    exit(2)
+}
+""".replace("__OPERATION__", operation)
+
+
+def _run_macos_keychain(operation, key=None):
+    """Access the login Keychain without putting the secret in process arguments."""
+    command = ["swift", "-e", _macos_keychain_script(operation)]
+    try:
+        return subprocess.run(
+            command,
+            input=(key + "\n") if key is not None else None,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError) as err:
+        raise RuntimeError(f"Could not access macOS Keychain using Swift: {err}") from err
+
+
+def _load_macos_keychain_key():
+    result = _run_macos_keychain("read")
+    if result.returncode == 3:
+        return ""
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"Swift exited with status {result.returncode}."
+        raise RuntimeError(detail)
+    return result.stdout.strip()
+
+
+def _save_macos_keychain_key(key):
+    result = _run_macos_keychain("write", key)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"Swift exited with status {result.returncode}."
+        raise RuntimeError(detail)
+
+
+def _encrypted_key_path():
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        raise RuntimeError("LOCALAPPDATA is not set; cannot choose a secure key-cache location.")
+    return Path(local_app_data) / "DivineClasses" / "supabase-service-role-key.dpapi"
+
+
+def _encrypt_key_for_current_user(key):
+    script = (
+        "$value = [Console]::In.ReadToEnd().TrimEnd([char]13, [char]10); "
+        "$secure = ConvertTo-SecureString $value -AsPlainText -Force; "
+        "ConvertFrom-SecureString $secure"
+    )
+    return _run_powershell(script, key).stdout.strip()
+
+
+def _decrypt_key_for_current_user(encrypted_key):
+    script = (
+        "$value = [Console]::In.ReadToEnd().TrimEnd([char]13, [char]10); "
+        "$secure = ConvertTo-SecureString $value; "
+        "[System.Net.NetworkCredential]::new('', $secure).Password"
+    )
+    return _run_powershell(script, encrypted_key).stdout.strip()
+
+
+def _save_encrypted_key(key):
+    encrypted_key = _encrypt_key_for_current_user(key)
+    if not encrypted_key:
+        raise RuntimeError("Windows did not return an encrypted key.")
+    key_path = _encrypted_key_path()
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_text(encrypted_key + "\n", encoding="utf-8")
+
+
+def _load_supabase_key():
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if key:
+        return key
+
+    if sys.platform == "darwin":
+        try:
+            key = _load_macos_keychain_key()
+        except RuntimeError as err:
+            raise SystemExit(f"Could not read the macOS Keychain: {err}") from err
+        if key:
+            return key
+
+    if os.name == "nt":
+        try:
+            key_path = _encrypted_key_path()
+            if key_path.exists():
+                encrypted_key = key_path.read_text(encoding="utf-8").strip()
+                if not encrypted_key:
+                    raise RuntimeError("The encrypted Supabase key cache is empty.")
+                key = _decrypt_key_for_current_user(encrypted_key)
+                if not key:
+                    raise RuntimeError("Windows returned an empty decrypted Supabase key.")
+                return key
+        except (OSError, RuntimeError, subprocess.SubprocessError) as err:
+            raise SystemExit(f"Could not read the encrypted Supabase key cache: {err}") from err
+
+        try:
+            clipboard = _run_powershell(
+                "Get-Clipboard -Raw"
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError) as err:
+            print(f"Clipboard read failed: {err}")
+            clipboard = ""
+        if clipboard:
+            return clipboard
+
+    if sys.platform == "darwin":
+        try:
+            clipboard = subprocess.run(
+                ["pbpaste"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError) as err:
+            print(f"Clipboard read failed: {err}")
+            clipboard = ""
+        if clipboard:
+            return clipboard
+
+    return getpass.getpass("Enter Supabase service-role key (input is hidden): ").strip()
+
+
+SUPABASE_SERVICE_ROLE_KEY = _load_supabase_key()
 if not SUPABASE_SERVICE_ROLE_KEY:
-    raise SystemExit("Set SUPABASE_SERVICE_ROLE_KEY in the environment before running this script.")
+    raise SystemExit("A Supabase service-role key is required.")
+if SUPABASE_SERVICE_ROLE_KEY.startswith("sb_publishable_"):
+    raise SystemExit(
+        "A Supabase publishable key cannot perform admin operations. "
+        "Use a service-role/secret key from the Supabase API Keys settings."
+    )
+
+if os.name == "nt" and not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+    try:
+        _save_encrypted_key(SUPABASE_SERVICE_ROLE_KEY)
+    except (OSError, RuntimeError, subprocess.SubprocessError) as err:
+        raise SystemExit(f"Could not store the key with Windows DPAPI encryption: {err}") from err
+elif sys.platform == "darwin" and not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+    try:
+        _save_macos_keychain_key(SUPABASE_SERVICE_ROLE_KEY)
+    except RuntimeError as err:
+        raise SystemExit(f"Could not store the key in macOS Keychain: {err}") from err
 
 HEADERS = {
     "apikey": SUPABASE_SERVICE_ROLE_KEY,
@@ -42,10 +261,13 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
-def api_request(endpoint, method="GET", data=None):
+def api_request(endpoint, method="GET", data=None, prefer=None):
     """Execute authenticated HTTP request to Supabase REST API."""
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
-    req = urllib.request.Request(url, method=method, headers=HEADERS)
+    req_headers = dict(HEADERS)
+    if prefer:
+        req_headers["Prefer"] = prefer
+    req = urllib.request.Request(url, method=method, headers=req_headers)
     if data is not None:
         req.data = json.dumps(data).encode("utf-8")
     try:
@@ -301,24 +523,30 @@ def add_batch():
 # =============================================================================
 def seed_from_dummy_data():
     print(f"\n{BOLD}{CYAN}=== POPULATE SUPABASE WITH INITIAL INSTITUTE DATA ==={RESET}")
-    js_path = os.path.join(os.path.dirname(__file__), "DummyData.js")
-    if not os.path.exists(js_path):
+    js_path = PROJECT_DIR / "DummyData.js"
+    if not js_path.exists():
         print(f"{RED}DummyData.js not found.{RESET}")
         return
 
     # Use node to extract getDummySeedData() as JSON
-    node_cmd = """
+    node_cmd = f"""
     const fs = require('fs');
     const vm = require('vm');
-    const code = fs.readFileSync('DummyData.js', 'utf8');
-    const sandbox = {};
+    const code = fs.readFileSync({json.dumps(str(js_path))}, 'utf8');
+    const sandbox = {{}};
     vm.createContext(sandbox);
     vm.runInContext(code, sandbox);
     const data = sandbox.getDummySeedData();
     console.log(JSON.stringify(data));
     """
     try:
-        proc = subprocess.run(["node", "-e", node_cmd], capture_output=True, text=True, check=True)
+        proc = subprocess.run(
+            ["node", "-e", node_cmd],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=PROJECT_DIR,
+        )
         seed_data = json.loads(proc.stdout)
     except Exception as e:
         print(f"{RED}Could not extract DummyData.js: {e}{RESET}")
@@ -336,10 +564,9 @@ def seed_from_dummy_data():
             "teacher": b.get("teacher", ""),
             "student_ids": b.get("studentIds", [])
         } for b in batches]
-        req_headers = dict(HEADERS)
-        req_headers["Prefer"] = "resolution=merge-duplicates"
-        req = urllib.request.Request(f"{SUPABASE_URL}/rest/v1/batches", data=json.dumps(mapped_b).encode("utf-8"), headers=req_headers, method="POST")
-        urllib.request.urlopen(req)
+        if api_request("batches", method="POST", data=mapped_b, prefer="resolution=merge-duplicates") is None:
+            print(f"{RED}Seeding stopped at batches; no later tables were attempted.{RESET}")
+            return
         print(f"{GREEN}✓ Seeded {len(mapped_b)} Batches!{RESET}")
 
     # 2. Students
@@ -361,10 +588,9 @@ def seed_from_dummy_data():
             "photo_url": s.get("photoUrl", ""),
             "address": s.get("address", "")
         } for s in students]
-        req_headers = dict(HEADERS)
-        req_headers["Prefer"] = "resolution=merge-duplicates"
-        req = urllib.request.Request(f"{SUPABASE_URL}/rest/v1/students", data=json.dumps(mapped_s).encode("utf-8"), headers=req_headers, method="POST")
-        urllib.request.urlopen(req)
+        if api_request("students", method="POST", data=mapped_s, prefer="resolution=merge-duplicates") is None:
+            print(f"{RED}Seeding stopped at students; earlier tables may already have been seeded.{RESET}")
+            return
         print(f"{GREEN}✓ Seeded {len(mapped_s)} Students!{RESET}")
 
     # 3. Teachers
@@ -385,10 +611,9 @@ def seed_from_dummy_data():
             "password": t.get("password", "teacher123"),
             "status": t.get("status", "Active")
         } for t in teachers]
-        req_headers = dict(HEADERS)
-        req_headers["Prefer"] = "resolution=merge-duplicates"
-        req = urllib.request.Request(f"{SUPABASE_URL}/rest/v1/teachers", data=json.dumps(mapped_t).encode("utf-8"), headers=req_headers, method="POST")
-        urllib.request.urlopen(req)
+        if api_request("teachers", method="POST", data=mapped_t, prefer="resolution=merge-duplicates") is None:
+            print(f"{RED}Seeding stopped at teachers; earlier tables may already have been seeded.{RESET}")
+            return
         print(f"{GREEN}✓ Seeded {len(mapped_t)} Teachers!{RESET}")
 
     # 4. Materials
@@ -408,10 +633,9 @@ def seed_from_dummy_data():
             "download_url": m.get("downloadUrl", ""),
             "drive_url": m.get("driveUrl", "")
         } for m in materials]
-        req_headers = dict(HEADERS)
-        req_headers["Prefer"] = "resolution=merge-duplicates"
-        req = urllib.request.Request(f"{SUPABASE_URL}/rest/v1/materials", data=json.dumps(mapped_m).encode("utf-8"), headers=req_headers, method="POST")
-        urllib.request.urlopen(req)
+        if api_request("materials", method="POST", data=mapped_m, prefer="resolution=merge-duplicates") is None:
+            print(f"{RED}Seeding stopped at materials; earlier tables may already have been seeded.{RESET}")
+            return
         print(f"{GREEN}✓ Seeded {len(mapped_m)} Materials!{RESET}")
 
     print(f"\n{BOLD}{GREEN}🎉 All institute data successfully populated into Supabase!{RESET}")
@@ -428,13 +652,17 @@ def cloud_sync_and_push():
 
     # 1. Git add & commit
     print(f"\n{YELLOW}1/3 Staging and pushing to GitHub...{RESET}")
-    subprocess.run(["git", "add", "-A"])
-    subprocess.run(["git", "commit", "-m", commit_msg])
-    subprocess.run(["git", "push", "origin", "main"])
+    try:
+        subprocess.run(["git", "add", "-A"], cwd=PROJECT_DIR, check=True)
+        subprocess.run(["git", "commit", "-m", commit_msg], cwd=PROJECT_DIR, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=PROJECT_DIR, check=True)
 
-    # 2. Clasp push
-    print(f"\n{YELLOW}2/3 Pushing to Google Apps Script (clasp)...{RESET}")
-    subprocess.run(["clasp", "push", "-f"], shell=True)
+        # 2. Clasp push
+        print(f"\n{YELLOW}2/3 Pushing to Google Apps Script (clasp)...{RESET}")
+        subprocess.run(["clasp", "push", "-f"], cwd=PROJECT_DIR, check=True)
+    except (OSError, subprocess.CalledProcessError) as err:
+        print(f"{RED}Deployment failed: {err}{RESET}")
+        return
 
     print(f"\n{GREEN}✓ Done! Code is live on GitHub, Vercel, and Google Apps Script.{RESET}")
 

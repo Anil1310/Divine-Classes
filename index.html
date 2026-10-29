@@ -4182,15 +4182,62 @@
         const stuId = document.getElementById('existing-student-id').value;
         const batch = state.batches.find(b => b.id === batchId);
         const stu = (state.students || []).find(s => s && (s.id === stuId || s.roll === stuId));
-        if (batch && stu) {
-            if (!batch.studentIds) batch.studentIds = [];
-            if (!batch.studentIds.includes(stu.id)) batch.studentIds.push(stu.id);
-            if (!batch.studentIds.includes(stu.roll)) batch.studentIds.push(stu.roll);
-            saveStateLocally();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        if (!batch || !stu) {
+            showToast('Choose an active student and a valid batch.', 'error');
+            return;
         }
-        closeModal();
-        renderMainContent();
-        showToast(`${stu ? stu.name : 'Student'} added to ${batch ? batch.name : 'Batch'}`, 'success');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+        }
+
+        function onAddSuccess(result) {
+            if (!result || !result.success) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add to Batch';
+                }
+                showToast((result && result.message) || 'Student could not be added to this batch.', 'error');
+                return;
+            }
+            if (!batch.studentIds) batch.studentIds = [];
+            [stu.id, stu.roll].filter(Boolean).forEach(function (id) {
+                if (!batch.studentIds.includes(id)) batch.studentIds.push(id);
+            });
+            saveStateLocally(true);
+            closeModal();
+            renderMainContent();
+            showToast(`${stu.name} added to ${batch.name}.`, 'success');
+        }
+
+        function onAddError(err) {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add to Batch';
+            }
+            console.error('Adding student to batch failed:', err);
+            showToast('Student could not be added to this batch: ' + ((err && err.message) || err || 'Please try again.'), 'error');
+        }
+
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(onAddSuccess)
+                .withFailureHandler(onAddError)
+                .apiAddStudentToBatch(stu.id, batch.id, state.authToken);
+        } else {
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'addStudentToBatch', studentId: stu.id, batchId: batch.id, token: state.authToken })
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(onAddSuccess)
+                .catch(onAddError);
+        }
     }
 
             function handleAddNewStudentToBatch(e, batchId) {
@@ -4802,6 +4849,70 @@
         }
     }
 
+    async function handleOwnTeacherPhotoPick(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        event.target.value = '';
+        if (state.currentRole !== 'teacher' || !state.activeTeacherId) {
+            showToast('Only the signed-in teacher can update their own photo.', 'error');
+            return;
+        }
+
+        try {
+            const photoDataUrl = await processImageUpload(file);
+            showToast('Uploading your profile photo...', 'info');
+
+            function onSaveSuccess(result) {
+                if (!result || !result.success || !result.photoUrl) {
+                    showToast((result && result.message) || 'Your photo could not be saved.', 'error');
+                    return;
+                }
+                const teacher = (state.teachers || []).find(function (record) {
+                    return record.id === state.activeTeacherId;
+                });
+                if (teacher) {
+                    teacher.photo = result.photoUrl;
+                    teacher.photoUrl = result.photoUrl;
+                }
+                saveStateLocally(true);
+                renderMainContent();
+                showToast('Your profile photo was saved.', 'success');
+            }
+
+            function onSaveError(err) {
+                console.error('Teacher photo update failed:', err);
+                showToast('Your photo could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
+            }
+
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                    .withSuccessHandler(onSaveSuccess)
+                    .withFailureHandler(onSaveError)
+                    .apiUpdateTeacherPhoto(state.activeTeacherId, photoDataUrl, state.authToken);
+            } else {
+                fetch(GAS_WEBAPP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: 'updateTeacherPhoto',
+                        teacherId: state.activeTeacherId,
+                        photoDataUrl: photoDataUrl,
+                        token: state.authToken
+                    })
+                })
+                    .then(function (response) {
+                        if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
+                        return response.json();
+                    })
+                    .then(onSaveSuccess)
+                    .catch(onSaveError);
+            }
+        } catch (err) {
+            console.error('Teacher photo processing failed:', err);
+            showToast('Could not process your photo: ' + ((err && err.message) || err || 'Please choose another image.'), 'error');
+        }
+    }
+
     function handleEditTeacherPhotoRemove() {
         const hiddenInput = document.getElementById('edit-tch-photo-val');
         const previewContainer = document.getElementById('edit-tch-photo-preview');
@@ -5172,37 +5283,67 @@
         const status = document.getElementById('edit-tch-status').value;
         const specialization = document.getElementById('edit-tch-spec').value.trim();
         const bio = document.getElementById('edit-tch-bio').value.trim();
+        const password = document.getElementById('edit-tch-pwd').value.trim();
         const photoVal = document.getElementById('edit-tch-photo-val');
         const photo = photoVal ? photoVal.value : (tch.photo || '');
 
-        tch.name = name;
-        tch.email = email;
-        tch.subject = subject;
-        tch.qualification = qualification;
-        tch.experience = experience;
-        tch.phone = phone;
-        tch.status = status;
-        tch.specialization = specialization;
-        tch.bio = bio;
-        tch.password = password || 'teacher123';
-        tch.photo = photo;
-        tch.photoUrl = photo;
-        tch.initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+        const previousTeacher = Object.assign({}, tch);
+        const profileData = {
+            name, email, subject, qualification, experience, phone, status, specialization, bio, password, photo
+        };
+        Object.assign(tch, profileData, {
+            photoUrl: photo,
+            initials: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+        });
 
-        saveStateLocally();
+        saveStateLocally(true);
         closeModal();
         renderMainContent();
 
+        function onSaveSuccess(result) {
+            if (!result || !result.success) {
+                Object.assign(tch, previousTeacher);
+                saveStateLocally(true);
+                renderMainContent();
+                showToast((result && result.message) || 'Faculty changes could not be saved.', 'error');
+                return;
+            }
+            if (result.photoUrl !== undefined) {
+                tch.photo = result.photoUrl;
+                tch.photoUrl = result.photoUrl;
+            }
+            saveStateLocally(true);
+            renderMainContent();
+            showToast(`Faculty ${name} updated in Database!`, 'success');
+        }
+
+        function onSaveError(err) {
+            Object.assign(tch, previousTeacher);
+            saveStateLocally(true);
+            renderMainContent();
+            console.error('Faculty profile save failed:', err);
+            showToast('Faculty changes could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
+        }
+
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
-                .withSuccessHandler(function () {
-                    showToast(`Faculty ${name} updated in Database!`, 'success');
-                })
+                .withSuccessHandler(onSaveSuccess)
+                .withFailureHandler(onSaveError)
                 .apiUpdateTeacherProfile(teacherId, {
-                    name, email, subject, qualification, experience, phone, status, specialization, bio, password, photo
+                    ...profileData
                 }, state.authToken);
         } else {
-            showToast(`Faculty ${name} updated successfully!`, 'success');
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'updateTeacherProfile', teacherId: teacherId, profileData: profileData, token: state.authToken })
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(onSaveSuccess)
+                .catch(onSaveError);
         }
     }
 
@@ -8126,10 +8267,20 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${visibleTeachers.map(t => `
+                        ${visibleTeachers.map(t => {
+            const isOwnTeacher = state.currentRole === 'teacher' && t.id === state.activeTeacherId;
+            return `
                             <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition flex flex-col justify-between">
                                 <div class="flex items-start gap-4">
-                                    <img src="${formatPhotoUrl(t.photo, t.name, 'teacher')}" alt="${escapeHtml(t.name)}" class="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shrink-0 shadow-md">
+                                    <div class="relative shrink-0">
+                                        <img src="${formatPhotoUrl(t.photo, t.name, 'teacher')}" alt="${escapeHtml(t.name)}" class="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shadow-md">
+                                        ${isOwnTeacher ? `
+                                        <label title="Upload your profile photo" class="absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center cursor-pointer shadow">
+                                            <i class="fa-solid fa-camera text-xs"></i>
+                                            <input type="file" accept="image/*" capture="user" class="sr-only" onchange="handleOwnTeacherPhotoPick(event)">
+                                        </label>
+                                        ` : ''}
+                                    </div>
                                     <div class="flex-1">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <h3 class="text-base font-bold text-slate-900 font-heading">${t.name}</h3>
@@ -8161,7 +8312,7 @@
                                     </div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `; }).join('')}
                     </div>
                 </div>
             `;
@@ -8344,7 +8495,7 @@
             status: 'Active'
         };
         state.teachers.push(newTeacherObj);
-        saveStateLocally();
+        saveStateLocally(true);
         closeModal();
         renderMainContent();
         showToast(`Faculty profile for ${name} published for students! Syncing to Database...`, 'info');
@@ -8354,11 +8505,26 @@
             google.script.run
                 .withSuccessHandler(function (res) {
                     if (res && res.success) {
+                        if (res.teacher) {
+                            newTeacherObj.photo = res.teacher.photo || '';
+                            newTeacherObj.photoUrl = res.teacher.photoUrl || newTeacherObj.photo;
+                            saveStateLocally(true);
+                            renderMainContent();
+                        }
                         showToast(`✓ Faculty ${name} added to Faculty Directory in Database!`, 'success');
+                        return;
                     }
+                    state.teachers = state.teachers.filter(function (teacher) { return teacher.id !== newTeacherObj.id; });
+                    saveStateLocally(true);
+                    renderMainContent();
+                    showToast((res && res.message) || 'Faculty profile could not be saved.', 'error');
                 })
                 .withFailureHandler(function (err) {
+                    state.teachers = state.teachers.filter(function (teacher) { return teacher.id !== newTeacherObj.id; });
+                    saveStateLocally(true);
+                    renderMainContent();
                     console.error('apiAppendTeacher error:', err);
+                    showToast('Faculty profile could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
                 })
                 .apiAppendTeacher(newTeacherObj);
         } else {
@@ -8366,7 +8532,34 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'appendTeacher', teacherData: newTeacherObj })
-            }).catch(function (e) { console.warn('Fetch appendTeacher notice:', e); });
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(function (res) {
+                    if (res && res.success) {
+                        if (res.teacher) {
+                            newTeacherObj.photo = res.teacher.photo || '';
+                            newTeacherObj.photoUrl = res.teacher.photoUrl || newTeacherObj.photo;
+                            saveStateLocally(true);
+                            renderMainContent();
+                        }
+                        showToast(`✓ Faculty ${name} added to Faculty Directory in Database!`, 'success');
+                        return;
+                    }
+                    state.teachers = state.teachers.filter(function (teacher) { return teacher.id !== newTeacherObj.id; });
+                    saveStateLocally(true);
+                    renderMainContent();
+                    showToast((res && res.message) || 'Faculty profile could not be saved.', 'error');
+                })
+                .catch(function (err) {
+                    state.teachers = state.teachers.filter(function (teacher) { return teacher.id !== newTeacherObj.id; });
+                    saveStateLocally(true);
+                    renderMainContent();
+                    console.error('appendTeacher request failed:', err);
+                    showToast('Faculty profile could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
+                });
         }
     }
 
