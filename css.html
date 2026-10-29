@@ -1,0 +1,146 @@
+<style>
+    html, body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        position: fixed;
+        inset: 0;
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+    }
+    h1, h2, h3, .font-heading {
+        font-family: 'Outfit', sans-serif;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    .fade-in {
+        animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+    /* Dark Mode Global Overrides */
+    html.dark, html.dark body {
+        background-color: #0b1120 !important;
+        color: #f1f5f9 !important;
+    }
+    html.dark header {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.dark header #role-banner {
+        background-color: #1e1b4b !important;
+        border-color: #312e81 !important;
+        color: #c7d2fe !important;
+    }
+    html.dark header h1#page-title {
+        color: #f8fafc !important;
+    }
+    html.dark header p#page-subtitle {
+        color: #94a3b8 !important;
+    }
+    html.dark .bg-white {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f1f5f9 !important;
+    }
+    html.dark .bg-slate-50 {
+        background-color: #0f172a !important;
+    }
+    html.dark .bg-slate-100 {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+    }
+    html.dark .border-slate-200,
+    html.dark .border-slate-100 {
+        border-color: #334155 !important;
+    }
+    html.dark .text-slate-900,
+    html.dark .text-slate-800 {
+        color: #f8fafc !important;
+    }
+    html.dark .text-slate-700,
+    html.dark .text-slate-600 {
+        color: #cbd5e1 !important;
+    }
+    html.dark .text-slate-500 {
+        color: #94a3b8 !important;
+    }
+    html.dark input, 
+    html.dark select, 
+    html.dark textarea {
+        background-color: #0f172a !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    html.dark input::placeholder, 
+    html.dark textarea::placeholder {
+        color: #64748b !important;
+    }
+    html.dark #modal-content {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    html.dark #notification-dropdown {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    html.dark .glass-panel {
+        background: rgba(30, 41, 59, 0.85) !important;
+    }
+    html.dark ::-webkit-scrollbar-track {
+        background: #0f172a;
+    }
+    html.dark ::-webkit-scrollbar-thumb {
+        background: #334155;
+    }
+    html.dark ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+    }
+    /* Print Styles for Report Card, Fee Receipts, and Student ID Card */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area *,
+        #student-id-card-render, #student-id-card-render * {
+            visibility: visible;
+        }
+        #printable-area,
+        #student-id-card-render {
+            position: absolute;
+            left: 50%;
+            top: 20px;
+            transform: translateX(-50%);
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>

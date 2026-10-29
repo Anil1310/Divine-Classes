@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+android/.gradle/
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+android/.idea/
+*.iml
+local.properties
+
+# Capacitor
+ios/
+*.keystore
+*.jks
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.*
+.vercel
+.env*
+
+# Python
+__pycache__/
+*.pyc
+
+.vercel

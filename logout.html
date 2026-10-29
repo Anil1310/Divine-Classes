@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logged Out - Divine Classes</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: {
+                            50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+                            400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+                            800: '#3730a3', 900: '#312e81', 950: '#1e1b4b'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <?!= include('css'); ?>
+</head>
+<body class="text-slate-800 antialiased bg-slate-50 min-h-screen flex flex-col justify-between p-4 sm:p-6">
+    <div class="max-w-md mx-auto my-auto w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 text-center space-y-6 fade-in">
+        <div id="logout-logo-container" class="w-20 h-20 mx-auto rounded-2xl bg-white p-2 shadow-md border border-slate-200 overflow-hidden flex items-center justify-center">
+            <i class="fa-solid fa-graduation-cap text-3xl text-indigo-600"></i>
+        </div>
+
+        <div class="space-y-2">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs font-semibold">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>Session Ended</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black font-heading text-slate-900 dark:text-slate-100">
+                You've Been Logged Out
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                Your portal session has been safely closed and local session tokens have been cleared.
+            </p>
+        </div>
+
+        <div class="pt-2 space-y-3">
+            <a id="btn-login-again" href="?page=login" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md hover:shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer">
+                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                <span>Sign In Again</span>
+            </a>
+            <a href="?page=index" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-xs transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-house"></i>
+                <span>Return to Portal Home</span>
+            </a>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 dark:border-slate-700 text-[11px] text-slate-400">
+            <p><i class="fa-solid fa-location-dot text-indigo-500 mr-1"></i> 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063</p>
+            <p class="mt-0.5"><i class="fa-solid fa-headset text-indigo-500 mr-1"></i> Contact: 9555-6787-53</p>
+        </div>
+    </div>
+
+    <footer class="text-center py-4 text-xs text-slate-400">
+        <p>&copy; 2026 Divine Classes • 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063 • Contact: 9555-6787-53</p>
+    </footer>
+
+    <?!= include('javascript'); ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                localStorage.removeItem('Divine_Classes_AUTH_SESSION');
+                sessionStorage.removeItem('Divine_Classes_AUTH_SESSION');
+            } catch(e) {}
+            if (typeof COACHING_LOGO_BASE64 !== 'undefined') {
+                const logoContainer = document.getElementById('logout-logo-container');
+                if (logoContainer) {
+                    logoContainer.innerHTML = `<img src="${COACHING_LOGO_BASE64}" alt="Divine Classes Logo" class="w-full h-full object-contain">`;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
