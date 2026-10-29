@@ -9596,9 +9596,7 @@
     }
 
     function openApkGuideModal() {
-        const liveUrl = (typeof GAS_WEBAPP_URL !== 'undefined' && GAS_WEBAPP_URL)
-            ? GAS_WEBAPP_URL
-            : 'https://script.google.com/macros/s/AKfycbyGBeVG3Gq1BvhHhahtR1yYNbrsBm4APzn92as_Clv1ySq96ipMSVgI6sToBcBDbZTHsg/exec';
+        const liveUrl = 'https://anil1310.github.io/Divine-Classes/';
 
         const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
@@ -9637,7 +9635,7 @@
                                 Generate Installable Android APK
                             </p>
                             <p class="text-slate-600 dark:text-slate-300 text-[11px] mt-1.5">
-                                Use <strong>Website 2 APK Builder</strong> or <strong>WebAPK</strong> with your live web app URL:
+                                Use <strong>Website 2 APK Builder</strong> or <strong>WebAPK</strong> with your live website URL:
                             </p>
                             <div class="mt-2 flex items-center gap-2">
                                 <input type="text" readonly value="${escapeAttr(liveUrl)}" class="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] text-indigo-600 dark:text-indigo-400 font-mono select-all" id="apk-app-url-input">
