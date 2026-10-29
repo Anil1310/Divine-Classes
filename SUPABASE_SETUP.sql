@@ -24,9 +24,9 @@ INSERT INTO settings (id, data) VALUES (
     "instituteName": "Divine Classes",
     "tagline": "Empowering Aspirants for JEE, NEET & Board Excellence",
     "address": "235 Paschimpuri Pocket 2, Club Rd New Delhi 110063",
-    "phone": "+91 95556 78753",
+    "phone": "+91 95556 78753", 
     "email": "contact@divineclasses.in",
-    "adminName": "Er. Rajesh Chahar",
+    "adminName": "Ravi Shankar",
     "adminEmail": "divineclasses1010@gmail.com",
     "showDummyData": true,
     "dummyDataConfig": {
@@ -34,6 +34,9 @@ INSERT INTO settings (id, data) VALUES (
       "offlineTests": true, "materials": true, "gallery": true, "feedbacks": true
     }
   }'::jsonb
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET
+  data = EXCLUDED.data,
+  updated_at = now();
 
 SELECT 'Divine Classes Supabase access configured successfully!' as status;
+
