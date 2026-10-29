@@ -1996,7 +1996,7 @@
         }
     }
 
-    const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
+    const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
 
     // Supabase access is server-side only; the authenticated Apps Script API is primary.
     let supabaseClient = null;
@@ -6307,7 +6307,7 @@
         const batchName = batch ? batch.name : 'Divine Classes General Batch';
         const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
         const studentRoll = stu.roll || stu.id || 'DC-101';
-        const portalUrl = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
+        const portalUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
 
         const message = `🎓 *DIVINE CLASSES - OFFICIAL STUDENT IDENTITY CARD* 🎓\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -6982,7 +6982,7 @@
                     .apiUploadMaterialToDrive(dataUrl, file.name, metadata);
             } else {
                 // Standalone / GitHub Pages / Android APK mode: upload to live Google Apps Script web app
-                const gasUrl = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
+                const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
                 const payload = {
                     action: 'uploadMaterial',
                     fileData: dataUrl,
@@ -7281,7 +7281,7 @@
                 .apiShareMaterialsDriveWithAdmin(email, customFolder);
         } else {
             // Standalone / GitHub Pages / Android APK mode: Call live Google Apps Script web app
-            const gasUrl = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
+            const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
 
             // Try direct POST first
             fetch(gasUrl, {
@@ -10908,7 +10908,7 @@
     function openApkGuideModal() {
         const liveUrl = (typeof GAS_WEBAPP_URL !== 'undefined' && GAS_WEBAPP_URL)
             ? GAS_WEBAPP_URL
-            : 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
+            : 'https://script.google.com/macros/s/AKfycbyGBeVG3Gq1BvhHhahtR1yYNbrsBm4APzn92as_Clv1ySq96ipMSVgI6sToBcBDbZTHsg/exec';
 
         const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
