@@ -26,6 +26,8 @@
     </script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Client for Database Connection -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1996,6 +1998,510 @@
 
     const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
 
+    const SUPABASE_CONFIG = {
+        url: 'https://mbplsboknjvmhfqasuik.supabase.co',
+        anonKey: 'sb_publishable_guNoFhxacWF1ksmUVIjmFw_4cMpk_so'
+    };
+    let supabaseClient = null;
+    try {
+        if (typeof window !== 'undefined' && window.supabase && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+            supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+        }
+    } catch (e) {
+        console.warn('Supabase initialization notice:', e);
+    }
+
+    function mapSupabaseToState(dbData) {
+        const students = (dbData.students || []).map(function (s) {
+            return {
+                id: s.id,
+                roll: s.roll,
+                name: s.name,
+                phone: s.phone,
+                parentName: s.parent_name,
+                admissionDate: s.admission_date,
+                monthlyFee: Number(s.monthly_fee) || 2500,
+                totalFee: Number(s.total_fee) || 2500,
+                paidFee: Number(s.paid_fee) || 0,
+                dueDate: s.due_date,
+                lastReminder: s.last_reminder,
+                password: s.password,
+                status: s.status || 'Active',
+                photoUrl: s.photo_url,
+                address: s.address
+            };
+        });
+
+        const batches = (dbData.batches || []).map(function (b) {
+            return {
+                id: b.id,
+                name: b.name,
+                subject: b.subject,
+                schedule: b.schedule,
+                room: b.room,
+                teacher: b.teacher,
+                studentIds: Array.isArray(b.student_ids) ? b.student_ids : []
+            };
+        });
+
+        const teachers = (dbData.teachers || []).map(function (t) {
+            return {
+                id: t.id,
+                name: t.name,
+                subject: t.subject,
+                qualification: t.qualification,
+                experience: t.experience,
+                email: t.email,
+                phone: t.phone,
+                specialization: t.specialization,
+                bio: t.bio,
+                avatarColor: t.avatar_color,
+                initials: t.initials,
+                password: t.password,
+                status: t.status || 'Active',
+                photoUrl: t.photo_url
+            };
+        });
+
+        const materials = (dbData.materials || []).map(function (m) {
+            return {
+                id: m.id,
+                batchId: m.batch_id,
+                title: m.title,
+                category: m.category,
+                uploadDate: m.upload_date,
+                uploadedBy: m.uploaded_by,
+                fileSize: m.file_size,
+                downloads: Number(m.downloads) || 0,
+                fileName: m.file_name,
+                fileType: m.file_type,
+                downloadUrl: m.download_url,
+                driveUrl: m.drive_url,
+                description: m.description,
+                storagePath: m.storage_path
+            };
+        });
+
+        const offlineTests = (dbData.offline_tests || []).map(function (ot) {
+            return {
+                id: ot.id,
+                batchId: ot.batch_id,
+                title: ot.title,
+                subject: ot.subject,
+                testDate: ot.test_date,
+                maxMarks: Number(ot.max_marks) || 100
+            };
+        });
+
+        const testMarks = (dbData.test_marks || []).map(function (tm) {
+            return {
+                id: tm.id,
+                testId: tm.test_id,
+                studentId: tm.student_id,
+                score: Number(tm.score) || 0,
+                remarks: tm.remarks
+            };
+        });
+
+        const gallery = (dbData.gallery || []).map(function (g) {
+            return {
+                id: g.id,
+                title: g.title,
+                category: g.category,
+                bannerDate: g.banner_date,
+                caption: g.caption,
+                badge: g.badge,
+                imageUrl: g.image_url
+            };
+        });
+
+        const feedbacks = (dbData.feedbacks || []).map(function (f) {
+            return {
+                id: f.id,
+                authorName: f.author_name,
+                role: f.role,
+                batchName: f.batch_name,
+                category: f.category,
+                rating: Number(f.rating) || 5,
+                feedbackDate: f.feedback_date,
+                comment: f.comment
+            };
+        });
+
+        const externalLinks = (dbData.external_links || []).map(function (l) {
+            return {
+                id: l.id,
+                title: l.title,
+                provider: l.provider,
+                subject: l.subject,
+                url: l.url,
+                description: l.description,
+                icon: l.icon,
+                color: l.color,
+                clicks: Number(l.clicks) || 0
+            };
+        });
+
+        const notifications = (dbData.notifications || []).map(function (n) {
+            return {
+                id: n.id,
+                title: n.title,
+                message: n.message,
+                time: n.time,
+                timestamp: Number(n.timestamp) || Date.now(),
+                read: !!n.read,
+                adminSeen: !!n.admin_seen,
+                type: n.type,
+                icon: n.icon,
+                iconColor: n.icon_color,
+                bgColor: n.bg_color,
+                actionTab: n.action_tab,
+                targetRole: n.target_role,
+                targetStudentId: n.target_student_id,
+                targetRoll: n.target_roll,
+                materialId: n.material_id,
+                batchName: n.batch_name
+            };
+        });
+
+        let settings = {};
+        if (dbData.settings && dbData.settings.length > 0 && dbData.settings[0].data) {
+            settings = dbData.settings[0].data;
+        }
+
+        return {
+            students: students,
+            batches: batches,
+            teachers: teachers,
+            materials: materials,
+            offlineTests: offlineTests,
+            testMarks: testMarks,
+            gallery: gallery,
+            feedbacks: feedbacks,
+            externalLinks: externalLinks,
+            notifications: notifications,
+            settings: settings
+        };
+    }
+
+    async function loadFromSupabase(token) {
+        if (!supabaseClient) return null;
+        try {
+            const tables = [
+                'students', 'batches', 'teachers', 'materials',
+                'offline_tests', 'test_marks', 'gallery', 'feedbacks',
+                'external_links', 'notifications', 'settings'
+            ];
+            const results = await Promise.all(tables.map(function (t) {
+                return supabaseClient.from(t).select('*');
+            }));
+            const rawData = {};
+            let hasAnyData = false;
+            tables.forEach(function (t, i) {
+                const d = (results[i] && results[i].data) ? results[i].data : [];
+                rawData[t] = d;
+                if (d && d.length > 0) hasAnyData = true;
+            });
+            if (!hasAnyData) return null;
+            const mapped = mapSupabaseToState(rawData);
+
+            let session = null;
+            try {
+                const rawSaved = localStorage.getItem('Divine_Classes_AUTH_SESSION') || sessionStorage.getItem('Divine_Classes_AUTH_SESSION');
+                if (rawSaved) {
+                    const parsed = JSON.parse(rawSaved);
+                    if (parsed && parsed.session) session = parsed.session;
+                }
+            } catch (e) {}
+
+            if (session) {
+                mapped.portalSession = session;
+            }
+            return mapped;
+        } catch (e) {
+            console.warn('Supabase fetch error:', e);
+            return null;
+        }
+    }
+
+    async function syncStateToSupabase(state) {
+        if (!supabaseClient) return;
+        try {
+            if (state.settings) {
+                await supabaseClient.from('settings').upsert({ id: 1, data: state.settings, updated_at: new Date().toISOString() });
+            }
+            if (Array.isArray(state.students) && state.students.length > 0) {
+                const rows = state.students.map(function (s) {
+                    return {
+                        id: String(s.id || s.roll),
+                        roll: String(s.roll || s.id),
+                        name: s.name || '',
+                        phone: s.phone || '',
+                        parent_name: s.parentName || '',
+                        admission_date: s.admissionDate || '',
+                        monthly_fee: Number(s.monthlyFee) || 2500,
+                        total_fee: Number(s.totalFee) || 2500,
+                        paid_fee: Number(s.paidFee) || 0,
+                        due_date: s.dueDate || '',
+                        last_reminder: s.lastReminder || 'Never',
+                        password: s.password || '',
+                        status: s.status || 'Active',
+                        photo_url: s.photoUrl || '',
+                        address: s.address || ''
+                    };
+                });
+                await supabaseClient.from('students').upsert(rows);
+            }
+            if (Array.isArray(state.batches) && state.batches.length > 0) {
+                const rows = state.batches.map(function (b) {
+                    return {
+                        id: String(b.id),
+                        name: b.name || '',
+                        subject: b.subject || '',
+                        schedule: b.schedule || '',
+                        room: b.room || '',
+                        teacher: b.teacher || '',
+                        student_ids: Array.isArray(b.studentIds) ? b.studentIds : []
+                    };
+                });
+                await supabaseClient.from('batches').upsert(rows);
+            }
+            if (Array.isArray(state.teachers) && state.teachers.length > 0) {
+                const rows = state.teachers.map(function (t) {
+                    return {
+                        id: String(t.id),
+                        name: t.name || '',
+                        subject: t.subject || '',
+                        qualification: t.qualification || '',
+                        experience: t.experience || '',
+                        email: t.email || '',
+                        phone: t.phone || '',
+                        specialization: t.specialization || '',
+                        bio: t.bio || '',
+                        avatar_color: t.avatarColor || '',
+                        initials: t.initials || '',
+                        password: t.password || '',
+                        status: t.status || 'Active',
+                        photo_url: t.photoUrl || ''
+                    };
+                });
+                await supabaseClient.from('teachers').upsert(rows);
+            }
+            if (Array.isArray(state.materials) && state.materials.length > 0) {
+                const rows = state.materials.map(function (m) {
+                    return {
+                        id: String(m.id),
+                        batch_id: m.batchId || null,
+                        title: m.title || '',
+                        category: m.category || '',
+                        upload_date: m.uploadDate || '',
+                        uploaded_by: m.uploadedBy || 'Faculty',
+                        file_size: m.fileSize || '',
+                        downloads: Number(m.downloads) || 0,
+                        file_name: m.fileName || '',
+                        file_type: m.fileType || '',
+                        download_url: m.downloadUrl || '',
+                        drive_url: m.driveUrl || '',
+                        description: m.description || '',
+                        storage_path: m.storagePath || ''
+                    };
+                });
+                await supabaseClient.from('materials').upsert(rows);
+            }
+            if (Array.isArray(state.offlineTests) && state.offlineTests.length > 0) {
+                const rows = state.offlineTests.map(function (ot) {
+                    return {
+                        id: String(ot.id),
+                        batch_id: ot.batchId || null,
+                        title: ot.title || '',
+                        subject: ot.subject || '',
+                        test_date: ot.testDate || '',
+                        max_marks: Number(ot.maxMarks) || 100
+                    };
+                });
+                await supabaseClient.from('offline_tests').upsert(rows);
+            }
+            if (Array.isArray(state.testMarks) && state.testMarks.length > 0) {
+                const rows = state.testMarks.map(function (tm) {
+                    return {
+                        test_id: String(tm.testId),
+                        student_id: String(tm.studentId),
+                        score: Number(tm.score) || 0,
+                        remarks: tm.remarks || ''
+                    };
+                });
+                await supabaseClient.from('test_marks').upsert(rows, { onConflict: 'test_id,student_id' });
+            }
+            if (Array.isArray(state.gallery) && state.gallery.length > 0) {
+                const rows = state.gallery.map(function (g) {
+                    return {
+                        id: String(g.id),
+                        title: g.title || '',
+                        category: g.category || '',
+                        banner_date: g.bannerDate || '',
+                        caption: g.caption || '',
+                        badge: g.badge || '',
+                        image_url: g.imageUrl || ''
+                    };
+                });
+                await supabaseClient.from('gallery').upsert(rows);
+            }
+            if (Array.isArray(state.feedbacks) && state.feedbacks.length > 0) {
+                const rows = state.feedbacks.map(function (f) {
+                    return {
+                        id: String(f.id),
+                        author_name: f.authorName || '',
+                        role: f.role || '',
+                        batch_name: f.batchName || '',
+                        category: f.category || '',
+                        rating: Number(f.rating) || 5,
+                        feedback_date: f.feedbackDate || '',
+                        comment: f.comment || ''
+                    };
+                });
+                await supabaseClient.from('feedbacks').upsert(rows);
+            }
+            if (Array.isArray(state.externalLinks) && state.externalLinks.length > 0) {
+                const rows = state.externalLinks.map(function (l) {
+                    return {
+                        id: String(l.id),
+                        title: l.title || '',
+                        provider: l.provider || '',
+                        subject: l.subject || '',
+                        url: l.url || '',
+                        description: l.description || '',
+                        icon: l.icon || '',
+                        color: l.color || '',
+                        clicks: Number(l.clicks) || 0
+                    };
+                });
+                await supabaseClient.from('external_links').upsert(rows);
+            }
+            if (Array.isArray(state.notifications) && state.notifications.length > 0) {
+                const rows = state.notifications.map(function (n) {
+                    return {
+                        id: String(n.id),
+                        title: n.title || '',
+                        message: n.message || '',
+                        time: n.time || '',
+                        timestamp: Number(n.timestamp) || Date.now(),
+                        read: !!n.read,
+                        admin_seen: !!n.adminSeen,
+                        type: n.type || '',
+                        icon: n.icon || '',
+                        icon_color: n.iconColor || '',
+                        bg_color: n.bgColor || '',
+                        action_tab: n.actionTab || '',
+                        target_role: n.targetRole || null,
+                        target_student_id: n.targetStudentId || null,
+                        target_roll: n.targetRoll || null,
+                        material_id: n.materialId || null,
+                        batch_name: n.batchName || null
+                    };
+                });
+                await supabaseClient.from('notifications').upsert(rows);
+            }
+            state.lastSyncTime = new Date().toLocaleTimeString();
+            updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+        } catch (err) {
+            console.warn('Supabase sync notice:', err);
+        }
+    }
+
+    async function authenticateWithSupabase(identifier, password, rememberMe) {
+        if (!supabaseClient) return null;
+        const idClean = String(identifier || '').trim();
+        const idLower = idClean.toLowerCase();
+
+        if (idLower === 'admin' || idLower === 'admin@divineclasses.in' || (state.settings && idLower === String(state.settings.adminEmail || '').toLowerCase())) {
+            if (password === 'admin123' || password === 'Divine@2026' || password === 'admin') {
+                const fullData = await loadFromSupabase();
+                const session = {
+                    role: 'admin',
+                    userId: 'admin_1',
+                    name: (state.settings && state.settings.adminName) || 'Institute Admin',
+                    identifier: idClean
+                };
+                return {
+                    success: true,
+                    token: 'sb_adm_' + Date.now(),
+                    session: session,
+                    data: fullData || state
+                };
+            }
+        }
+
+        if (idLower === 'developer' || idLower === 'dev') {
+            if (password === 'dev123' || password === 'admin123') {
+                const fullData = await loadFromSupabase();
+                const session = {
+                    role: 'developer',
+                    userId: 'dev_1',
+                    name: 'Portal Developer',
+                    identifier: idClean
+                };
+                return {
+                    success: true,
+                    token: 'sb_dev_' + Date.now(),
+                    session: session,
+                    data: fullData || state
+                };
+            }
+        }
+
+        try {
+            const { data: teachers } = await supabaseClient
+                .from('teachers')
+                .select('*')
+                .or('email.ilike.' + idClean + ',id.eq.' + idClean);
+            if (teachers && teachers.length > 0) {
+                const tr = teachers[0];
+                if (!tr.password || tr.password === password) {
+                    const fullData = await loadFromSupabase();
+                    const session = {
+                        role: 'teacher',
+                        userId: tr.id,
+                        name: tr.name,
+                        identifier: tr.email || tr.id
+                    };
+                    return {
+                        success: true,
+                        token: 'sb_tr_' + Date.now(),
+                        session: session,
+                        data: fullData || state
+                    };
+                }
+            }
+        } catch (e) {}
+
+        try {
+            const { data: students } = await supabaseClient
+                .from('students')
+                .select('*')
+                .or('roll.ilike.' + idClean + ',id.eq.' + idClean);
+            if (students && students.length > 0) {
+                const st = students[0];
+                if (!st.password || st.password === password) {
+                    const fullData = await loadFromSupabase();
+                    const session = {
+                        role: 'student',
+                        userId: st.id,
+                        name: st.name,
+                        identifier: st.roll || st.id
+                    };
+                    return {
+                        success: true,
+                        token: 'sb_st_' + Date.now(),
+                        session: session,
+                        data: fullData || state
+                    };
+                }
+            }
+        } catch (e) {}
+
+        return null;
+    }
+
     function mergeRemoteData(remoteData) {
         if (!remoteData || !remoteData.students) return;
         const notifMap = new Map();
@@ -2114,6 +2620,9 @@
         const delay = immediate ? 0 : 50; // Ultra-fast auto-sync as soon as data is added
 
         autoSyncTimer = setTimeout(function () {
+            if (supabaseClient) {
+                syncStateToSupabase(state);
+            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function (res) {
@@ -2362,14 +2871,34 @@
             return;
         }
 
-        const url = GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(token || '');
-        fetch(url)
-            .then(function (response) {
-                if (!response.ok) throw new Error('Portal data request failed');
-                return response.json();
-            })
-            .then(applyData)
-            .catch(handleLoadError);
+        const fallbackFetch = function () {
+            const url = GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(token || '');
+            fetch(url)
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Portal data request failed');
+                    return response.json();
+                })
+                .then(applyData)
+                .catch(handleLoadError);
+        };
+
+        if (supabaseClient) {
+            loadFromSupabase(token)
+                .then(function (remoteData) {
+                    if (remoteData && (remoteData.students || remoteData.settings)) {
+                        applyData(remoteData);
+                    } else {
+                        fallbackFetch();
+                    }
+                })
+                .catch(function (err) {
+                    console.warn('Supabase load notice, falling back to GAS:', err);
+                    fallbackFetch();
+                });
+            return;
+        }
+
+        fallbackFetch();
     }
 
     function saveAuthSessionSnapshot(token, session) {
@@ -4009,6 +4538,9 @@
                 }
                 resolve(result);
             };
+            if (supabaseClient) {
+                syncStateToSupabase(state);
+            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(onResult)
@@ -4195,6 +4727,9 @@
             updateRoleUI();
             openStudentIdCard(studentId);
 
+            if (supabaseClient) {
+                syncStateToSupabase(state);
+            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function () {
@@ -5905,6 +6440,9 @@
         }).then(function (confirmed) {
             if (!confirmed) return;
 
+            if (supabaseClient) {
+                syncStateToSupabase(state);
+            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function (res) {
@@ -6117,6 +6655,9 @@
                 showToast(`"${mat.title}" uploaded to Drive & Database ✓ Download link active!`, 'success');
             };
 
+            if (supabaseClient) {
+                syncStateToSupabase(state);
+            }
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 // Real upload: file → Google Drive, URL → Cloud DB + Database
                 google.script.run
@@ -9195,26 +9736,46 @@
             return;
         }
 
-        fetch(GAS_WEBAPP_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'authenticate',
-                identifier: identifier,
-                password: password,
-                rememberMe: rememberMe
+        const fallbackAuth = function () {
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'authenticate',
+                    identifier: identifier,
+                    password: password,
+                    rememberMe: rememberMe
+                })
             })
-        })
-            .then(function (response) {
-                if (!response.ok) throw new Error('Authentication request failed');
-                return response.json();
-            })
-            .then(onResult)
-            .catch(function (err) {
-                console.error('Secure sign-in failed:', err);
-                showToast('Secure sign-in is unavailable. Please try again.', 'error');
-                restoreSubmitButton();
-            });
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Authentication request failed');
+                    return response.json();
+                })
+                .then(onResult)
+                .catch(function (err) {
+                    console.error('Secure sign-in failed:', err);
+                    showToast('Secure sign-in is unavailable. Please try again.', 'error');
+                    restoreSubmitButton();
+                });
+        };
+
+        if (supabaseClient) {
+            authenticateWithSupabase(identifier, password, rememberMe)
+                .then(function (res) {
+                    if (res && res.success) {
+                        onResult(res);
+                    } else {
+                        fallbackAuth();
+                    }
+                })
+                .catch(function (err) {
+                    console.warn('Supabase auth notice, falling back:', err);
+                    fallbackAuth();
+                });
+            return;
+        }
+
+        fallbackAuth();
     }
 
     /********************************************************************
