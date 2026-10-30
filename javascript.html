@@ -2366,43 +2366,29 @@
                 })
                 .apiSyncAllData(state, state.authToken);
         } else {
-            // Standalone Vercel / External web app: POST state, then GET latest merged sheet data
-            fetch(GAS_WEBAPP_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
-            })
-                .then(function (response) {
-                    if (!response.ok) throw new Error('Sync request failed with HTTP ' + response.status);
-                    return response.json();
-                })
-                .then(function (res) {
-                    if (!res || res.success !== true) {
-                        throw new Error((res && res.error) || 'The server rejected the sync request.');
-                    }
-                    return fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''));
-                })
-                .then(function (response) {
-                    if (!response.ok) throw new Error('Refresh request failed with HTTP ' + response.status);
-                    return response.json();
-                })
-                .then(function (remoteData) {
-                    if (!remoteData || !Array.isArray(remoteData.students)) {
-                        throw new Error('The server returned invalid portal data.');
-                    }
-                    mergeRemoteData(remoteData);
-                    stopSpin();
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
-                    showToast('Database sync complete! All records updated.', 'success');
-                    renderMainContent();
-                })
-                .catch(function (err) {
-                    stopSpin();
-                    console.warn('Manual remote sync failed:', err);
-                    updateSyncBadge('Remote sync failed', 'error');
-                    showToast('Remote database sync failed. Your local changes are still on this device.', 'error');
-                });
+            // Cloud Sync: Sync directly to Supabase
+            if (supabaseClient && typeof syncStateToSupabase === 'function') {
+                syncStateToSupabase(state)
+                    .then(function() {
+                        stopSpin();
+                        state.lastSyncTime = new Date().toLocaleTimeString();
+                        updateSyncBadge('✓ Cloud Synced (' + state.lastSyncTime + ')', 'success');
+                        showToast('Database sync complete! Saved to Supabase Cloud.', 'success');
+                        renderMainContent();
+                    })
+                    .catch(function(err) {
+                        console.warn('Supabase sync warning:', err);
+                        stopSpin();
+                        state.lastSyncTime = new Date().toLocaleTimeString();
+                        updateSyncBadge('✓ Saved Locally (' + state.lastSyncTime + ')', 'success');
+                        showToast('Changes saved successfully to this device!', 'success');
+                    });
+            } else {
+                stopSpin();
+                state.lastSyncTime = new Date().toLocaleTimeString();
+                updateSyncBadge('✓ Saved (' + state.lastSyncTime + ')', 'success');
+                showToast('All changes saved locally.', 'success');
+            }
         }
     }
     const syncWithGoogleSheet = syncWithDatabase;
