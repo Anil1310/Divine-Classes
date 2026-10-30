@@ -267,6 +267,61 @@ def api_request(endpoint, method="GET", data=None, prefer=None):
 
 
 # =============================================================================
+# 0. DATABASE SETUP & INITIALIZATION FROM SQL
+# =============================================================================
+def init_database_from_sql():
+    """
+    Connect to Supabase, apply settings from SUPABASE_SETUP.sql, and guide setup.
+    """
+    print(f"\n{BOLD}{CYAN}=== 0. INITIALIZE SUPABASE DATABASE FROM SQL ==={RESET}")
+    sql_path = PROJECT_DIR / "SUPABASE_SETUP.sql"
+    if not sql_path.exists():
+        print(f"{RED}SUPABASE_SETUP.sql not found!{RESET}")
+        return
+
+    print(f"Reading {sql_path.name}...")
+
+    # Upsert initial settings
+    print(f"{YELLOW}Applying initial institute settings to Supabase...{RESET}")
+    initial_settings = {
+        "instituteName": "Divine Classes",
+        "tagline": "Empowering Aspirants for JEE, NEET & Board Excellence",
+        "address": "235 Paschimpuri Pocket 2, Club Rd New Delhi 110063",
+        "phone": "+91 95556 78753",
+        "email": "contact@divineclasses.in",
+        "adminName": "Ravi Shankar",
+        "adminEmail": "divineclasses1010@gmail.com",
+        "showDummyData": True,
+        "dummyDataConfig": {
+            "students": True, "teachers": True, "batches": True,
+            "offlineTests": True, "materials": True, "gallery": True, "feedbacks": True
+        }
+    }
+
+    req_headers = dict(HEADERS)
+    req_headers["Prefer"] = "resolution=merge-duplicates"
+    url = f"{SUPABASE_URL}/rest/v1/settings"
+    body = json.dumps({"id": 1, "data": initial_settings}).encode("utf-8")
+    req = urllib.request.Request(url, data=body, headers=req_headers, method="POST")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            print(f"{GREEN}✓ Institute settings configured in database successfully!{RESET}")
+    except Exception as e:
+        print(f"{YELLOW}Note on settings: {e}{RESET}")
+
+    print(f"\n{CYAN}To execute table definitions (CREATE TABLE) and RLS security policies:{RESET}")
+    print(f"{YELLOW}Open Supabase SQL Editor and run SUPABASE_SETUP.sql:{RESET}")
+    sql_editor_url = "https://supabase.com/dashboard/project/mbplsboknjvmhfqasuik/sql/new"
+    print(f"  {sql_editor_url}")
+
+    open_browser = input(f"\nOpen SQL Editor in your default web browser now? (Y/n): ").strip().lower()
+    if open_browser != "n":
+        import webbrowser
+        webbrowser.open(sql_editor_url)
+        print(f"{GREEN}✓ Browser opened. Simply paste SUPABASE_SETUP.sql and click 'Run'!{RESET}")
+
+
+# =============================================================================
 # 1. SETTINGS MANAGEMENT
 # =============================================================================
 def get_settings():
@@ -685,6 +740,7 @@ def main():
         print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════╗{RESET}")
         print(f"{BOLD}{CYAN}║     DIVINE CLASSES — SUPABASE & PORTAL CONTROL       ║{RESET}")
         print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════╝{RESET}")
+        print(f" {BOLD}0.{RESET} {YELLOW}Initialize Database / Apply SUPABASE_SETUP.sql{RESET}")
         print(f" {BOLD}1.{RESET} Update Institute Settings (Name, Admin, Phone, Email)")
         print(f" {BOLD}2.{RESET} View All Students")
         print(f" {BOLD}3.{RESET} Add New Student")
@@ -701,7 +757,9 @@ def main():
 
         choice = input(f"{BOLD}Choose an option: {RESET}").strip().upper()
 
-        if choice == "1":
+        if choice == "0":
+            init_database_from_sql()
+        elif choice == "1":
             update_settings_menu()
         elif choice == "2":
             list_students()
