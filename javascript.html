@@ -8964,26 +8964,45 @@
             return;
         }
 
-        fetch(GAS_WEBAPP_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'authenticate',
-                identifier: identifier,
-                password: password,
-                rememberMe: rememberMe
+        const fallbackAuth = function () {
+            fetch(GAS_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'authenticate',
+                    identifier: identifier,
+                    password: password,
+                    rememberMe: rememberMe
+                })
             })
-        })
-            .then(function (response) {
-                if (!response.ok) throw new Error('Authentication request failed');
-                return response.json();
-            })
-            .then(onResult)
-            .catch(function (err) {
-                console.error('Secure sign-in failed:', err);
-                showToast('Secure sign-in is unavailable. Please try again.', 'error');
-                restoreSubmitButton();
-            });
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Authentication request failed');
+                    return response.json();
+                })
+                .then(onResult)
+                .catch(function (err) {
+                    console.error('Secure sign-in failed:', err);
+                    showToast('Secure sign-in is unavailable. Please try again.', 'error');
+                    restoreSubmitButton();
+                });
+        };
+
+        if (supabaseClient && typeof authenticateWithSupabase === 'function') {
+            authenticateWithSupabase(identifier, password, rememberMe)
+                .then(function (res) {
+                    if (res && res.success) {
+                        onResult(res);
+                    } else {
+                        fallbackAuth();
+                    }
+                })
+                .catch(function (err) {
+                    console.warn('Supabase auth notice, falling back:', err);
+                    fallbackAuth();
+                });
+        } else {
+            fallbackAuth();
+        }
     }
 
     /********************************************************************

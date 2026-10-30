@@ -2447,7 +2447,7 @@
         const idClean = String(identifier || '').trim();
         const idLower = idClean.toLowerCase();
 
-        if (idLower === 'admin' || idLower === 'admin@divineclasses.in' || (state.settings && idLower === String(state.settings.adminEmail || '').toLowerCase())) {
+        if (idLower === 'admin' || idLower === 'admin@divineclasses.in' || idLower === 'divineclasses1010@gmail.com' || (state.settings && idLower === String(state.settings.adminEmail || '').toLowerCase())) {
             if (password === 'admin123' || password === 'Divine@2026' || password === 'admin') {
                 const fullData = await loadFromSupabase();
                 const session = {
