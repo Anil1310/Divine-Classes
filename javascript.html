@@ -1,4 +1,13 @@
 <script>
+    const SUPABASE_PROJECT_URL = 'https://srjqsofkjizwskqnzyfn.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyanFzb2Zraml6d3NrcW56eWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMzcyMzMsImV4cCI6MjEwODkxMzIzM30.HfIquCn3qMKb5KUFZOgYTRJn1ucu7ZkU2oOLm-2tHoY';
+    let supabaseClient = null;
+    try {
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+            supabaseClient = supabase.createClient(SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY);
+        }
+    } catch(e) {}
+
     /********************************************************************
      * Divine Classes - STATE & DATABASE FOR ALL 10 REQUIREMENTS
      ********************************************************************/

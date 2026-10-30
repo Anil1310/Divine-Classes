@@ -1998,8 +1998,19 @@
 
     const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
 
-    // Supabase access is server-side only; the authenticated Apps Script API is primary.
+    // Supabase Live Client Configuration for Divine Classes
+    const SUPABASE_PROJECT_URL = 'https://srjqsofkjizwskqnzyfn.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyanFzb2Zraml6d3NrcW56eWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMzcyMzMsImV4cCI6MjEwODkxMzIzM30.HfIquCn3qMKb5KUFZOgYTRJn1ucu7ZkU2oOLm-2tHoY';
+
     let supabaseClient = null;
+    try {
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+            supabaseClient = supabase.createClient(SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY);
+            console.log('Divine Classes Supabase Cloud connected successfully!');
+        }
+    } catch (e) {
+        console.warn('Supabase client initialization notice:', e);
+    }
 
     function mapSupabaseToState(dbData) {
         const students = (dbData.students || []).map(function (s) {
