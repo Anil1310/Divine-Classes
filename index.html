@@ -2449,7 +2449,8 @@
 
         if (idLower === 'admin' || idLower === 'admin@divineclasses.in' || idLower === 'divineclasses1010@gmail.com' || (state.settings && idLower === String(state.settings.adminEmail || '').toLowerCase())) {
             if (password === 'admin123' || password === 'Divine@2026' || password === 'admin') {
-                const fullData = await loadFromSupabase();
+                let fullData = null;
+                try { fullData = await loadFromSupabase(); } catch(e) { console.warn('Supabase load note:', e); }
                 const session = {
                     role: 'admin',
                     userId: 'admin_1',

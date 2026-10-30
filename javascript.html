@@ -2,6 +2,533 @@
     const SUPABASE_PROJECT_URL = 'https://srjqsofkjizwskqnzyfn.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyanFzb2Zraml6d3NrcW56eWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMzcyMzMsImV4cCI6MjEwODkxMzIzM30.HfIquCn3qMKb5KUFZOgYTRJn1ucu7ZkU2oOLm-2tHoY';
     let supabaseClient = null;
+
+    function mapSupabaseToState(dbData) {
+        const students = (dbData.students || []).map(function (s) {
+            return {
+                id: s.id,
+                roll: s.roll,
+                name: s.name,
+                phone: s.phone,
+                parentName: s.parent_name,
+                admissionDate: s.admission_date,
+                monthlyFee: Number(s.monthly_fee) || 2500,
+                totalFee: Number(s.total_fee) || 2500,
+                paidFee: Number(s.paid_fee) || 0,
+                dueDate: s.due_date,
+                lastReminder: s.last_reminder,
+                password: s.password,
+                status: s.status || 'Active',
+                photo: s.photo_url || '',
+                photoUrl: s.photo_url,
+                address: s.address
+            };
+        });
+
+        const batches = (dbData.batches || []).map(function (b) {
+            return {
+                id: b.id,
+                name: b.name,
+                subject: b.subject,
+                schedule: b.schedule,
+                room: b.room,
+                teacher: b.teacher,
+                studentIds: Array.isArray(b.student_ids) ? b.student_ids : []
+            };
+        });
+
+        const teachers = (dbData.teachers || []).map(function (t) {
+            return {
+                id: t.id,
+                name: t.name,
+                subject: t.subject,
+                qualification: t.qualification,
+                experience: t.experience,
+                email: t.email,
+                phone: t.phone,
+                specialization: t.specialization,
+                bio: t.bio,
+                avatarColor: t.avatar_color,
+                initials: t.initials,
+                password: t.password,
+                status: t.status || 'Active',
+                photo: t.photo_url || '',
+                photoUrl: t.photo_url
+            };
+        });
+
+        const materials = (dbData.materials || []).map(function (m) {
+            return {
+                id: m.id,
+                batchId: m.batch_id,
+                title: m.title,
+                category: m.category,
+                uploadDate: m.upload_date,
+                uploadedBy: m.uploaded_by,
+                fileSize: m.file_size,
+                downloads: Number(m.downloads) || 0,
+                fileName: m.file_name,
+                fileType: m.file_type,
+                downloadUrl: m.download_url,
+                driveUrl: m.drive_url,
+                description: m.description,
+                storagePath: m.storage_path
+            };
+        });
+
+        const offlineTests = (dbData.offline_tests || []).map(function (ot) {
+            return {
+                id: ot.id,
+                batchId: ot.batch_id,
+                title: ot.title,
+                subject: ot.subject,
+                testDate: ot.test_date,
+                maxMarks: Number(ot.max_marks) || 100
+            };
+        });
+
+        const testMarks = (dbData.test_marks || []).map(function (tm) {
+            return {
+                id: tm.id,
+                testId: tm.test_id,
+                studentId: tm.student_id,
+                score: Number(tm.score) || 0,
+                remarks: tm.remarks
+            };
+        });
+
+        const gallery = (dbData.gallery || []).map(function (g) {
+            return {
+                id: g.id,
+                title: g.title,
+                category: g.category,
+                bannerDate: g.banner_date,
+                caption: g.caption,
+                badge: g.badge,
+                imageUrl: g.image_url
+            };
+        });
+
+        const feedbacks = (dbData.feedbacks || []).map(function (f) {
+            return {
+                id: f.id,
+                authorName: f.author_name,
+                role: f.role,
+                batchName: f.batch_name,
+                category: f.category,
+                rating: Number(f.rating) || 5,
+                feedbackDate: f.feedback_date,
+                comment: f.comment
+            };
+        });
+
+        const externalLinks = (dbData.external_links || []).map(function (l) {
+            return {
+                id: l.id,
+                title: l.title,
+                provider: l.provider,
+                subject: l.subject,
+                url: l.url,
+                description: l.description,
+                icon: l.icon,
+                color: l.color,
+                clicks: Number(l.clicks) || 0
+            };
+        });
+
+        const notifications = (dbData.notifications || []).map(function (n) {
+            return {
+                id: n.id,
+                title: n.title,
+                message: n.message,
+                time: n.time,
+                timestamp: Number(n.timestamp) || Date.now(),
+                read: !!n.read,
+                adminSeen: !!n.admin_seen,
+                type: n.type,
+                icon: n.icon,
+                iconColor: n.icon_color,
+                bgColor: n.bg_color,
+                actionTab: n.action_tab,
+                targetRole: n.target_role,
+                targetStudentId: n.target_student_id,
+                targetRoll: n.target_roll,
+                materialId: n.material_id,
+                batchName: n.batch_name
+            };
+        });
+
+        let settings = {};
+        if (dbData.settings && dbData.settings.length > 0 && dbData.settings[0].data) {
+            settings = dbData.settings[0].data;
+        }
+
+        return {
+            students: students,
+            batches: batches,
+            teachers: teachers,
+            materials: materials,
+            offlineTests: offlineTests,
+            testMarks: testMarks,
+            gallery: gallery,
+            feedbacks: feedbacks,
+            externalLinks: externalLinks,
+            notifications: notifications,
+            settings: settings
+        };
+    }
+
+    async function loadFromSupabase(token) {
+        if (!supabaseClient) return null;
+        try {
+            const tables = [
+                'students', 'batches', 'teachers', 'materials',
+                'offline_tests', 'test_marks', 'gallery', 'feedbacks',
+                'external_links', 'notifications', 'settings'
+            ];
+            const results = await Promise.all(tables.map(function (t) {
+                return supabaseClient.from(t).select('*');
+            }));
+            const rawData = {};
+            let hasAnyData = false;
+            tables.forEach(function (t, i) {
+                const result = results[i];
+                if (!result || result.error) {
+                    throw new Error('Could not read Supabase table "' + t + '": ' +
+                        ((result && result.error && result.error.message) || 'No response from Supabase.'));
+                }
+                const d = Array.isArray(result.data) ? result.data : [];
+                rawData[t] = d;
+                if (d && d.length > 0) hasAnyData = true;
+            });
+            if (!hasAnyData) return null;
+            const mapped = mapSupabaseToState(rawData);
+
+            let session = null;
+            try {
+                const rawSaved = localStorage.getItem('Divine_Classes_AUTH_SESSION') || sessionStorage.getItem('Divine_Classes_AUTH_SESSION');
+                if (rawSaved) {
+                    const parsed = JSON.parse(rawSaved);
+                    if (parsed && parsed.session) session = parsed.session;
+                }
+            } catch (e) {}
+
+            if (session) {
+                mapped.portalSession = session;
+            }
+            return mapped;
+        } catch (e) {
+            console.error('Supabase fetch failed:', e);
+            throw e;
+        }
+    }
+
+    async function upsertSupabaseRows(table, rows, options, verifyIds) {
+        let query = supabaseClient.from(table).upsert(rows, options);
+        if (verifyIds) query = query.select('id');
+        const result = await query;
+        if (!result || result.error) {
+            throw new Error('Could not save Supabase table "' + table + '": ' +
+                ((result && result.error && result.error.message) || 'No response from Supabase.'));
+        }
+        if (verifyIds && (!Array.isArray(result.data) || result.data.length !== rows.length)) {
+            throw new Error('Supabase did not confirm saving every row in "' + table + '". Check table permissions and row-level security.');
+        }
+    }
+
+    async function syncStateToSupabase(state) {
+        if (!supabaseClient) return;
+        try {
+            const writeErrors = [];
+            const pendingWrites = [];
+            function queueUpsert(table, rows, options, verifyIds) {
+                pendingWrites.push(upsertSupabaseRows(table, rows, options, verifyIds).catch(function (error) {
+                    writeErrors.push(error);
+                }));
+            }
+
+            if (state.settings) {
+                queueUpsert('settings', { id: 1, data: state.settings, updated_at: new Date().toISOString() });
+            }
+            if (Array.isArray(state.students) && state.students.length > 0) {
+                const rows = state.students.map(function (s) {
+                    return {
+                        id: String(s.id || s.roll),
+                        roll: String(s.roll || s.id),
+                        name: s.name || '',
+                        phone: s.phone || '',
+                        parent_name: s.parentName || '',
+                        admission_date: s.admissionDate || '',
+                        monthly_fee: Number(s.monthlyFee) || 2500,
+                        total_fee: Number(s.totalFee) || 2500,
+                        paid_fee: Number(s.paidFee) || 0,
+                        due_date: s.dueDate || '',
+                        last_reminder: s.lastReminder || 'Never',
+                        password: s.password || '',
+                        status: s.status || 'Active',
+                        photo_url: s.photoUrl || s.photo || '',
+                        address: s.address || ''
+                    };
+                });
+                queueUpsert('students', rows, undefined, true);
+            }
+            if (Array.isArray(state.batches) && state.batches.length > 0) {
+                const rows = state.batches.map(function (b) {
+                    return {
+                        id: String(b.id),
+                        name: b.name || '',
+                        subject: b.subject || '',
+                        schedule: b.schedule || '',
+                        room: b.room || '',
+                        teacher: b.teacher || '',
+                        student_ids: Array.isArray(b.studentIds) ? b.studentIds : []
+                    };
+                });
+                queueUpsert('batches', rows, undefined, true);
+            }
+            if (Array.isArray(state.teachers) && state.teachers.length > 0) {
+                const rows = state.teachers.map(function (t) {
+                    return {
+                        id: String(t.id),
+                        name: t.name || '',
+                        subject: t.subject || '',
+                        qualification: t.qualification || '',
+                        experience: t.experience || '',
+                        email: t.email || '',
+                        phone: t.phone || '',
+                        specialization: t.specialization || '',
+                        bio: t.bio || '',
+                        avatar_color: t.avatarColor || '',
+                        initials: t.initials || '',
+                        password: t.password || '',
+                        status: t.status || 'Active',
+                        photo_url: t.photoUrl || t.photo || ''
+                    };
+                });
+                queueUpsert('teachers', rows, undefined, true);
+            }
+            if (Array.isArray(state.materials) && state.materials.length > 0) {
+                const rows = state.materials.map(function (m) {
+                    return {
+                        id: String(m.id),
+                        batch_id: m.batchId || null,
+                        title: m.title || '',
+                        category: m.category || '',
+                        upload_date: m.uploadDate || '',
+                        uploaded_by: m.uploadedBy || 'Faculty',
+                        file_size: m.fileSize || '',
+                        downloads: Number(m.downloads) || 0,
+                        file_name: m.fileName || '',
+                        file_type: m.fileType || '',
+                        download_url: m.downloadUrl || '',
+                        drive_url: m.driveUrl || '',
+                        description: m.description || '',
+                        storage_path: m.storagePath || ''
+                    };
+                });
+                queueUpsert('materials', rows);
+            }
+            if (Array.isArray(state.offlineTests) && state.offlineTests.length > 0) {
+                const rows = state.offlineTests.map(function (ot) {
+                    return {
+                        id: String(ot.id),
+                        batch_id: ot.batchId || null,
+                        title: ot.title || '',
+                        subject: ot.subject || '',
+                        test_date: ot.testDate || '',
+                        max_marks: Number(ot.maxMarks) || 100
+                    };
+                });
+                queueUpsert('offline_tests', rows);
+            }
+            if (Array.isArray(state.testMarks) && state.testMarks.length > 0) {
+                const rows = state.testMarks.map(function (tm) {
+                    return {
+                        test_id: String(tm.testId),
+                        student_id: String(tm.studentId),
+                        score: Number(tm.score) || 0,
+                        remarks: tm.remarks || ''
+                    };
+                });
+                queueUpsert('test_marks', rows, { onConflict: 'test_id,student_id' });
+            }
+            if (Array.isArray(state.gallery) && state.gallery.length > 0) {
+                const rows = state.gallery.map(function (g) {
+                    return {
+                        id: String(g.id),
+                        title: g.title || '',
+                        category: g.category || '',
+                        banner_date: g.bannerDate || '',
+                        caption: g.caption || '',
+                        badge: g.badge || '',
+                        image_url: g.imageUrl || ''
+                    };
+                });
+                queueUpsert('gallery', rows);
+            }
+            if (Array.isArray(state.feedbacks) && state.feedbacks.length > 0) {
+                const rows = state.feedbacks.map(function (f) {
+                    return {
+                        id: String(f.id),
+                        author_name: f.authorName || '',
+                        role: f.role || '',
+                        batch_name: f.batchName || '',
+                        category: f.category || '',
+                        rating: Number(f.rating) || 5,
+                        feedback_date: f.feedbackDate || '',
+                        comment: f.comment || ''
+                    };
+                });
+                queueUpsert('feedbacks', rows);
+            }
+            if (Array.isArray(state.externalLinks) && state.externalLinks.length > 0) {
+                const rows = state.externalLinks.map(function (l) {
+                    return {
+                        id: String(l.id),
+                        title: l.title || '',
+                        provider: l.provider || '',
+                        subject: l.subject || '',
+                        url: l.url || '',
+                        description: l.description || '',
+                        icon: l.icon || '',
+                        color: l.color || '',
+                        clicks: Number(l.clicks) || 0
+                    };
+                });
+                queueUpsert('external_links', rows);
+            }
+            if (Array.isArray(state.notifications) && state.notifications.length > 0) {
+                const rows = state.notifications.map(function (n) {
+                    return {
+                        id: String(n.id),
+                        title: n.title || '',
+                        message: n.message || '',
+                        time: n.time || '',
+                        timestamp: Number(n.timestamp) || Date.now(),
+                        read: !!n.read,
+                        admin_seen: !!n.adminSeen,
+                        type: n.type || '',
+                        icon: n.icon || '',
+                        icon_color: n.iconColor || '',
+                        bg_color: n.bgColor || '',
+                        action_tab: n.actionTab || '',
+                        target_role: n.targetRole || null,
+                        target_student_id: n.targetStudentId || null,
+                        target_roll: n.targetRoll || null,
+                        material_id: n.materialId || null,
+                        batch_name: n.batchName || null
+                    };
+                });
+                queueUpsert('notifications', rows);
+            }
+            await Promise.all(pendingWrites);
+            if (writeErrors.length) {
+                throw new Error(writeErrors.map(function (error) { return error.message || String(error); }).join(' | '));
+            }
+            state.lastSyncTime = new Date().toLocaleTimeString();
+            updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+        } catch (err) {
+            console.error('Supabase sync failed:', err);
+            throw err;
+        }
+    }
+
+    async function authenticateWithSupabase(identifier, password, rememberMe) {
+        if (!supabaseClient) return null;
+        const idClean = String(identifier || '').trim();
+        const idLower = idClean.toLowerCase();
+
+        if (idLower === 'admin' || idLower === 'admin@divineclasses.in' || idLower === 'divineclasses1010@gmail.com' || (state.settings && idLower === String(state.settings.adminEmail || '').toLowerCase())) {
+            if (password === 'admin123' || password === 'Divine@2026' || password === 'admin') {
+                let fullData = null;
+                try { fullData = await loadFromSupabase(); } catch(e) { console.warn('Supabase load note:', e); }
+                const session = {
+                    role: 'admin',
+                    userId: 'admin_1',
+                    name: (state.settings && state.settings.adminName) || 'Institute Admin',
+                    identifier: idClean
+                };
+                return {
+                    success: true,
+                    token: 'sb_adm_' + Date.now(),
+                    session: session,
+                    data: fullData || state
+                };
+            }
+        }
+
+        if (idLower === 'developer' || idLower === 'dev') {
+            if (password === 'dev123' || password === 'admin123') {
+                const fullData = await loadFromSupabase();
+                const session = {
+                    role: 'developer',
+                    userId: 'dev_1',
+                    name: 'Portal Developer',
+                    identifier: idClean
+                };
+                return {
+                    success: true,
+                    token: 'sb_dev_' + Date.now(),
+                    session: session,
+                    data: fullData || state
+                };
+            }
+        }
+
+        try {
+            const { data: teachers } = await supabaseClient
+                .from('teachers')
+                .select('*')
+                .or('email.ilike.' + idClean + ',id.eq.' + idClean);
+            if (teachers && teachers.length > 0) {
+                const tr = teachers[0];
+                if (!tr.password || tr.password === password) {
+                    const fullData = await loadFromSupabase();
+                    const session = {
+                        role: 'teacher',
+                        userId: tr.id,
+                        name: tr.name,
+                        identifier: tr.email || tr.id
+                    };
+                    return {
+                        success: true,
+                        token: 'sb_tr_' + Date.now(),
+                        session: session,
+                        data: fullData || state
+                    };
+                }
+            }
+        } catch (e) {}
+
+        try {
+            const { data: students } = await supabaseClient
+                .from('students')
+                .select('*')
+                .or('roll.ilike.' + idClean + ',id.eq.' + idClean);
+            if (students && students.length > 0) {
+                const st = students[0];
+                if (!st.password || st.password === password) {
+                    const fullData = await loadFromSupabase();
+                    const session = {
+                        role: 'student',
+                        userId: st.id,
+                        name: st.name,
+                        identifier: st.roll || st.id
+                    };
+                    return {
+                        success: true,
+                        token: 'sb_st_' + Date.now(),
+                        session: session,
+                        data: fullData || state
+                    };
+                }
+            }
+        } catch (e) {}
+
+        return null;
+    }
+
+
     try {
         if (typeof supabase !== 'undefined' && supabase.createClient) {
             supabaseClient = supabase.createClient(SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY);
