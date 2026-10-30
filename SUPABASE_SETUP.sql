@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Divine Classes — Supabase Configuration SQL
 -- Run this in your Supabase Dashboard -> SQL Editor -> New query -> Run
--- Project: https://mbplsboknjvmhfqasuik.supabase.co
+-- Project: https://srjqsofkjizwskqnzyfn.supabase.co
 -- ============================================================================
 
 -- 1. Primary state store. Only the Apps Script backend uses the service-role key.

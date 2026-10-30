@@ -22,7 +22,7 @@ import subprocess
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-SUPABASE_URL = "https://mbplsboknjvmhfqasuik.supabase.co"
+SUPABASE_URL = "https://srjqsofkjizwskqnzyfn.supabase.co"
 PROJECT_DIR = Path(__file__).resolve().parent
 
 
@@ -311,7 +311,7 @@ def init_database_from_sql():
 
     print(f"\n{CYAN}To execute table definitions (CREATE TABLE) and RLS security policies:{RESET}")
     print(f"{YELLOW}Open Supabase SQL Editor and run SUPABASE_SETUP.sql:{RESET}")
-    sql_editor_url = "https://supabase.com/dashboard/project/mbplsboknjvmhfqasuik/sql/new"
+    sql_editor_url = "https://supabase.com/dashboard/project/srjqsofkjizwskqnzyfn/sql/new"
     print(f"  {sql_editor_url}")
 
     open_browser = input("\nOpen SQL Editor in Microsoft Edge now? (y/n): ").strip().lower()
