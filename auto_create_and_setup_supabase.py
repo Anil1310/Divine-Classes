@@ -7,7 +7,7 @@ Uses Supabase Management API (Access Token) to:
   2. Wait for the database to finish provisioning
   3. Automatically fetch Project URL, anon key, and service_role key
   4. Automatically execute SUPABASE_SETUP.sql directly
-  5. Automatically update all local project files (index.html, javascript.html, Code.js)
+  5. Automatically update all local project files (index.html, javascript.html, Update_Portal.py)
   6. Automatically commit and push everything to GitHub
 
 Usage:
@@ -21,6 +21,7 @@ import time
 import urllib.request
 import urllib.error
 import subprocess
+import getpass
 from pathlib import Path
 
 try:
@@ -34,8 +35,9 @@ PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_ORG_ID = "sskdtmhprtqukkxyajca"  # Divine Classes Organization ID
 
 def api_call(url, token, method="GET", data=None):
+    clean_token = token.strip()
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {clean_token}",
         "Content-Type": "application/json"
     }
     body = json.dumps(data).encode("utf-8") if data else None
@@ -61,12 +63,17 @@ def main():
 
     token = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
     if not token:
-        token = input("Enter your Supabase Personal Access Token (sbp_...): ").strip()
+        # Using getpass prevents terminal pasting from inserting bullet Unicode characters (••••)
+        token = getpass.getpass("Enter/paste your Supabase Personal Access Token (input hidden): ").strip()
         if not token:
             print("Access token is required to automate project creation.")
             return
 
-    db_password = input("Choose a Database Password for the new project: ").strip()
+    # Verify token format
+    if not token.startswith("sbp_"):
+        print("\nWarning: Personal access tokens typically start with 'sbp_'.")
+
+    db_password = getpass.getpass("Choose a Database Password for the new project (input hidden): ").strip()
     if not db_password or len(db_password) < 6:
         print("Please choose a valid password with at least 6 characters.")
         return
@@ -139,9 +146,9 @@ def main():
     sql_script = sql_path.read_text(encoding="utf-8") if sql_path.exists() else ""
 
     connected = False
-    for attempt in range(5):
+    for attempt in range(6):
         try:
-            time.sleep(3)
+            time.sleep(4)
             conn = pg8000.native.Connection(
                 user=f"postgres.{proj_id}",
                 host="aws-0-ap-south-1.pooler.supabase.com",
@@ -164,7 +171,7 @@ def main():
             print("  -> SUPABASE_SETUP.sql executed successfully!")
             break
         except Exception as e:
-            print(f"  -> Waiting for DB socket (attempt {attempt+1}/5): {e}")
+            print(f"  -> Waiting for DB socket (attempt {attempt+1}/6): {e}")
 
     # 6. Update local files with new credentials & push to GitHub
     print("\n[6/6] Updating local codebase with new Supabase credentials...")
