@@ -19,9 +19,9 @@ import json
 import urllib.request
 import urllib.error
 import subprocess
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-# Supabase Credentials
 SUPABASE_URL = "https://mbplsboknjvmhfqasuik.supabase.co"
 PROJECT_DIR = Path(__file__).resolve().parent
 
@@ -196,61 +196,44 @@ def _load_supabase_key():
         except (OSError, RuntimeError, subprocess.SubprocessError) as err:
             raise SystemExit(f"Could not read the encrypted Supabase key cache: {err}") from err
 
-        try:
-            clipboard = _run_powershell(
-                "Get-Clipboard -Raw"
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError) as err:
-            print(f"Clipboard read failed: {err}")
-            clipboard = ""
-        if clipboard:
-            return clipboard
-
-    if sys.platform == "darwin":
-        try:
-            clipboard = subprocess.run(
-                ["pbpaste"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=10,
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError) as err:
-            print(f"Clipboard read failed: {err}")
-            clipboard = ""
-        if clipboard:
-            return clipboard
-
     return getpass.getpass("Enter Supabase service-role key (input is hidden): ").strip()
 
 
-SUPABASE_SERVICE_ROLE_KEY = _load_supabase_key()
-if not SUPABASE_SERVICE_ROLE_KEY:
-    raise SystemExit("A Supabase service-role key is required.")
-if SUPABASE_SERVICE_ROLE_KEY.startswith("sb_publishable_"):
-    raise SystemExit(
-        "A Supabase publishable key cannot perform admin operations. "
-        "Use a service-role/secret key from the Supabase API Keys settings."
-    )
+SUPABASE_SERVICE_ROLE_KEY = ""
+HEADERS = {}
 
-if os.name == "nt" and not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
-    try:
-        _save_encrypted_key(SUPABASE_SERVICE_ROLE_KEY)
-    except (OSError, RuntimeError, subprocess.SubprocessError) as err:
-        raise SystemExit(f"Could not store the key with Windows DPAPI encryption: {err}") from err
-elif sys.platform == "darwin" and not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
-    try:
-        _save_macos_keychain_key(SUPABASE_SERVICE_ROLE_KEY)
-    except RuntimeError as err:
-        raise SystemExit(f"Could not store the key in macOS Keychain: {err}") from err
 
-HEADERS = {
-    "apikey": SUPABASE_SERVICE_ROLE_KEY,
-    "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-    "Content-Type": "application/json",
-    "User-Agent": "divine-classes-admin-agent",
-    "Prefer": "return=representation"
-}
+def _initialize_supabase_credentials():
+    global SUPABASE_SERVICE_ROLE_KEY, HEADERS
+
+    key = _load_supabase_key()
+    if not key:
+        raise SystemExit("A Supabase service-role key is required.")
+    if key.startswith("sb_publishable_"):
+        raise SystemExit(
+            "A Supabase publishable key cannot perform admin operations. "
+            "Use a service-role/secret key from the Supabase API Keys settings."
+        )
+
+    if os.name == "nt" and not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        try:
+            _save_encrypted_key(key)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as err:
+            raise SystemExit(f"Could not store the key with Windows DPAPI encryption: {err}") from err
+    elif sys.platform == "darwin" and not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        try:
+            _save_macos_keychain_key(key)
+        except RuntimeError as err:
+            raise SystemExit(f"Could not store the key in macOS Keychain: {err}") from err
+
+    SUPABASE_SERVICE_ROLE_KEY = key
+    HEADERS = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "User-Agent": "divine-classes-admin-agent",
+        "Prefer": "return=representation"
+    }
 
 # Terminal Colors
 CYAN = "\033[1;36m"
@@ -362,6 +345,28 @@ def list_students():
     return students
 
 
+def _prompt_nonnegative_amount(prompt, default=None, allow_blank=False):
+    while True:
+        raw_value = input(prompt).strip()
+        if not raw_value:
+            if allow_blank:
+                return None
+            if default is not None:
+                return float(default)
+            print(f"{RED}An amount is required.{RESET}")
+            continue
+
+        try:
+            amount = Decimal(raw_value)
+        except InvalidOperation:
+            print(f"{RED}Enter a valid number.{RESET}")
+            continue
+        if not amount.is_finite() or amount < 0:
+            print(f"{RED}Enter a finite, non-negative amount.{RESET}")
+            continue
+        return float(amount)
+
+
 def add_student():
     print(f"\n{BOLD}{CYAN}=== ADD NEW STUDENT ==={RESET}")
     roll = input("Student Roll No / ID (e.g. DC-101): ").strip()
@@ -371,8 +376,8 @@ def add_student():
     name = input("Student Full Name: ").strip()
     phone = input("Phone Number: ").strip()
     parent_name = input("Parent Name: ").strip()
-    monthly_fee = input("Monthly Fee [2500]: ").strip() or "2500"
-    paid_fee = input("Paid Fee [0]: ").strip() or "0"
+    monthly_fee = _prompt_nonnegative_amount("Monthly Fee [2500]: ", default=2500)
+    paid_fee = _prompt_nonnegative_amount("Paid Fee [0]: ", default=0)
     due_date = input("Due Date [2026-11-10]: ").strip() or "2026-11-10"
     password = input("Portal Password [student123]: ").strip() or "student123"
 
@@ -382,9 +387,9 @@ def add_student():
         "name": name,
         "phone": phone,
         "parent_name": parent_name,
-        "monthly_fee": float(monthly_fee),
-        "total_fee": float(monthly_fee),
-        "paid_fee": float(paid_fee),
+        "monthly_fee": monthly_fee,
+        "total_fee": monthly_fee,
+        "paid_fee": paid_fee,
         "due_date": due_date,
         "password": password,
         "status": "Active"
@@ -405,9 +410,12 @@ def update_student_fee():
         return
     st = match[0]
     print(f"\nSelected: {st.get('name')} (Current Paid: Rs.{st.get('paid_fee')})")
-    new_paid = input(f"Enter new Total Paid Amount: ").strip()
-    if new_paid:
-        res = api_request(f"students?id=eq.{st.get('id')}", method="PATCH", data={"paid_fee": float(new_paid)})
+    new_paid = _prompt_nonnegative_amount(
+        "Enter new Total Paid Amount (leave blank to keep current): ",
+        allow_blank=True,
+    )
+    if new_paid is not None:
+        res = api_request(f"students?id=eq.{st.get('id')}", method="PATCH", data={"paid_fee": new_paid})
         if res is not None:
             print(f"{GREEN}✓ Fee updated successfully!{RESET}")
 
@@ -420,7 +428,8 @@ def delete_student():
     confirm = input(f"{RED}Are you sure you want to delete '{roll}'? (y/N): {RESET}").strip().lower()
     if confirm == "y":
         res = api_request(f"students?id=eq.{roll}", method="DELETE")
-        print(f"{GREEN}✓ Student deleted from Supabase!{RESET}")
+        if res is not None:
+            print(f"{GREEN}✓ Student deleted from Supabase!{RESET}")
 
 
 # =============================================================================
@@ -671,6 +680,7 @@ def cloud_sync_and_push():
 # MAIN INTERACTIVE MENU
 # =============================================================================
 def main():
+    _initialize_supabase_credentials()
     while True:
         print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════╗{RESET}")
         print(f"{BOLD}{CYAN}║     DIVINE CLASSES — SUPABASE & PORTAL CONTROL       ║{RESET}")

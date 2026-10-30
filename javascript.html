@@ -1537,7 +1537,7 @@
         }
     }
 
-    const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
+    const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
 
     function mergeRemoteData(remoteData) {
         if (!remoteData || !remoteData.students) return;
@@ -1660,12 +1660,30 @@
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function (res) {
-                        state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+                        if (!res || res.success !== true) {
+                            updateSyncBadge('Remote sync failed', 'error');
+                            console.warn('Auto-sync rejected:', res && res.error);
+                            return;
+                        }
+                        google.script.run
+                            .withSuccessHandler(function (remoteData) {
+                                if (remoteData && Array.isArray(remoteData.students)) {
+                                    mergeRemoteData(remoteData);
+                                    state.lastSyncTime = new Date().toLocaleTimeString();
+                                    updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
+                                } else {
+                                    updateSyncBadge('Remote refresh failed', 'error');
+                                }
+                            })
+                            .withFailureHandler(function (err) {
+                                console.warn('Post-save refresh failed:', err);
+                                updateSyncBadge('Saved, refresh failed', 'error');
+                            })
+                            .apiGetInitialData(state.authToken);
                     })
                     .withFailureHandler(function (err) {
                         console.warn('Auto-sync notice:', err);
-                        updateSyncBadge('Saved locally', 'info');
+                        updateSyncBadge('Remote sync failed', 'error');
                     })
                     .apiSyncAllData(state, state.authToken);
             } else {
@@ -1675,15 +1693,31 @@
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
                 })
-                    .then(function (res) { return res.json(); })
+                    .then(function (response) {
+                        if (!response.ok) throw new Error('Sync request failed with HTTP ' + response.status);
+                        return response.json();
+                    })
                     .then(function (res) {
+                        if (!res || res.success !== true) {
+                            throw new Error((res && res.error) || 'The server rejected the sync request.');
+                        }
+                        return fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''));
+                    })
+                    .then(function (response) {
+                        if (!response.ok) throw new Error('Refresh request failed with HTTP ' + response.status);
+                        return response.json();
+                    })
+                    .then(function (remoteData) {
+                        if (!remoteData || !Array.isArray(remoteData.students)) {
+                            throw new Error('The server returned invalid portal data.');
+                        }
+                        mergeRemoteData(remoteData);
                         state.lastSyncTime = new Date().toLocaleTimeString();
                         updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
                     })
                     .catch(function (err) {
                         console.warn('Remote sync notice:', err);
-                        state.lastSyncTime = new Date().toLocaleTimeString();
-                        updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
+                        updateSyncBadge('Remote sync failed', 'error');
                     });
             }
         }, delay);
@@ -1759,11 +1793,21 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
                 .withSuccessHandler(function (res) {
+                    if (!res || res.success !== true) {
+                        stopSpin();
+                        updateSyncBadge('Remote sync failed', 'error');
+                        showToast((res && res.error) || 'Remote database rejected the sync.', 'error');
+                        return;
+                    }
                     google.script.run
                         .withSuccessHandler(function (remoteData) {
-                            if (remoteData && remoteData.students) {
-                                mergeRemoteData(remoteData);
+                            if (!remoteData || !Array.isArray(remoteData.students)) {
+                                stopSpin();
+                                updateSyncBadge('Remote refresh failed', 'error');
+                                showToast('Saved, but the latest database state could not be loaded.', 'error');
+                                return;
                             }
+                            mergeRemoteData(remoteData);
                             stopSpin();
                             state.lastSyncTime = new Date().toLocaleTimeString();
                             updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
@@ -1772,14 +1816,17 @@
                         })
                         .withFailureHandler(function (err) {
                             stopSpin();
-                            updateSyncBadge('✓ Database Synced', 'success');
+                            console.warn('Post-sync refresh failed:', err);
+                            updateSyncBadge('Saved, refresh failed', 'error');
+                            showToast('Saved, but the latest database state could not be loaded.', 'error');
                         })
                         .apiGetInitialData(state.authToken || '');
                 })
                 .withFailureHandler(function (err) {
                     stopSpin();
-                    updateSyncBadge('Saved locally', 'info');
-                    showToast('Database notice: Saved in local session storage', 'info');
+                    console.warn('Manual database sync failed:', err);
+                    updateSyncBadge('Remote sync failed', 'error');
+                    showToast('Remote database sync failed. Your local changes are still on this device.', 'error');
                 })
                 .apiSyncAllData(state, state.authToken);
         } else {
@@ -1789,15 +1836,25 @@
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'syncData', data: state, token: state.authToken })
             })
-                .then(function (r) { return r.json(); })
-                .then(function () {
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Sync request failed with HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(function (res) {
+                    if (!res || res.success !== true) {
+                        throw new Error((res && res.error) || 'The server rejected the sync request.');
+                    }
                     return fetch(GAS_WEBAPP_URL + '?action=getData&token=' + encodeURIComponent(state.authToken || ''));
                 })
-                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Refresh request failed with HTTP ' + response.status);
+                    return response.json();
+                })
                 .then(function (remoteData) {
-                    if (remoteData && remoteData.students) {
-                        mergeRemoteData(remoteData);
+                    if (!remoteData || !Array.isArray(remoteData.students)) {
+                        throw new Error('The server returned invalid portal data.');
                     }
+                    mergeRemoteData(remoteData);
                     stopSpin();
                     state.lastSyncTime = new Date().toLocaleTimeString();
                     updateSyncBadge('✓ Database Synced (' + state.lastSyncTime + ')', 'success');
@@ -1806,9 +1863,9 @@
                 })
                 .catch(function (err) {
                     stopSpin();
-                    state.lastSyncTime = new Date().toLocaleTimeString();
-                    updateSyncBadge('✓ Saved locally (' + state.lastSyncTime + ')', 'info');
-                    showToast('State saved locally. Remote sync queued.', 'info');
+                    console.warn('Manual remote sync failed:', err);
+                    updateSyncBadge('Remote sync failed', 'error');
+                    showToast('Remote database sync failed. Your local changes are still on this device.', 'error');
                 });
         }
     }
@@ -3334,12 +3391,12 @@
             google.script.run
                 .withSuccessHandler(onAppendSuccess)
                 .withFailureHandler(onAppendError)
-                .apiAppendStudent(newStu, batchId);
+                .apiAppendStudent(newStu, batchId, state.authToken);
         } else {
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'appendStudent', studentData: newStu, batchId: batchId })
+                body: JSON.stringify({ action: 'appendStudent', studentData: newStu, batchId: batchId, token: state.authToken })
             })
                 .then(function (res) { return res.json(); })
                 .then(onAppendSuccess)
@@ -5111,7 +5168,7 @@
         const batchName = batch ? batch.name : 'Divine Classes General Batch';
         const batchId = batch ? (batch.id || 'DC-B01') : 'DC-B01';
         const studentRoll = stu.roll || stu.id || 'DC-101';
-        const portalUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
+        const portalUrl = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
 
         const message = `🎓 *DIVINE CLASSES - OFFICIAL STUDENT IDENTITY CARD* 🎓\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -5786,7 +5843,7 @@
                     .apiUploadMaterialToDrive(dataUrl, file.name, metadata);
             } else {
                 // Standalone / GitHub Pages / Android APK mode: upload to live Google Apps Script web app
-                const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
+                const gasUrl = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
                 const payload = {
                     action: 'uploadMaterial',
                     fileData: dataUrl,
@@ -6085,7 +6142,7 @@
                 .apiShareMaterialsDriveWithAdmin(email, customFolder);
         } else {
             // Standalone / GitHub Pages / Android APK mode: Call live Google Apps Script web app
-            const gasUrl = 'https://script.google.com/macros/s/AKfycbwgxVhhqBvAwgSVRzryGDoz-Td7x2Fojezw6MvwejXZsnek7HMy1QDybklNO0W3GCdINQ/exec';
+            const gasUrl = 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
 
             // Try direct POST first
             fetch(gasUrl, {
@@ -7495,12 +7552,12 @@
                     console.error('apiAppendTeacher error:', err);
                     showToast('Faculty profile could not be saved: ' + ((err && err.message) || err || 'Please try again.'), 'error');
                 })
-                .apiAppendTeacher(newTeacherObj);
+                .apiAppendTeacher(newTeacherObj, state.authToken);
         } else {
             fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'appendTeacher', teacherData: newTeacherObj })
+                body: JSON.stringify({ action: 'appendTeacher', teacherData: newTeacherObj, token: state.authToken })
             })
                 .then(function (response) {
                     if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
@@ -9191,6 +9248,27 @@
                                         </a>
                                     </div>
 
+                                    <div class="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50/60 dark:bg-sky-950/30 p-4 space-y-3">
+                                        <div>
+                                            <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Supabase Primary Connection</h4>
+                                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1">The secret is sent directly to Apps Script and stored server-side. It is never displayed or saved in portal settings.</p>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label for="supabase-project-url" class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Supabase project URL</label>
+                                                <input id="supabase-project-url" type="url" value="https://mbplsboknjvmhfqasuik.supabase.co" autocomplete="url" class="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                            </div>
+                                            <div>
+                                                <label for="supabase-service-role-key" class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Supabase secret/service-role key</label>
+                                                <input id="supabase-service-role-key" type="password" autocomplete="new-password" placeholder="Paste key here" class="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <button type="button" onclick="saveSupabaseConfiguration()" class="px-3.5 py-2 text-xs font-bold rounded-lg bg-sky-700 hover:bg-sky-800 text-white transition">Save &amp; Verify</button>
+                                            <span class="text-[11px] text-slate-500 dark:text-slate-400">Requires a Supabase secret/service-role key, not the database password.</span>
+                                        </div>
+                                    </div>
+
                                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
                                         <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
                                             <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold">Students_Master</p>
@@ -9305,6 +9383,57 @@
                     </form>
                 </div>
             `;
+    }
+
+    function saveSupabaseConfiguration() {
+        if (state.currentRole !== 'developer') {
+            showToast('Only the Developer can configure Supabase.', 'error');
+            return;
+        }
+        const urlInput = document.getElementById('supabase-project-url');
+        const keyInput = document.getElementById('supabase-service-role-key');
+        const button = document.querySelector('[onclick="saveSupabaseConfiguration()"]');
+        const url = urlInput ? urlInput.value.trim() : '';
+        const serviceRoleKey = keyInput ? keyInput.value.trim() : '';
+        if (!serviceRoleKey) {
+            showToast('Enter the Supabase secret/service-role key.', 'error');
+            return;
+        }
+        if (button) button.disabled = true;
+
+        function finish(result) {
+            if (button) button.disabled = false;
+            if (result && result.success) {
+                if (keyInput) keyInput.value = '';
+                showToast(result.message || 'Supabase connection verified.', 'success');
+                return;
+            }
+            showToast((result && result.error) || 'Supabase configuration failed.', 'error');
+        }
+
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(finish)
+                .withFailureHandler(function (error) {
+                    finish({ success: false, error: (error && error.message) || 'Could not reach Apps Script.' });
+                })
+                .apiConfigureSupabase(url, serviceRoleKey, state.authToken);
+            return;
+        }
+
+        fetch(GAS_WEBAPP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'configureSupabase', url: url, serviceRoleKey: serviceRoleKey, token: state.authToken })
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('Configuration request failed with HTTP ' + response.status);
+                return response.json();
+            })
+            .then(finish)
+            .catch(function (error) {
+                finish({ success: false, error: (error && error.message) || 'Could not reach Apps Script.' });
+            });
     }
 
     function handleSaveSettings(e) {
@@ -9580,6 +9709,10 @@
     }
 
     function openApkGuideModal() {
+        const liveUrl = (typeof GAS_WEBAPP_URL !== 'undefined' && GAS_WEBAPP_URL)
+            ? GAS_WEBAPP_URL
+            : 'https://script.google.com/macros/s/AKfycby0Sp0jWW4XVwwWo60xpl3PB4--BjGZf8G5IsUK4LqAEnA9P3-hqvXUNmhyre7-I5_dFA/exec';
+
         const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
                     <div class="flex items-center gap-2">

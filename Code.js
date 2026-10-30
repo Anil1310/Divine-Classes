@@ -158,7 +158,7 @@ function doGet(e) {
         stuPayload = e.parameter;
       }
       const bId = e.parameter.batchId || '';
-      const res = apiAppendStudent(stuPayload, bId);
+      const res = apiAppendStudent(stuPayload, bId, e.parameter.token || '');
       const callback = e.parameter.callback;
       if (callback) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
@@ -180,7 +180,7 @@ function doGet(e) {
       } else {
         teachPayload = e.parameter;
       }
-      const res = apiAppendTeacher(teachPayload);
+      const res = apiAppendTeacher(teachPayload, e.parameter.token || '');
       const callback = e.parameter.callback;
       if (callback) {
         return ContentService.createTextOutput(callback + '(' + JSON.stringify(res) + ');')
@@ -271,6 +271,12 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'updateStudentProfile') {
+      const result = apiUpdateStudentProfile(payload.studentId, payload.profileData, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === 'addStudentToBatch') {
       const result = apiAddStudentToBatch(payload.studentId, payload.batchId, payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(result))
@@ -312,6 +318,12 @@ function doPost(e) {
     if (action === 'getData' || action === 'loadData') {
       const data = apiGetInitialData(payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'configureSupabase') {
+      const result = apiConfigureSupabase(payload.url, payload.serviceRoleKey, payload.token || '');
+      return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -359,7 +371,7 @@ function doPost(e) {
     if (action === 'appendStudent') {
       const studentData = payload.studentData || payload.data || payload;
       const batchId = payload.batchId || '';
-      const result = apiAppendStudent(studentData, batchId);
+      const result = apiAppendStudent(studentData, batchId, payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -367,7 +379,7 @@ function doPost(e) {
     // 8. Append New Faculty directly to Teachers_Roster in Google Sheet
     if (action === 'appendTeacher') {
       const teacherData = payload.teacherData || payload.data || payload;
-      const result = apiAppendTeacher(teacherData);
+      const result = apiAppendTeacher(teacherData, payload.token || '');
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -1377,48 +1389,150 @@ function restoreDummyData_(incoming) {
 
 /**
  * ============================================================================
- * CLOUD DATABASE ENGINE (PropertiesService Persistent NoSQL Store)
+ * PRIMARY DATABASE ENGINE (Supabase PostgreSQL JSONB Store)
  * ============================================================================
- * Primary database engine that runs independently of Database.
- * Stores tables (students, batches, teachers, tests, materials, settings, etc.)
- * with ultra-fast persistent access across all users and executions.
+ * Stores the complete portal state in Supabase. Google Sheets remain readable
+ * mirrors, and legacy PropertiesService data is migrated on first successful read.
  */
 
 const DB_TABLES = ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'settings', 'notifications'];
 
-function dbGetTable_(tableName) {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty('DB_' + tableName);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (err) {
-    Logger.log('dbGetTable error for ' + tableName + ': ' + err.toString());
+const SUPABASE_STATE_TABLE_ = 'portal_state';
+const SUPABASE_STATE_ID_ = 'primary';
+
+function apiConfigureSupabase(url, serviceRoleKey, token) {
+  const session = getPortalSession_(token);
+  if (!session || session.role !== 'developer') {
+    return { success: false, error: 'Access denied.' };
   }
-  return null;
+
+  const normalizedUrl = String(url || '').trim().replace(/\/+$/, '');
+  const key = String(serviceRoleKey || '').trim();
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(normalizedUrl)) {
+    return { success: false, error: 'Enter a valid Supabase project URL.' };
+  }
+  if (!key || key.startsWith('sb_publishable_')) {
+    return { success: false, error: 'Enter a Supabase secret/service-role key, not a publishable key.' };
+  }
+
+  const properties = PropertiesService.getScriptProperties();
+  const previousUrl = properties.getProperty('SUPABASE_URL');
+  const previousKey = properties.getProperty('SUPABASE_SERVICE_ROLE_KEY');
+  properties.setProperty('SUPABASE_URL', normalizedUrl);
+  properties.setProperty('SUPABASE_SERVICE_ROLE_KEY', key);
+  try {
+    const rows = supabaseRequest_('get', '?select=state_id&limit=1');
+    if (!Array.isArray(rows)) throw new Error('Supabase returned an invalid response.');
+  } catch (error) {
+    if (previousUrl === null) properties.deleteProperty('SUPABASE_URL');
+    else properties.setProperty('SUPABASE_URL', previousUrl);
+    if (previousKey === null) properties.deleteProperty('SUPABASE_SERVICE_ROLE_KEY');
+    else properties.setProperty('SUPABASE_SERVICE_ROLE_KEY', previousKey);
+    Logger.log('Supabase configuration check failed: ' + error.message);
+    return { success: false, error: 'Could not verify Supabase access. Check the URL, key, and setup SQL.' };
+  }
+
+  return { success: true, message: 'Supabase connection verified. Portal data will migrate on the next load.' };
+}
+
+function getSupabaseConfig_() {
+  const properties = PropertiesService.getScriptProperties();
+  const url = String(properties.getProperty('SUPABASE_URL') || '').trim().replace(/\/+$/, '');
+  const key = String(properties.getProperty('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) {
+    throw new Error('Set a valid SUPABASE_URL in Apps Script Script Properties.');
+  }
+  if (!key) {
+    throw new Error('Set SUPABASE_SERVICE_ROLE_KEY in Apps Script Script Properties.');
+  }
+  return { url: url, key: key };
+}
+
+function supabaseRequest_(method, query, payload, prefer, tableName) {
+  const config = getSupabaseConfig_();
+  const options = {
+    method: method,
+    headers: {
+      apikey: config.key,
+      Authorization: 'Bearer ' + config.key,
+      Prefer: prefer || 'return=representation'
+    },
+    muteHttpExceptions: true
+  };
+  if (payload !== undefined) {
+    options.contentType = 'application/json';
+    options.payload = JSON.stringify(payload);
+  }
+
+  const response = UrlFetchApp.fetch(
+    config.url + '/rest/v1/' + (tableName || SUPABASE_STATE_TABLE_) + (query || ''),
+    options
+  );
+  const status = response.getResponseCode();
+  const content = response.getContentText();
+  if (status < 200 || status >= 300) {
+    throw new Error('Supabase request failed (' + status + '): ' + content.slice(0, 500));
+  }
+  return content ? JSON.parse(content) : null;
+}
+
+function loadLegacyScriptDatabase_() {
+  const properties = PropertiesService.getScriptProperties();
+  const result = {};
+  let count = 0;
+  DB_TABLES.forEach(function (tableName) {
+    const raw = properties.getProperty('DB_' + tableName);
+    if (raw === null) return;
+    try {
+      result[tableName] = JSON.parse(raw);
+      count++;
+    } catch (error) {
+      throw new Error('Legacy database data is invalid for ' + tableName + '.');
+    }
+  });
+  return count ? result : null;
+}
+
+function clearLegacyScriptDatabase_() {
+  const properties = PropertiesService.getScriptProperties();
+  DB_TABLES.forEach(function (tableName) {
+    properties.deleteProperty('DB_' + tableName);
+  });
+}
+
+function dbGetTable_(tableName) {
+  if (DB_TABLES.indexOf(tableName) === -1) return null;
+  const data = dbLoadAll_();
+  return data && data[tableName] !== undefined ? data[tableName] : null;
 }
 
 function dbSetTable_(tableName, tableData) {
-  try {
-    PropertiesService.getScriptProperties().setProperty('DB_' + tableName, JSON.stringify(tableData));
-    return true;
-  } catch (err) {
-    Logger.log('dbSetTable error for ' + tableName + ': ' + err.toString());
-    return false;
-  }
+  if (DB_TABLES.indexOf(tableName) === -1) throw new Error('Unknown database table: ' + tableName);
+  const data = dbLoadAll_() || getDefaultSeedData();
+  data[tableName] = tableData;
+  return dbSaveAll_(data);
 }
 
 function dbLoadAll_() {
-  const result = {};
-  let count = 0;
-  DB_TABLES.forEach(function (tbl) {
-    const data = dbGetTable_(tbl);
-    if (data !== null) {
-      result[tbl] = data;
-      count++;
+  try {
+    getSupabaseConfig_();
+  } catch (configError) {
+    return loadLegacyScriptDatabase_();
+  }
+
+  const rows = supabaseRequest_('get', '?state_id=eq.' + SUPABASE_STATE_ID_ + '&select=data');
+  if (!Array.isArray(rows)) throw new Error('Supabase returned an invalid portal state response.');
+  if (rows.length) {
+    if (!rows[0].data || typeof rows[0].data !== 'object' || Array.isArray(rows[0].data)) {
+      throw new Error('The Supabase portal state row contains invalid data.');
     }
-  });
-  return count > 0 ? result : null;
+    return rows[0].data;
+  }
+
+  const legacyData = loadLegacyScriptDatabase_();
+  if (!legacyData) return null;
+  dbSaveAll_(legacyData);
+  return legacyData;
 }
 
 function dbSaveAll_(fullData) {
@@ -1426,17 +1540,31 @@ function dbSaveAll_(fullData) {
   if (Array.isArray(fullData.students)) {
     const seenRolls = {};
     fullData.students = fullData.students.filter(function (s) {
+      if (!s || typeof s !== 'object') return false;
       const k = String(s.roll || s.id || "").trim().toLowerCase();
       if (!k || seenRolls[k]) return false;
       seenRolls[k] = true;
       return true;
     });
   }
-  DB_TABLES.forEach(function (tbl) {
-    if (fullData[tbl] !== undefined) {
-      dbSetTable_(tbl, fullData[tbl]);
-    }
-  });
+  try {
+    getSupabaseConfig_();
+  } catch (configError) {
+    const properties = PropertiesService.getScriptProperties();
+    DB_TABLES.forEach(function (tableName) {
+      if (fullData[tableName] !== undefined) {
+        properties.setProperty('DB_' + tableName, JSON.stringify(fullData[tableName]));
+      }
+    });
+    return true;
+  }
+
+  supabaseRequest_('post', '?on_conflict=state_id', {
+    state_id: SUPABASE_STATE_ID_,
+    data: fullData,
+    updated_at: new Date().toISOString()
+  }, 'resolution=merge-duplicates,return=minimal');
+  clearLegacyScriptDatabase_();
   return true;
 }
 
@@ -2532,11 +2660,11 @@ function mergeSettingsFromSheet_(appData) {
 
 /**
  * Initializes or returns the Database records
- * Primary source is Cloud Database (PropertiesService) & Database tables
+ * Primary source is Supabase; Google Sheets are fallback/mirror data sources.
  */
 function getFullInitialData_() {
   try {
-    // 1. Primary Source: Cloud Database (PropertiesService)
+    // 1. Primary source: Supabase
     let appData = dbLoadAll_();
     const hasCloudDatabase = !!appData;
 
@@ -2638,12 +2766,7 @@ function getFullInitialData_() {
     return isDemoDisabled ? stripDummyData_(appData) : appData;
   } catch (err) {
     Logger.log('apiGetInitialData error: ' + err.toString());
-    try {
-      const saved = dbLoadAll_();
-      if (saved && (saved.students || saved.batches)) return saved;
-    } catch (loadErr) { }
-    const seed = getDefaultSeedData();
-    return seed;
+    throw new Error('Primary Supabase database is unavailable: ' + err.message);
   }
 }
 
@@ -2993,7 +3116,7 @@ function formatAttendanceTimestamp_(value) {
   return Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'dd:MM:yyyy:HH:mm:ss');
 }
 
-function getAttendanceDatabaseRecords_(month) {
+function getLegacyAttendanceDatabaseRecords_(month) {
   const properties = PropertiesService.getScriptProperties();
   const rawManifest = properties.getProperty(attendanceDatabaseManifestKey_(month));
   if (!rawManifest) return [];
@@ -3026,14 +3149,57 @@ function getAttendanceDatabaseRecords_(month) {
   return records;
 }
 
+function deleteLegacyAttendanceDatabaseRecords_(month) {
+  const properties = PropertiesService.getScriptProperties();
+  const rawManifest = properties.getProperty(attendanceDatabaseManifestKey_(month));
+  if (!rawManifest) return;
+  const manifest = JSON.parse(rawManifest);
+  if (!manifest || typeof manifest.revision !== 'string' || !Number.isInteger(manifest.chunks)) {
+    throw new Error('Legacy attendance database manifest is incomplete for ' + month + '.');
+  }
+  for (let i = 0; i < manifest.chunks; i++) {
+    properties.deleteProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + manifest.revision + '_' + i);
+  }
+  properties.deleteProperty(attendanceDatabaseManifestKey_(month));
+}
+
+function getAttendanceDatabaseRecords_(month) {
+  const rows = supabaseRequest_(
+    'get',
+    '?month_id=eq.' + encodeURIComponent(month) + '&select=records',
+    undefined,
+    undefined,
+    'portal_attendance'
+  );
+  if (!Array.isArray(rows)) throw new Error('Supabase returned an invalid attendance response.');
+  if (rows.length) {
+    if (!Array.isArray(rows[0].records)) throw new Error('The Supabase attendance row contains invalid records.');
+    return rows[0].records;
+  }
+
+  const legacyRecords = getLegacyAttendanceDatabaseRecords_(month);
+  if (!legacyRecords.length) return [];
+  saveAttendanceDatabaseRecords_(month, legacyRecords);
+  deleteLegacyAttendanceDatabaseRecords_(month);
+  return legacyRecords;
+}
+
 function getAllAttendanceDatabaseRecords_() {
+  const rows = supabaseRequest_('get', '?select=month_id,records', undefined, undefined, 'portal_attendance');
+  if (!Array.isArray(rows)) throw new Error('Supabase returned an invalid attendance list.');
+  const records = [];
+  const seenMonths = {};
+  rows.forEach(function (row) {
+    if (!row || typeof row.month_id !== 'string' || !Array.isArray(row.records)) return;
+    seenMonths[row.month_id] = true;
+    Array.prototype.push.apply(records, row.records);
+  });
   const properties = PropertiesService.getScriptProperties().getProperties();
-  const months = Object.keys(properties).map(function (key) {
+  const legacyMonths = Object.keys(properties).map(function (key) {
     const match = key.match(/^DB_attendance_(\d{4}-\d{2})_manifest$/);
     return match ? match[1] : '';
-  }).filter(Boolean);
-  const records = [];
-  months.forEach(function (month) {
+  }).filter(function (month) { return month && !seenMonths[month]; });
+  legacyMonths.forEach(function (month) {
     Array.prototype.push.apply(records, getAttendanceDatabaseRecords_(month));
   });
   return records;
@@ -3081,60 +3247,17 @@ function syncAttendanceDatabaseToSheet_() {
 }
 
 function saveAttendanceDatabaseRecords_(month, records) {
-  const properties = PropertiesService.getScriptProperties();
-  const serializedRecords = records.map(function (record) { return JSON.stringify(record); });
-  const chunks = [];
-  let current = [];
-  let currentSize = 2;
-  serializedRecords.forEach(function (serialized) {
-    const recordSize = Utilities.newBlob(serialized).getBytes().length;
-    const nextSize = currentSize + recordSize + (current.length ? 1 : 0);
-    if (nextSize > ATTENDANCE_DB_CHUNK_SIZE_ && current.length) {
-      chunks.push('[' + current.join(',') + ']');
-      current = [];
-      currentSize = 2;
-    }
-    if (Utilities.newBlob(serialized).getBytes().length + 2 > ATTENDANCE_DB_CHUNK_SIZE_) {
-      throw new Error('An attendance record exceeds the database storage limit.');
-    }
-    if (current.length) currentSize++;
-    current.push(serialized);
-    currentSize += recordSize;
-  });
-  if (current.length) chunks.push('[' + current.join(',') + ']');
-
-  const previousRaw = properties.getProperty(attendanceDatabaseManifestKey_(month));
-  let previousManifest = null;
-  if (previousRaw) {
-    try {
-      previousManifest = JSON.parse(previousRaw);
-    } catch (error) {
-      throw new Error('Attendance database manifest is invalid for ' + month + '.');
-    }
+  if (!/^\d{4}-\d{2}$/.test(month) || !Array.isArray(records)) {
+    throw new Error('Attendance month or records are invalid.');
   }
-  if (chunks.length === 0) {
-    properties.deleteProperty(attendanceDatabaseManifestKey_(month));
-    if (previousManifest && typeof previousManifest.revision === 'string') {
-      for (let i = 0; i < previousManifest.chunks; i++) {
-        properties.deleteProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + previousManifest.revision + '_' + i);
-      }
-    }
-    return;
-  }
-  const revision = Date.now().toString(36) + Math.floor(Math.random() * 1000000).toString(36);
-  chunks.forEach(function (chunk, index) {
-    properties.setProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + revision + '_' + index, chunk);
-  });
-  properties.setProperty(attendanceDatabaseManifestKey_(month), JSON.stringify({
-    revision: revision,
-    chunks: chunks.length
-  }));
-
-  if (previousManifest && typeof previousManifest.revision === 'string') {
-    for (let i = 0; i < previousManifest.chunks; i++) {
-      properties.deleteProperty(ATTENDANCE_DB_PREFIX_ + month + '_' + previousManifest.revision + '_' + i);
-    }
-  }
+  supabaseRequest_(
+    'post',
+    '?on_conflict=month_id',
+    { month_id: month, records: records, updated_at: new Date().toISOString() },
+    'resolution=merge-duplicates,return=minimal',
+    'portal_attendance'
+  );
+  deleteLegacyAttendanceDatabaseRecords_(month);
 }
 
 function migrateAttendanceSheetToDatabase_() {
@@ -4713,7 +4836,11 @@ function debugShareAdminDrive() {
  * Ensures new students enrolled from the web app are directly appended
  * to the Google Sheet in an appended manner and saved in backend database.
  */
-function apiAppendStudent(studentData, batchId) {
+function apiAppendStudent(studentData, batchId, token) {
+  const session = getPortalSession_(token);
+  if (!session || ['admin', 'teacher', 'developer'].indexOf(session.role) === -1) {
+    return { success: false, message: 'Access denied.' };
+  }
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -4899,7 +5026,11 @@ function apiAppendStudent(studentData, batchId) {
  * Ensures new faculty added from the web app are directly appended
  * to the Google Sheet in an appended manner and saved in backend database.
  */
-function apiAppendTeacher(teacherData) {
+function apiAppendTeacher(teacherData, token) {
+  const session = getPortalSession_(token);
+  if (!session || ['admin', 'developer'].indexOf(session.role) === -1) {
+    return { success: false, message: 'Access denied.' };
+  }
   try {
     const ss = getDbSpreadsheet();
     if (!ss) return { success: false, message: 'Database not found' };

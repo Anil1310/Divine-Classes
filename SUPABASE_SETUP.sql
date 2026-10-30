@@ -4,20 +4,52 @@
 -- Project: https://mbplsboknjvmhfqasuik.supabase.co
 -- ============================================================================
 
--- 1. Enable full access for the Portal Web App across all institute tables
-ALTER TABLE IF EXISTS students DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS batches DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS teachers DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS materials DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS offline_tests DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS test_marks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS gallery DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS feedbacks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS external_links DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS notifications DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS settings DISABLE ROW LEVEL SECURITY;
+-- 1. Primary state store. Only the Apps Script backend uses the service-role key.
+CREATE TABLE IF NOT EXISTS public.portal_state (
+  state_id text PRIMARY KEY CHECK (state_id = 'primary'),
+  data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 
--- 2. Ensure initial settings exist
+ALTER TABLE public.portal_state ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.portal_state FROM anon, authenticated, PUBLIC;
+GRANT ALL ON TABLE public.portal_state TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.portal_attendance (
+  month_id text PRIMARY KEY CHECK (month_id ~ '^\d{4}-(0[1-9]|1[0-2])$'),
+  records jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(records) = 'array'),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.portal_attendance ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.portal_attendance FROM anon, authenticated, PUBLIC;
+GRANT ALL ON TABLE public.portal_attendance TO service_role;
+
+-- Restore row-level security if an earlier setup disabled it on legacy tables.
+ALTER TABLE IF EXISTS public.students ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.students FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.batches ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.batches FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.teachers ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.teachers FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.materials ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.materials FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.offline_tests ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.offline_tests FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.test_marks ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.test_marks FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.gallery ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.gallery FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.feedbacks ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.feedbacks FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.external_links ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.external_links FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.notifications FROM anon, authenticated, PUBLIC;
+ALTER TABLE IF EXISTS public.settings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.settings FROM anon, authenticated, PUBLIC;
+
+-- 2. Ensure initial settings exist in the legacy settings table if it is still used.
 INSERT INTO settings (id, data) VALUES (
   1,
   '{

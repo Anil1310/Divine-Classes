@@ -609,6 +609,16 @@ Adapt `sendReceiptOnWhatsApp` to send appointment confirmations, medical reports
 
 ---
 
+## Supabase Primary Database Setup
+
+The portal's primary state is stored in the `public.portal_state` JSONB row. Google Sheets tabs remain human-readable mirrors. Existing Apps Script `DB_*` properties are migrated the first time the backend reads and successfully writes the Supabase row; legacy properties are removed only after that write succeeds. Attendance uses `public.portal_attendance`, with legacy monthly property chunks and sheet records imported before legacy chunks are removed.
+
+1. Run `SUPABASE_SETUP.sql` in the Supabase SQL Editor for this project.
+2. In Apps Script, open **Project Settings > Script Properties** and set `SUPABASE_URL` to the project URL and `SUPABASE_SERVICE_ROLE_KEY` to a Supabase service-role/secret key. Never put this key in browser code or commit it to the repository.
+3. Save the project and authorize the new external-request scope when prompted. Verify the first portal load and a test CRUD operation before switching users to the updated deployment.
+
+The service-role key stays server-side in Apps Script. Row-level security remains enabled on `portal_state`, with direct access denied to `anon` and `authenticated`; the backend applies the portal's existing role checks before reading or writing data.
+
 ## Running the Divine Classes Admin Script on Windows and macOS
 
 The Python admin utility runs locally on Windows or macOS. Open the project folder in VS Code and run this in its terminal (no machine-specific absolute path is needed):
