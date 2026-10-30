@@ -314,11 +314,22 @@ def init_database_from_sql():
     sql_editor_url = "https://supabase.com/dashboard/project/mbplsboknjvmhfqasuik/sql/new"
     print(f"  {sql_editor_url}")
 
-    open_browser = input(f"\nOpen SQL Editor in your default web browser now? (Y/n): ").strip().lower()
+    open_browser = input("\nOpen SQL Editor in Microsoft Edge now? (y/n): ").strip().lower()
     if open_browser != "n":
         import webbrowser
-        webbrowser.open(sql_editor_url)
-        print(f"{GREEN}✓ Browser opened. Simply paste SUPABASE_SETUP.sql and click 'Run'!{RESET}")
+        opened = False
+        try:
+            # Explicitly launch Microsoft Edge on Windows
+            subprocess.run(["cmd.exe", "/c", "start", "msedge", sql_editor_url], check=True)
+            opened = True
+        except Exception:
+            try:
+                webbrowser.open(sql_editor_url)
+                opened = True
+            except Exception:
+                pass
+        if opened:
+            print(f"{GREEN}✓ Microsoft Edge opened. Simply paste SUPABASE_SETUP.sql and click 'Run'!{RESET}")
 
 
 # =============================================================================
