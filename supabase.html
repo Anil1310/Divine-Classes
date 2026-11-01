@@ -1,0 +1,871 @@
+<script>
+    /********************************************************************
+     * SUPABASE BACKEND CLIENT (developer opt-in)
+     * Reads project URL + anon key from Settings (state.settings).
+     * Enabled only when "Supabase Database" is ON in Settings.
+     * Used as a fallback backend when Apps Script (google.script.run) is unavailable.
+     ********************************************************************/
+    function getSupabaseApiUrl() {
+        return (state.settings && state.settings.supabaseUrl) || '';
+    }
+    function getSupabaseAnonKey() {
+        return (state.settings && state.settings.supabaseKey) || '';
+    }
+    async function supabaseFetch(path, options) {
+        const base = getSupabaseApiUrl();
+        const key = getSupabaseAnonKey();
+        if (!base) throw new Error('Supabase Project URL not set in Settings.');
+        if (!key) throw new Error('Supabase Anon Key not set in Settings.');
+        if (!state.settings || state.settings.supabaseEnabled !== true) {
+            throw new Error('Supabase Database is disabled in Settings.');
+        }
+        const normalizedBase = base.replace(/\/+$/, '');
+        const apiBase = /\/rest\/v1$/i.test(normalizedBase)
+            ? normalizedBase
+            : normalizedBase + '/rest/v1';
+        const url = apiBase + '/' + path.replace(/^\/+/, '');
+        const headers = {
+            apikey: key,
+            Authorization: 'Bearer ' + key,
+            'Content-Type': 'application/json',
+            ...(options && options.headers ? options.headers : {})
+        };
+        return fetch(url, { ...options, headers });
+    }
+
+    /********************************************************************
+     * COLUMN MAPPING: Supabase snake_case columns → app camelCase properties
+     ********************************************************************/
+    const SUPABASE_TABLE_MAP = {
+        'batches': {
+            stateKey: 'batches',
+            altTable: 'batches_roster',
+            columns: {
+                'batch_id': 'id',
+                'batch_name': 'name',
+                'subjects': 'subject',
+                'classroom_hall': 'room',
+                'lead_faculty': 'teacher',
+                'schedule': 'schedule',
+                'student_ids': 'studentIds',
+                'schedule_time': 'schedule',
+                'room_no': 'room'
+            }
+        },
+        'students': {
+            stateKey: 'students',
+            altTable: 'students_master',
+            columns: {
+                'roll_no': 'roll',
+                'student_name': 'name',
+                'login_password': 'password',
+                'access_status': 'status',
+                'contact_phone': 'phone',
+                'parent_name': 'parentName',
+                'total_fee_inr': 'totalFee',
+                'paid_fee_inr': 'paidFee',
+                'monthly_fee_inr': 'monthlyFee',
+                'fee_due_date': 'dueDate',
+                'last_reminder_sent': 'lastReminder',
+                'admission_date': 'admissionDate',
+                'batch_id': 'batchId',
+                'monthly_paid_this_cycle': 'monthlyPaidThisCycle',
+                'payment_history': 'paymentHistory',
+                'is_dummy': 'isDummy'
+            }
+        },
+        'materials': {
+            stateKey: 'materials',
+            altTable: 'materials_repository',
+            columns: {
+                'material_id': 'id',
+                'batch_name': 'batchName',
+                'batch_id': 'batchId',
+                'upload_date': 'uploadDate',
+                'uploaded_by': 'uploadedBy',
+                'file_size': 'fileSize',
+                'download_url': 'downloadUrl',
+                'google_drive_link': 'driveUrl',
+                'drive_url': 'driveUrl'
+            }
+        },
+        'offline_tests': {
+            stateKey: 'offlineTests',
+            altTable: 'offline_test_marks',
+            columns: {
+                'test_id': 'id',
+                'test_title': 'title',
+                'test_date': 'date',
+                'max_marks': 'maxMarks',
+                'marks_obtained': 'marksObtained',
+                'student_name': 'studentName',
+                'teacher_remarks': 'remarks',
+                'is_dummy': 'isDummy'
+            }
+        },
+        'teachers': {
+            stateKey: 'teachers',
+            altTable: 'teachers_roster',
+            columns: {
+                'teacher_id': 'id',
+                'teacher_name': 'name',
+                'login_email': 'email',
+                'login_password': 'password',
+                'access_status': 'status',
+                'contact_phone': 'phone',
+                'avatar_color': 'avatarColor'
+            }
+        },
+        'gallery': {
+            stateKey: 'gallery',
+            altTable: 'gallery_banners',
+            columns: {
+                'banner_id': 'id',
+                'banner_date': 'date',
+                'badge_air_rank': 'badge',
+                'image_url': 'imageUrl'
+            }
+        },
+        'external_links': {
+            stateKey: 'externalLinks',
+            altTable: 'external_links_hub',
+            columns: {
+                'link_id': 'id',
+                'resource_title': 'title',
+                'external_url': 'url',
+                'provider_portal': 'category'
+            }
+        },
+        'feedbacks': {
+            stateKey: 'feedbacks',
+            altTable: 'feedback_responses',
+            columns: {
+                'row_id': 'id',
+                'author_name': 'authorName',
+                'name': 'authorName',
+                'student_name': 'authorName',
+                'feedback_comment': 'comment',
+                'message': 'comment',
+                'rating_stars': 'rating',
+                'rating': 'rating',
+                'feedback_date': 'date',
+                'created_at': 'date',
+                'batch': 'batchName',
+                'batch_name': 'batchName',
+                'batch_id': 'batchId',
+                'role': 'role',
+                'category': 'category',
+                'topic': 'category'
+            }
+        },
+        'notifications': {
+            stateKey: 'notifications',
+            columns: {
+                'admin_seen': 'adminSeen',
+                'action_tab': 'actionTab',
+                'target_role': 'targetRole',
+                'material_id': 'materialId',
+                'batch_name': 'batchName',
+                'icon_color': 'iconColor',
+                'bg_color': 'bgColor'
+            }
+        }
+    };
+
+    let supabaseSyncTimer = null;
+
+    function supabaseStableFingerprint(value) {
+        const text = JSON.stringify(value == null ? null : value);
+        let hash = 2166136261;
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return text.length + ':' + (hash >>> 0).toString(16);
+    }
+
+    function getSupabaseSyncSnapshot() {
+        try { return JSON.parse(localStorage.getItem(getSupabaseSyncSnapshotKey()) || '{}'); }
+        catch (e) { return {}; }
+    }
+
+    function getSupabaseSyncSnapshotKey() {
+        return 'DIVINE_SUPABASE_SYNC_SNAPSHOT_' + supabaseStableFingerprint(getSupabaseApiUrl());
+    }
+
+    function rememberSupabaseSyncSnapshot() {
+        const snapshot = {};
+        ['batches', 'students', 'teachers', 'materials', 'offlineTests'].forEach(function (key) {
+            snapshot[key] = {};
+            (state[key] || []).forEach(function (record) {
+                if (record && (record.id != null || record.roll != null)) {
+                    const idKey = String(record.id || record.roll);
+                    snapshot[key][idKey] = supabaseStableFingerprint(record);
+                }
+            });
+        });
+        try { localStorage.setItem(getSupabaseSyncSnapshotKey(), JSON.stringify(snapshot)); }
+        catch (e) { }
+    }
+
+    // DB metadata columns to strip from every row
+    const SUPABASE_META_COLS = ['created_at', 'updated_at', 'created_at_ts'];
+
+    /**
+     * Transform a raw Supabase row (snake_case) into the app's camelCase format.
+     */
+    function supabaseRowToAppFormat(row, tableConfig) {
+        if (!row || typeof row !== 'object') return row;
+        const out = {};
+        const colMap = tableConfig.columns || {};
+
+        for (const rawKey of Object.keys(row)) {
+            const targetKey = colMap[rawKey] || rawKey;
+            if (SUPABASE_META_COLS.includes(rawKey) && !colMap[rawKey]) continue;
+            out[targetKey] = row[rawKey];
+        }
+
+        // Normalization guarantees so frontend never displays "undefined"
+        if (tableConfig.stateKey === 'batches') {
+            out.id = out.id || row.batch_id || row.id || '';
+            out.name = out.name || row.batch_name || row.name || 'Batch ' + out.id;
+            out.room = out.room || row.classroom_hall || row.room || 'Lecture Hall 101';
+            out.subject = out.subject || row.subjects || row.subject || 'All Subjects';
+            out.teacher = out.teacher || row.lead_faculty || row.teacher || 'Faculty';
+            out.schedule = out.schedule || row.schedule || 'Regular Schedule';
+            if (!Array.isArray(out.studentIds) || !out.studentIds.length) {
+                if (out.id === 'b1') out.studentIds = ['DC-101', 'DC-102', 'DC-103', 'DC-104', 'DC-105'];
+                else if (out.id === 'b2') out.studentIds = ['DC-106', 'DC-107', 'DC-108'];
+                else if (out.id === 'b3') out.studentIds = ['DC-109', 'DC-110', 'DC-111'];
+                else out.studentIds = [];
+            }
+        }
+        if (tableConfig.stateKey === 'students') {
+            out.id = out.id || row.roll_no || row.id || row.roll || '';
+            out.roll = out.roll || row.roll_no || row.roll || out.id;
+            out.name = out.name || row.student_name || row.name || 'Student';
+            out.password = out.password || row.login_password || row.password || 'password123';
+            out.status = out.status || row.access_status || row.status || 'Active';
+            out.phone = out.phone || row.contact_phone || row.phone || '';
+            out.parentName = out.parentName || row.parent_name || row.parentName || '';
+            out.totalFee = Number(out.totalFee !== undefined ? out.totalFee : (row.total_fee_inr !== undefined ? row.total_fee_inr : (row.total_fee || 48000)));
+            out.paidFee = Number(out.paidFee !== undefined ? out.paidFee : (row.paid_fee_inr !== undefined ? row.paid_fee_inr : (row.paid_fee || 0)));
+            out.monthlyFee = Number(out.monthlyFee !== undefined ? out.monthlyFee : (row.monthly_fee_inr !== undefined ? row.monthly_fee_inr : (row.monthly_fee || 0)));
+            out.dueDate = out.dueDate || row.fee_due_date || row.due_date || 'Fully Paid';
+            out.lastReminder = out.lastReminder || row.last_reminder_sent || row.last_reminder || '-';
+            out.admissionDate = out.admissionDate || row.admission_date || '';
+            out.batchId = out.batchId || (['DC-101','DC-102','DC-103','DC-104','DC-105'].includes(out.roll) ? 'b1' : (['DC-106','DC-107','DC-108'].includes(out.roll) ? 'b2' : 'b3'));
+        }
+        if (tableConfig.stateKey === 'teachers') {
+            out.id = out.id || row.teacher_id || row.id || '';
+            out.name = out.name || row.teacher_name || row.name || 'Teacher';
+            out.email = out.email || row.login_email || row.email || '';
+            out.password = out.password || row.login_password || row.password || 'teacher123';
+            out.status = out.status || row.access_status || row.status || 'Active';
+            out.phone = out.phone || row.contact_phone || row.phone || '';
+        }
+        if (tableConfig.stateKey === 'feedbacks') {
+            out.id = out.id || row.id || ('f' + Math.random().toString(36).substr(2, 6));
+            out.authorName = out.authorName || row.name || row.author_name || row.student_name || 'Parent / Student';
+            out.comment = out.comment || row.message || row.comment || row.feedback_comment || '';
+            out.rating = Number(out.rating !== undefined ? out.rating : (row.rating || 5));
+            out.batchName = out.batchName || row.batch || row.batch_name || 'JEE Advanced Target 2027';
+            out.date = out.date || row.created_at || row.date || '13 Oct 2026';
+            out.role = out.role || row.role || ((out.authorName && /parent/i.test(out.authorName)) ? 'Parent' : 'Student');
+            out.category = out.category || row.category || row.topic || 'Teaching Quality';
+        }
+
+        return out;
+    }
+
+    /**
+     * Persist pending edits directly to Supabase
+     */
+    async function syncPendingDataToSupabase() {
+        if (!state.settings || state.settings.supabaseEnabled !== true) return { synced: false };
+        
+        // 1. Sync full state snapshot to db_json table (instantly persists all edits)
+        try {
+            await supabaseFetch('db_json?snapshot_key=eq.main', {
+                method: 'PATCH',
+                headers: { Prefer: 'return=minimal' },
+                body: JSON.stringify({
+                    payload: state,
+                    updated_at: new Date().toISOString()
+                })
+            });
+        } catch (dbJsonErr) {
+            console.warn('[Supabase] db_json update notice:', dbJsonErr);
+        }
+
+        // 2. Also sync batches and students to their dedicated tables
+        const batchesPayload = (state.batches || []).map(function (b) {
+            return {
+                batch_id: b.id,
+                batch_name: b.name,
+                subjects: b.subject,
+                schedule: b.schedule,
+                classroom_hall: b.room,
+                lead_faculty: b.teacher,
+                student_count: (b.studentIds || []).length
+            };
+        });
+        const studentsPayload = (state.students || []).map(function (s) {
+            return {
+                roll_no: s.roll || s.id,
+                student_name: s.name,
+                login_password: s.password || 'password123',
+                access_status: s.status || 'Active',
+                parent_name: s.parentName || '',
+                contact_phone: s.phone || '',
+                total_fee_inr: Number(s.totalFee || 0),
+                paid_fee_inr: Number(s.paidFee || 0),
+                pending_dues_inr: Number((s.totalFee || 0) - (s.paidFee || 0)),
+                fee_due_date: s.dueDate || 'Fully Paid',
+                last_reminder_sent: s.lastReminder || '-',
+                admission_date: s.admissionDate || '',
+                monthly_fee_inr: Number(s.monthlyFee || 0)
+            };
+        });
+
+        // 2. Sync to core tables first, with roster/master fallback
+        const standardBatchesPayload = (state.batches || []).map(function (b) {
+            return {
+                id: b.id,
+                name: b.name,
+                subject: b.subject,
+                schedule: b.schedule,
+                room: b.room,
+                teacher: b.teacher,
+                student_ids: b.studentIds || []
+            };
+        });
+
+        const standardStudentsPayload = (state.students || []).map(function (s) {
+            return {
+                id: s.id || s.roll,
+                roll: s.roll || s.id,
+                name: s.name,
+                phone: s.phone || '',
+                parent_name: s.parentName || '',
+                total_fee: Number(s.totalFee || 0),
+                paid_fee: Number(s.paidFee || 0),
+                monthly_fee: Number(s.monthlyFee || 0),
+                due_date: s.dueDate || 'Fully Paid',
+                last_reminder: s.lastReminder || '-',
+                password: s.password || 'password123',
+                status: s.status || 'Active',
+                admission_date: s.admissionDate || '',
+                batch_id: s.batchId || ''
+            };
+        });
+
+        try {
+            const bRes = await supabaseFetch('batches?on_conflict=id', {
+                method: 'POST',
+                headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                body: JSON.stringify(standardBatchesPayload)
+            });
+            if (!bRes.ok) console.warn('[Supabase] batches sync status:', bRes.status, await bRes.text().catch(function(){return ''}));
+        } catch (e1) {
+            try {
+                await supabaseFetch('batches_roster?on_conflict=batch_id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(batchesPayload)
+                });
+            } catch (e2) {
+                console.warn('[Supabase] batches fallback error:', e2);
+            }
+        }
+
+        try {
+            const sRes = await supabaseFetch('students?on_conflict=id', {
+                method: 'POST',
+                headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                body: JSON.stringify(standardStudentsPayload)
+            });
+            if (!sRes.ok) console.warn('[Supabase] students sync status:', sRes.status, await sRes.text().catch(function(){return ''}));
+        } catch (e3) {
+            try {
+                await supabaseFetch('students_master?on_conflict=roll_no', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(studentsPayload)
+                });
+            } catch (e4) {
+                console.warn('[Supabase] students fallback error:', e4);
+            }
+        }
+
+        // 3. Teachers sync
+        if (Array.isArray(state.teachers) && state.teachers.length) {
+            const teachersPayload = state.teachers.map(function(t) {
+                return {
+                    id: t.id,
+                    name: t.name || '',
+                    subject: t.subject || '',
+                    qualification: t.qualification || '',
+                    experience: t.experience || '',
+                    email: t.email || '',
+                    phone: t.phone || '',
+                    specialization: t.specialization || '',
+                    bio: t.bio || '',
+                    initials: t.initials || '',
+                    password: t.password || 'teacher123',
+                    status: t.status || 'Active'
+                };
+            });
+            try {
+                await supabaseFetch('teachers?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(teachersPayload)
+                });
+            } catch (et) {}
+        }
+
+        // 4. Materials sync
+        if (Array.isArray(state.materials) && state.materials.length) {
+            const materialsPayload = state.materials.map(function(m) {
+                return {
+                    id: m.id,
+                    title: m.title || '',
+                    subject: m.subject || '',
+                    batch_id: m.batchId || '',
+                    category: m.category || '',
+                    drive_url: m.driveUrl || m.downloadUrl || '',
+                    type: m.type || 'PDF',
+                    date: m.date || m.uploadDate || ''
+                };
+            });
+            try {
+                await supabaseFetch('materials?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(materialsPayload)
+                });
+            } catch (em) {}
+        }
+
+        // 5. Offline Tests sync
+        if (Array.isArray(state.offlineTests) && state.offlineTests.length) {
+            const testsPayload = state.offlineTests.map(function(ot) {
+                return {
+                    id: ot.id,
+                    batch_id: ot.batchId || '',
+                    name: ot.name || ot.title || '',
+                    date: ot.date || '',
+                    max_marks: Number(ot.maxMarks || 100),
+                    subject: ot.subject || '',
+                    results: ot.results || []
+                };
+            });
+            try {
+                await supabaseFetch('offline_tests?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(testsPayload)
+                });
+            } catch (eot) {}
+        }
+
+        // 6. Gallery sync
+        if (Array.isArray(state.gallery) && state.gallery.length) {
+            const galleryPayload = state.gallery.map(function(g) {
+                return {
+                    id: g.id,
+                    title: g.title || '',
+                    url: g.url || '',
+                    category: g.category || '',
+                    date: g.date || ''
+                };
+            });
+            try {
+                await supabaseFetch('gallery?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(galleryPayload)
+                });
+            } catch (eg) {}
+        }
+
+        // 7. External Links sync
+        if (Array.isArray(state.externalLinks) && state.externalLinks.length) {
+            const linksPayload = state.externalLinks.map(function(l) {
+                return {
+                    id: l.id,
+                    title: l.title || '',
+                    url: l.url || '',
+                    category: l.category || ''
+                };
+            });
+            try {
+                await supabaseFetch('external_links?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(linksPayload)
+                });
+            } catch (el) {}
+        }
+
+        // 8. Feedbacks sync
+        if (Array.isArray(state.feedbacks) && state.feedbacks.length) {
+            const feedbacksPayload = state.feedbacks.map(function(f) {
+                return {
+                    id: f.id,
+                    name: f.authorName || f.name || f.student_name || '',
+                    message: f.comment || f.message || '',
+                    rating: Number(f.rating || 5),
+                    batch: f.batchName || f.batch || '',
+                    created_at: f.date || f.created_at || ''
+                };
+            });
+            try {
+                await supabaseFetch('feedbacks?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(feedbacksPayload)
+                });
+            } catch (ef) {}
+        }
+
+        rememberSupabaseSyncSnapshot();
+        return { synced: true };
+    }
+
+    function autoSyncToSupabase() {
+        if (!state.settings || state.settings.supabaseEnabled !== true || !state.settings.supabaseUrl || !state.settings.supabaseKey) return;
+        if (supabaseSyncTimer) clearTimeout(supabaseSyncTimer);
+        supabaseSyncTimer = setTimeout(function () {
+            syncPendingDataToSupabase().then(function (result) {
+                if (result && result.synced) updateSyncBadge('✓ Cloud Synced', 'success');
+            }).catch(function (error) {
+                console.warn('[Supabase] Sync notice:', error);
+            });
+        }, 300);
+    }
+
+
+    /********************************************************************
+     * SUPABASE DATA LOADING - Load all tables from Supabase into state
+     * Used when Supabase Database is enabled as primary data source.
+     ********************************************************************/
+    async function supabaseLoadTable(tableName, altTable) {
+        let response = await supabaseFetch(tableName + '?select=*');
+        if (!response.ok && altTable) {
+            response = await supabaseFetch(altTable + '?select=*');
+        }
+        if (!response.ok) {
+            const details = await response.text().catch(function () { return ''; });
+            throw new Error('Failed to load ' + tableName + ' (HTTP ' + response.status + ')' + (details ? ': ' + details : ''));
+        }
+        return await response.json();
+    }
+
+    async function loadDataFromSupabase() {
+        if (!state.settings || state.settings.supabaseEnabled !== true) return;
+
+        const loadedData = {};
+        const loadErrors = [];
+        const emptyTables = [];
+        for (const tableName of Object.keys(SUPABASE_TABLE_MAP)) {
+            try {
+                const config = SUPABASE_TABLE_MAP[tableName];
+                const rawData = await supabaseLoadTable(tableName, config.altTable);
+                if (Array.isArray(rawData)) {
+                    // Transform each row from snake_case → camelCase
+                    const transformed = rawData.map(function(row) {
+                        return supabaseRowToAppFormat(row, config);
+                    });
+                    const currentRows = Array.isArray(state[config.stateKey]) ? state[config.stateKey] : [];
+                    if (transformed.length === 0 && currentRows.length > 0) {
+                        emptyTables.push(tableName);
+                    } else {
+                        loadedData[config.stateKey] = transformed;
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not load ' + tableName + ' from Supabase (skipping):', e);
+            }
+        }
+
+        // Handle settings (support both settings_config and settings key-value tables)
+        try {
+            let settingsData = null;
+            try {
+                settingsData = await supabaseLoadTable('settings_config');
+            } catch (eConfig) {
+                try { settingsData = await supabaseLoadTable('settings'); } catch (eSet) { }
+            }
+            if (Array.isArray(settingsData)) {
+                const settingsKeyMap = {
+                    'Institute Name': 'instituteName',
+                    'Tagline': 'tagline',
+                    'Helpline Phone': 'phone',
+                    'Display Contact': 'contactDisplay',
+                    'Official Email': 'email',
+                    'Address': 'address',
+                    'YouTube Channel': 'youtubeUrl',
+                    'Admin Name': 'adminName',
+                    'Master Admin Password': 'adminPassword',
+                    'Admin Email ID': 'adminEmail',
+                    'Lead Dev Email': 'leadDevEmail',
+                    'Lead Developer Email': 'leadDevEmail',
+                    'LEAD_DEV_EMAIL': 'leadDevEmail',
+                    'LEAD_DEV_PASSWORD': 'leadDevPassword',
+                    'Lead Developer Password': 'leadDevPassword',
+                    'UPI Payment ID': 'upiId',
+                    'Facebook Page': 'facebookUrl',
+                    'Instagram Profile': 'instagramUrl',
+                    'Show Requirement Labels': 'showRequirementLabels',
+                    'Admin Feedback Delete': 'allowAdminFeedbackDelete',
+                    'Study Link Delete': 'allowAdminLinkDelete',
+                    'Show Dummy / Demo Data': 'showDummyData',
+                    'institute_name': 'instituteName',
+                    'contact_display': 'contactDisplay',
+                    'show_requirement_labels': 'showRequirementLabels',
+                    'allow_admin_feedback_delete': 'allowAdminFeedbackDelete',
+                    'allow_admin_link_delete': 'allowAdminLinkDelete',
+                    'show_dummy_data': 'showDummyData',
+                    'supabase_enabled': 'supabaseEnabled',
+                    'supabase_url': 'supabaseUrl',
+                    'supabase_key': 'supabaseKey',
+                    'sheets_mirror_enabled': 'sheetsMirrorEnabled',
+                    'drive_folder_url': 'driveFolderUrl',
+                    'admin_name': 'adminName',
+                    'admin_password': 'adminPassword',
+                    'admin_email': 'adminEmail',
+                    'facebook_url': 'facebookUrl',
+                    'instagram_url': 'instagramUrl',
+                    'youtube_url': 'youtubeUrl'
+                };
+                const settingsObj = {};
+                settingsData.forEach(function(s) {
+                    if (s && s.setting_parameter) {
+                        const k = settingsKeyMap[s.setting_parameter] || s.setting_parameter;
+                        settingsObj[k] = s.configured_value;
+                    } else if (s && s.key) {
+                        const mappedKey = settingsKeyMap[s.key] || s.key;
+                        settingsObj[mappedKey] = s.value;
+                    }
+                });
+                const boolKeys = ['showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'dummyDataWiped'];
+                boolKeys.forEach(function(bk) {
+                    if (settingsObj[bk] !== undefined) {
+                        const str = String(settingsObj[bk]).trim().toLowerCase();
+                        settingsObj[bk] = !(str === 'off' || str === 'false' || str === '0' || str === 'no');
+                    }
+                });
+                loadedData.settings = Object.assign({}, state.settings, settingsObj);
+            }
+        } catch (e) {
+            console.warn('Failed to load settings from Supabase:', e);
+        }
+
+        Object.keys(loadedData).forEach(function (key) {
+            if (loadedData[key] && (Array.isArray(loadedData[key]) ? loadedData[key].length > 0 : true)) {
+                state[key] = loadedData[key];
+            }
+        });
+        if (!emptyTables.includes('batches') && !emptyTables.includes('students')) {
+            rememberSupabaseSyncSnapshot();
+        }
+        return { emptyTables: emptyTables };
+    }
+
+    async function supabaseClearDummyData() {
+        if (!state.settings || !state.settings.supabaseUrl || !state.settings.supabaseKey) return { success: false, reason: 'Supabase not configured' };
+        const dummyTableIds = {
+            'batches': ['b1','b2','b3','b4','b5','b6','b7','b8','b9','b10'],
+            'students': ['s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11'],
+            'materials': ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10'],
+            'offline_tests': ['t1','t2','t3','t4','t5','t6','t7','t8','t9','t10'],
+            'teachers': ['tr1','tr2','tr3','tr4','tr5','tr6','tr7','tr8','tr9','tr10'],
+            'gallery': ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'],
+            'feedbacks': ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10']
+        };
+        // CRITICAL: external_links and settings_config are NEVER deleted!
+        for (const [tbl, ids] of Object.entries(dummyTableIds)) {
+            try {
+                await supabaseFetch(`${tbl}?id=in.(${ids.join(',')})`, {
+                    method: 'DELETE',
+                    headers: { 'Prefer': 'return=minimal' }
+                });
+            } catch (e) {
+                console.warn(`[Supabase] Error deleting dummy records from ${tbl}:`, e);
+            }
+        }
+        // Clear notifications from Supabase
+        try {
+            await supabaseFetch('notifications?id=neq.placeholder', {
+                method: 'DELETE',
+                headers: { 'Prefer': 'return=minimal' }
+            });
+        } catch (e) {
+            console.warn('[Supabase] Error deleting notifications:', e);
+        }
+        // Update settings_config in Supabase
+        try {
+            await supabaseFetch('settings_config?setting_parameter=eq.Show Dummy / Demo Data', {
+                method: 'PATCH',
+                headers: { 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ configured_value: 'Off' })
+            });
+        } catch (e) {}
+        // Update snapshot db_json
+        try {
+            await supabaseFetch('db_json?snapshot_key=eq.main', {
+                method: 'PATCH',
+                headers: { 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ payload: state, updated_at: new Date().toISOString() })
+            });
+        } catch (e) {}
+        return { success: true };
+    }
+
+    async function supabaseSyncSettings(s) {
+        if (!s) s = state.settings || {};
+        const url = (state.settings && state.settings.supabaseUrl) || 'https://srjqsofkjizwskqnzyfn.supabase.co';
+        const key = (state.settings && state.settings.supabaseKey) || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+        if (!url || !key) return;
+        const base = url.replace(/\/+$/, '') + (/\/rest\/v1$/i.test(url) ? '' : '/rest/v1');
+        const headers = {
+            apikey: key,
+            Authorization: 'Bearer ' + key,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=minimal'
+        };
+
+        const configUpdates = [
+            { setting_parameter: 'Institute Name', configured_value: s.instituteName || 'Divine Classes', description: 'Official Coaching Name' },
+            { setting_parameter: 'Tagline', configured_value: s.tagline || 'Empowering Aspirants for JEE, NEET & Board Excellence', description: 'Coaching Slogan & Mission' },
+            { setting_parameter: 'Helpline Phone', configured_value: s.phone || '+91 95556 78753', description: 'Official Contact Number' },
+            { setting_parameter: 'Display Contact', configured_value: s.contactDisplay || '9555-6787-53', description: 'Formatted Helpline' },
+            { setting_parameter: 'Official Email', configured_value: s.email || 'contact@divineclasses.in', description: 'Inquiry Email' },
+            { setting_parameter: 'Address', configured_value: s.address || '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063', description: 'Center Location' },
+            { setting_parameter: 'YouTube Channel', configured_value: s.youtubeUrl || 'https://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8', description: 'Official Video Channel' },
+            { setting_parameter: 'Admin Name', configured_value: s.adminName || 'Ravi Shankar', description: 'Display Name of Institute Admin' },
+            { setting_parameter: 'Master Admin Password', configured_value: s.adminPassword || 'admin123', description: 'Password to access Admin portal' },
+            { setting_parameter: 'Admin Email ID', configured_value: s.adminEmail || 'edivineclasses@gmail.com', description: 'Official Admin Contact / Login Email' },
+            { setting_parameter: 'Lead Developer Email', configured_value: s.leadDevEmail || 'anil.chahar170@gmail.com', description: 'Lead Developer login email' },
+            { setting_parameter: 'Lead Developer Password', configured_value: s.leadDevPassword || 'Anil@1310', description: 'Lead Developer login password' },
+            { setting_parameter: 'LEAD_DEV_EMAIL', configured_value: s.leadDevEmail || 'anil.chahar170@gmail.com', description: 'Lead Developer Login Credentials' },
+            { setting_parameter: 'LEAD_DEV_PASSWORD', configured_value: s.leadDevPassword || 'Anil@1310', description: 'Lead Developer login password' },
+            { setting_parameter: 'UPI Payment ID', configured_value: s.upiId || 'divineclasses@upi', description: 'Fee Collection UPI' },
+            { setting_parameter: 'Facebook Page', configured_value: s.facebookUrl || 'https://www.facebook.com/edivineclasses/?_rdr', description: 'Social Channel' },
+            { setting_parameter: 'Instagram Profile', configured_value: s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq', description: 'Social Channel' },
+            { setting_parameter: 'Show Requirement Labels', configured_value: (s.showRequirementLabels === false || s.showRequirementLabels === 'Off' || s.showRequirementLabels === 'off' || s.showRequirementLabels === 'false' || s.showRequirementLabels === 0 || s.showRequirementLabels === '0') ? 'Off' : 'On', description: 'Page header Requirement #N tags (toggle in Settings)' },
+            { setting_parameter: 'Admin Feedback Delete', configured_value: (s.allowAdminFeedbackDelete === false || s.allowAdminFeedbackDelete === 'Off' || s.allowAdminFeedbackDelete === 'off' || s.allowAdminFeedbackDelete === 'false') ? 'Off' : 'On', description: 'Admin delete button on Feedback Wall (toggle in Settings)' },
+            { setting_parameter: 'Study Link Delete', configured_value: (s.allowAdminLinkDelete === false || s.allowAdminLinkDelete === 'Off' || s.allowAdminLinkDelete === 'off' || s.allowAdminLinkDelete === 'false') ? 'Off' : 'On', description: 'Admin delete button on Study Links cards (toggle in Settings)' },
+            { setting_parameter: 'Show Dummy / Demo Data', configured_value: (s.showDummyData === false || s.showDummyData === 'Off' || s.showDummyData === 'off' || s.showDummyData === 'false' || s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Off' : 'On', description: 'Seed demo students/batches/tests visibility' },
+            { setting_parameter: 'Dummy Data Wiped', configured_value: (s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Yes' : 'No', description: 'Permanent clearance status before client handover' },
+            { setting_parameter: 'Supabase Enabled', configured_value: (s.supabaseEnabled === false || s.supabaseEnabled === 'Off' || s.supabaseEnabled === 'off' || s.supabaseEnabled === 'false') ? 'Off' : 'On', description: 'Supabase primary database toggle' },
+            { setting_parameter: 'Supabase URL', configured_value: s.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co', description: 'Supabase Project REST URL' },
+            { setting_parameter: 'Supabase Key', configured_value: s.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS', description: 'Supabase API Key' },
+            { setting_parameter: 'Last Auto-Sync Timestamp', configured_value: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }), description: 'Time of last auto-sync from Web App' }
+        ];
+
+        try {
+            await fetch(`${base}/settings_config?on_conflict=setting_parameter`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(configUpdates)
+            });
+        } catch (e) {
+            console.warn('[Supabase] settings_config upsert notice:', e);
+        }
+
+        // Also update db_json snapshot
+        try {
+            await fetch(`${base}/db_json?snapshot_key=eq.main`, {
+                method: 'PATCH',
+                headers: {
+                    apikey: key,
+                    Authorization: 'Bearer ' + key,
+                    'Content-Type': 'application/json',
+                    Prefer: 'return=minimal'
+                },
+                body: JSON.stringify({ payload: state, updated_at: new Date().toISOString() })
+            });
+        } catch (e) {}
+    }
+
+    let supabaseSettingsPollTimer = null;
+
+    async function pollSupabaseSettings() {
+        if (!state.settings || state.settings.supabaseEnabled !== true) return;
+        try {
+            const rawData = await supabaseLoadTable('settings_config');
+            if (!Array.isArray(rawData) || rawData.length === 0) return;
+            const settingsKeyMap = {
+                'Institute Name': 'instituteName',
+                'Tagline': 'tagline',
+                'Helpline Phone': 'phone',
+                'Display Contact': 'contactDisplay',
+                'Official Email': 'email',
+                'Address': 'address',
+                'YouTube Channel': 'youtubeUrl',
+                'Admin Name': 'adminName',
+                'Master Admin Password': 'adminPassword',
+                'Admin Email ID': 'adminEmail',
+                'Lead Dev Email': 'leadDevEmail',
+                'Lead Developer Email': 'leadDevEmail',
+                'LEAD_DEV_EMAIL': 'leadDevEmail',
+                'LEAD_DEV_PASSWORD': 'leadDevPassword',
+                'Lead Developer Password': 'leadDevPassword',
+                'UPI Payment ID': 'upiId',
+                'Facebook Page': 'facebookUrl',
+                'Instagram Profile': 'instagramUrl',
+                'Show Requirement Labels': 'showRequirementLabels',
+                'Admin Feedback Delete': 'allowAdminFeedbackDelete',
+                'Study Link Delete': 'allowAdminLinkDelete',
+                'Show Dummy / Demo Data': 'showDummyData',
+                'Dummy Data Wiped': 'dummyDataWiped'
+            };
+            const boolKeys = ['showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'dummyDataWiped'];
+            let changed = false;
+            rawData.forEach(function(item) {
+                if (!item || !item.setting_parameter) return;
+                const k = settingsKeyMap[item.setting_parameter];
+                if (!k) return;
+                let val = item.configured_value;
+                if (boolKeys.indexOf(k) !== -1) {
+                    const str = String(val).trim().toLowerCase();
+                    val = !(str === 'off' || str === 'false' || str === '0' || str === 'no');
+                }
+                if (state.settings[k] !== val) {
+                    state.settings[k] = val;
+                    changed = true;
+                }
+            });
+            if (changed) {
+                console.log('[Supabase] Live settings updated from cloud (multi-device sync)');
+                saveStateLocally();
+                if (typeof savePersistentSettingsToLocal === 'function') {
+                    savePersistentSettingsToLocal();
+                }
+                if (typeof updateRoleUI === 'function') updateRoleUI();
+                if (typeof renderSidebar === 'function') renderSidebar();
+                if (typeof renderMainContentPreservingScroll === 'function') {
+                    renderMainContentPreservingScroll();
+                } else if (typeof renderMainContent === 'function') {
+                    renderMainContent();
+                }
+            }
+        } catch (e) {
+            // silent polling
+        }
+    }
+
+    function startSupabaseLiveSync() {
+        if (supabaseSettingsPollTimer) return;
+        supabaseSettingsPollTimer = setInterval(pollSupabaseSettings, 4000);
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) pollSupabaseSettings();
+        });
+        window.addEventListener('focus', function() {
+            pollSupabaseSettings();
+        });
+    }
+</script>

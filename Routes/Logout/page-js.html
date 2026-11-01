@@ -1,0 +1,14 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+            try {
+                localStorage.removeItem('DIVINE_AUTH_SESSION');
+                sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+            } catch(e) {}
+            if (typeof COACHING_LOGO_BASE64 !== 'undefined') {
+                const logoContainer = document.getElementById('logout-logo-container');
+                if (logoContainer) {
+                    logoContainer.innerHTML = `<img src="${COACHING_LOGO_BASE64}" alt="Divine Classes Logo" class="w-full h-full object-contain">`;
+                }
+            }
+        });
+</script>

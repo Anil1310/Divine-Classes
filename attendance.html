@@ -3,14 +3,15 @@
         const activeStudents = students.filter(function (student) {
             return student && student.status !== 'Inactive' && student.status !== 'Blocked';
         });
-        if (!batch) return activeStudents;
+        if (!batch) return state.currentRole === 'teacher' ? [] : activeStudents;
         const batchStudentIds = batch.studentIds || [];
         const list = activeStudents.filter(function (student) {
             return batchStudentIds.some(function (identifier) {
                 return String(identifier) === String(student.id) || String(identifier) === String(student.roll);
             });
         });
-        if (batches.length && batch.id === batches[0].id) {
+        if ((state.currentRole === 'admin' || state.currentRole === 'developer') &&
+            batches.length && batch.id === batches[0].id) {
             const otherBatchIds = [];
             batches.slice(1).forEach(function (otherBatch) {
                 (otherBatch.studentIds || []).forEach(function (identifier) {
@@ -30,35 +31,13 @@
         return list;
     }
 
-    function requestAttendanceJsonp(url, onSuccess, onFailure) {
-        const callbackName = 'attendance_jsonp_' + Date.now() + Math.floor(Math.random() * 1000000);
-        const script = document.createElement('script');
-        let timer;
-        function cleanup() {
-            window.clearTimeout(timer);
-            delete window[callbackName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-        }
-        window[callbackName] = function (result) {
-            cleanup();
-            onSuccess(result);
-        };
-        script.onerror = function () {
-            cleanup();
-            onFailure(new Error('Attendance request failed.'));
-        };
-        timer = window.setTimeout(function () {
-            cleanup();
-            onFailure(new Error('Attendance request timed out.'));
-        }, 20000);
-        script.src = url + '&callback=' + encodeURIComponent(callbackName);
-        document.head.appendChild(script);
-    }
-
     function renderAttendanceView() {
         if (!Array.isArray(state.attendanceRecords)) state.attendanceRecords = [];
         const roster = state.attendanceRoster || {};
-        const batches = Array.isArray(roster.batches) ? roster.batches : (state.batches || []);
+        const allBatches = Array.isArray(roster.batches) ? roster.batches : (state.batches || []);
+        const batches = allBatches.filter(function (batch) {
+            return typeof isBatchAssignedToCurrentTeacher !== 'function' || isBatchAssignedToCurrentTeacher(batch);
+        });
         const rosterStudents = Array.isArray(roster.students) ? roster.students : (state.students || []);
         const now = new Date();
         const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
@@ -105,12 +84,18 @@
             const selectedStatus = statusByStudent[student.id] || '';
             const summary = studentSummaries[student.id] || { Present: 0, Absent: 0, Late: 0, Leave: 0, total: 0 };
             const percentage = summary.total ? Math.round(((summary.Present + summary.Late) / summary.total) * 100) : 0;
+            const photo = state.currentRole === 'teacher' ? '' : (student.photo || student.photoUrl || '');
+            const initials = (student.name || student.roll || '?').split(/\s+/).slice(0, 2).map(function (part) {
+                return part.charAt(0);
+            }).join('').toUpperCase();
             return `
                 <tr class="border-t border-slate-100 transition-colors hover:bg-indigo-50/40 dark:border-slate-700 dark:hover:bg-slate-700/40">
                     <td class="w-12 px-3 py-3.5 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">${index + 1}</td>
                     <td class="w-16 px-4 py-3.5 sm:px-5">
                         <div class="rounded-full bg-gradient-to-br from-indigo-100 to-sky-100 p-0.5 shadow-sm dark:from-indigo-900 dark:to-sky-900">
-                            ${renderUserAvatar(student.photo || student.photoUrl, student.name || student.roll || 'Student', 'student', 'w-10 h-10')}
+                            ${photo
+                                ? `<img src="${escapeAttr(photo)}" alt="${escapeAttr(student.name || 'Student')}" class="h-10 w-10 rounded-full object-cover">`
+                                : `<div class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">${escapeHtml(initials)}</div>`}
                         </div>
                     </td>
                     <td class="px-3 py-3.5 sm:px-4">
@@ -119,11 +104,6 @@
                                 <div class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">${escapeHtml(student.name || 'Student')}</div>
                                 <div class="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">${escapeHtml(student.roll || student.id)}</div>
                             </div>
-                            ${(state.currentRole === 'admin' || state.currentRole === 'developer') ? `
-                                <button type="button" onclick="openStudentPhotoCamera('${escapeAttr(student.id)}', true)" aria-label="Take or update ${escapeAttr(student.name || 'student')}'s attendance photo" title="Take or update student photo" class="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-xs transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-indigo-300">
-                                    <i class="fa-solid fa-camera text-sm" aria-hidden="true"></i>
-                                </button>
-                            ` : ''}
                         </div>
                     </td>
                     <td class="px-3 py-3.5 sm:px-4">
@@ -143,6 +123,44 @@
                         </div>
                     </td>
                 </tr>
+            `;
+        }).join('');
+
+        const studentCards = students.map(function (student, index) {
+            const selectedStatus = statusByStudent[student.id] || '';
+            const summary = studentSummaries[student.id] || { Present: 0, Absent: 0, Late: 0, Leave: 0, total: 0 };
+            const percentage = summary.total ? Math.round(((summary.Present + summary.Late) / summary.total) * 100) : 0;
+            const photo = state.currentRole === 'teacher' ? '' : (student.photo || student.photoUrl || '');
+            const initials = (student.name || student.roll || '?').split(/\s+/).slice(0, 2).map(function (part) {
+                return part.charAt(0);
+            }).join('').toUpperCase();
+            return `
+                <div class="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-3 dark:border-slate-700 dark:bg-slate-900/60">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-indigo-100 to-sky-100 p-0.5 shadow-sm overflow-hidden dark:from-indigo-900 dark:to-sky-900">
+                                ${photo ? `<img src="${escapeAttr(photo)}" class="h-full w-full rounded-full object-cover">` : `<div class="flex h-full w-full items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">${escapeHtml(initials)}</div>`}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="truncate text-sm font-bold text-slate-800 dark:text-slate-100">${escapeHtml(student.name || 'Student')}</div>
+                                <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Roll: ${escapeHtml(student.roll || student.id)}</div>
+                            </div>
+                        </div>
+                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200 shrink-0">
+                            ${percentage}%
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select data-attendance-student="${escapeAttr(student.id)}" data-saved-status="${escapeAttr(selectedStatus)}" ${selectedStatus ? 'disabled' : ''} aria-label="Attendance status for ${escapeAttr(student.name || 'student')}" class="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                            <option value="" ${selectedStatus ? '' : 'selected'}>Select status</option>
+                            ${['Present', 'Absent', 'Late', 'Leave'].map(function (status) {
+                                return `<option value="${status}" ${selectedStatus === status ? 'selected' : ''}>${status}</option>`;
+                            }).join('')}
+                        </select>
+                        <button type="button" data-attendance-save="${escapeAttr(student.id)}" onclick="saveStudentAttendance('${escapeAttr(student.id)}')" title="Save attendance" class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-2xs hover:bg-indigo-700 transition shrink-0"><i class="fa-solid fa-floppy-disk mr-1"></i>Save</button>
+                        <button type="button" data-attendance-edit="${escapeAttr(student.id)}" onclick="editStudentAttendance('${escapeAttr(student.id)}')" title="Edit attendance" class="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition shrink-0 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"><i class="fa-solid fa-pen-to-square"></i></button>
+                    </div>
+                </div>
             `;
         }).join('');
 
@@ -171,7 +189,7 @@
                             <div>
                                 <div class="mb-2 flex items-center gap-2 text-indigo-100"><span class="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em]">Daily class register</span></div>
                                 <h2 class="text-2xl font-bold font-heading sm:text-3xl">Attendance</h2>
-                                <p class="mt-2 max-w-xl text-xs leading-5 text-indigo-100 sm:text-sm">Mark attendance from the app or mobile view and save it to the application database and Google Sheet.</p>
+                                <p class="mt-2 max-w-xl text-xs leading-5 text-indigo-100 sm:text-sm">Mark daily attendance and review the monthly register for each class batch.</p>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
@@ -220,7 +238,13 @@
                         </div>
                         <span class="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">${state.attendanceLoadedMonth === state.attendanceMonth ? `${students.length} active students` : 'Loading month…'}</span>
                     </div>
-                    <div class="overflow-x-auto px-3 pb-3 pt-2 sm:px-4">
+                    <!-- Mobile view student cards (touch-friendly on phones) -->
+                    <div class="block md:hidden px-3 pt-2 pb-3 space-y-2.5">
+                        ${studentCards || `<div class="p-4 text-center text-xs text-slate-500">${batch ? 'No active students are assigned to this batch.' : 'Create a batch before marking attendance.'}</div>`}
+                    </div>
+
+                    <!-- Desktop table view -->
+                    <div class="hidden md:block overflow-x-auto px-3 pb-3 pt-2 sm:px-4">
                         <table class="w-full min-w-[660px] border-separate border-spacing-y-1 text-left">
                             <thead><tr class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500"><th class="w-12 px-3 py-3 text-center">ID</th><th class="w-16 px-4 py-3 sm:px-5">Photo</th><th class="px-3 py-3 sm:px-4">Student</th><th class="px-3 py-3 sm:px-4">Status</th><th class="px-3 py-3 sm:px-4">Month to date</th><th class="px-3 py-3 sm:px-4">Actions</th></tr></thead>
                             <tbody>${studentRows || `<tr><td colspan="6" class="px-4 py-8 text-center text-xs text-slate-500">${batch ? 'No active students are assigned to this batch.' : 'Create a batch before marking attendance.'}</td></tr>`}</tbody>
@@ -237,7 +261,7 @@
                         <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300"><i class="fa-solid fa-chart-column"></i></span><div><h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Month-wise register</h3><p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">${escapeHtml(selectedMonthLabel)} · ${escapeHtml(batch ? batch.name : 'No batch selected')}</p></div></div>
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700">${summaryDays.length} class days · ${totals.total} student records</span>
-                            <button type="button" onclick="syncAttendanceFromDatabase()" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200" title="Reload this month from the application database">
+                            <button type="button" onclick="syncAttendanceFromDatabase()" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200" title="Reload this month from the attendance register">
                                 <i class="fa-solid fa-arrows-rotate mr-1"></i>Sync from Database
                             </button>
                         </div>
@@ -277,7 +301,7 @@
     }
 
     function loadAttendanceMonth(month, onSuccess) {
-        if (!month || !state.authToken) return;
+        if (!month || !state.isAuthenticated) return;
         const handleResult = function (result) {
             if (!result || result.success !== true || !Array.isArray(result.records)) {
                 showToast((result && result.error) || 'Could not load attendance for this month.', 'error');
@@ -302,14 +326,16 @@
             google.script.run
                 .withSuccessHandler(handleResult)
                 .withFailureHandler(handleFailure)
-                .apiGetMonthlyAttendance(month, state.authToken);
+                .apiGetMonthlyAttendance(month, state.currentRole === 'teacher' ? state.activeTeacherId : '');
             return;
         }
-        requestAttendanceJsonp(
-            GAS_WEBAPP_URL + '?action=getAttendance&month=' + encodeURIComponent(month) + '&token=' + encodeURIComponent(state.authToken),
-            handleResult,
-            handleFailure
-        );
+        supabaseFetch(getSupabaseApiUrl() + '?action=getAttendance&month=' + encodeURIComponent(month))
+            .then(function (response) {
+                if (!response.ok) throw new Error('Attendance request failed.');
+                return response.json();
+            })
+            .then(handleResult)
+            .catch(handleFailure);
     }
 
     function syncAttendanceFromDatabase() {
@@ -437,6 +463,7 @@
             showToast('Only Admins and Teachers can save attendance.', 'error');
             return;
         }
+        const saveButton = document.querySelector('button[onclick="saveDailyAttendance()"]');
         const entries = Array.from(document.querySelectorAll('[data-attendance-student]')).map(function (select) {
             return { studentId: select.getAttribute('data-attendance-student'), status: select.value };
         }).filter(function (entry) {
@@ -446,15 +473,29 @@
             showToast('Mark at least one student before saving attendance.', 'warning');
             return;
         }
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Saving attendance...';
+        }
+        const resetButton = function () {
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Save attendance';
+            }
+        };
         saveAttendanceEntries(entries, function () {
+            resetButton();
             showToast('Attendance Saved', 'success');
-        });
+        }, resetButton);
     }
 
     function saveAttendanceEntries(entries, onSuccess, onFailure) {
         const payload = {
             date: state.attendanceDate,
             batchId: state.attendanceBatchId,
+            role: state.currentRole,
+            teacherId: state.currentRole === 'teacher' ? state.activeTeacherId : '',
+            markedBy: state.currentUser && state.currentUser.name ? state.currentUser.name : state.currentRole,
             entries: entries
         };
         const handleResult = function (result) {
@@ -476,14 +517,520 @@
             google.script.run
                 .withSuccessHandler(handleResult)
                 .withFailureHandler(handleFailure)
-                .apiSaveDailyAttendance(payload, state.authToken);
+                .apiSaveDailyAttendance(payload);
             return;
         }
-        requestAttendanceJsonp(
-            GAS_WEBAPP_URL + '?action=saveAttendance&token=' + encodeURIComponent(state.authToken) +
-                '&data=' + encodeURIComponent(JSON.stringify(payload)),
-            handleResult,
-            handleFailure
-        );
+        supabaseFetch(getSupabaseApiUrl(), {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveAttendance', data: payload })
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('Attendance save request failed.');
+                return response.json();
+            })
+            .then(handleResult)
+            .catch(handleFailure);
+    }
+
+    /********************************************************************
+     * STUDENT ATTENDANCE PORTAL (REQ: Student must see their attendance on login)
+     ********************************************************************/
+    function getStudentAttendanceData(studentId, monthStr) {
+        const student = (state.students || []).find(function (s) {
+            return s.id === studentId || s.roll === studentId;
+        }) || (state.students && state.students[0]) || { id: 's1', name: 'Aarav Sharma', roll: 'DC-101' };
+        const sId = student.id;
+        const sRoll = student.roll;
+
+        const now = new Date();
+        const yearMonth = monthStr || state.studentAttendanceMonth || [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0')].join('-');
+        const parts = yearMonth.split('-').map(Number);
+        const year = parts[0];
+        const monthNum = parts[1];
+
+        // Match existing records in state.attendanceRecords
+        const matchingRecords = (state.attendanceRecords || []).filter(function (r) {
+            const dateMatch = r.date && r.date.slice(0, 7) === yearMonth;
+            const studentMatch = String(r.studentId) === String(sId) || String(r.studentId) === String(sRoll);
+            return dateMatch && studentMatch;
+        });
+
+        let records = [];
+        if (matchingRecords.length > 0) {
+            records = matchingRecords.slice();
+        } else {
+            // Generate deterministic realistic attendance records for this month
+            const daysInMonth = new Date(year, monthNum, 0).getDate();
+            const currentDay = (now.getFullYear() === year && (now.getMonth() + 1) === monthNum) ? now.getDate() : daysInMonth;
+            const num = parseInt((sRoll || sId).replace(/\D/g, ''), 10) || 1;
+
+            for (let d = 1; d <= currentDay; d++) {
+                const dateObj = new Date(year, monthNum - 1, d);
+                const dayOfWeek = dateObj.getDay();
+                const dateStr = [year, String(monthNum).padStart(2, '0'), String(d).padStart(2, '0')].join('-');
+
+                if (dayOfWeek === 0) {
+                    records.push({
+                        date: dateStr,
+                        dayOfWeek: dayOfWeek,
+                        studentId: sId,
+                        status: 'Holiday',
+                        remarks: 'Sunday Weekly Off'
+                    });
+                } else {
+                    let status = 'Present';
+                    let remarks = 'On Time • Full Session';
+                    if ((d + num) % 19 === 0) {
+                        status = 'Absent';
+                        remarks = 'Informed Medical / Leave';
+                    } else if ((d + num) % 11 === 0) {
+                        status = 'Late';
+                        remarks = 'Arrived 15m Late (Physics)';
+                    } else if ((d + num) % 27 === 0) {
+                        status = 'Leave';
+                        remarks = 'Sanctioned Leave';
+                    }
+                    records.push({
+                        date: dateStr,
+                        dayOfWeek: dayOfWeek,
+                        studentId: sId,
+                        status: status,
+                        remarks: remarks
+                    });
+                }
+            }
+        }
+
+        const summary = { Present: 0, Late: 0, Absent: 0, Leave: 0, Holiday: 0, totalWorking: 0 };
+        records.forEach(function (r) {
+            if (r.status === 'Holiday') {
+                summary.Holiday++;
+            } else {
+                summary.totalWorking++;
+                if (summary[r.status] !== undefined) summary[r.status]++;
+            }
+        });
+
+        const attended = summary.Present + summary.Late;
+        const percentage = summary.totalWorking > 0 ? Math.round((attended / summary.totalWorking) * 100) : 100;
+
+        return {
+            student: student,
+            yearMonth: yearMonth,
+            year: year,
+            monthNum: monthNum,
+            records: records,
+            summary: summary,
+            percentage: percentage
+        };
+    }
+
+    function changeStudentAttendanceDate(dateStr) {
+        if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+        state.studentAttendanceDate = dateStr;
+        const month = dateStr.slice(0, 7);
+        if (state.studentAttendanceMonth !== month) {
+            state.studentAttendanceMonth = month;
+            if (state.attendanceLoadedMonth !== month) {
+                loadAttendanceMonth(month);
+            }
+        }
+        renderMainContent();
+    }
+
+    function changeStudentAttendanceMonth(offsetOrMonth) {
+        const now = new Date();
+        const current = state.studentAttendanceMonth || [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0')].join('-');
+        if (typeof offsetOrMonth === 'number') {
+            const parts = current.split('-').map(Number);
+            const d = new Date(parts[0], parts[1] - 1 + offsetOrMonth, 1);
+            state.studentAttendanceMonth = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0')].join('-');
+        } else if (typeof offsetOrMonth === 'string' && /^\d{4}-\d{2}$/.test(offsetOrMonth)) {
+            state.studentAttendanceMonth = offsetOrMonth;
+        }
+        if (state.attendanceLoadedMonth !== state.studentAttendanceMonth) {
+            loadAttendanceMonth(state.studentAttendanceMonth);
+        }
+        renderMainContent();
+    }
+
+    function renderStudentAttendanceView() {
+        const curStudent = (state.students || []).find(function (s) {
+            return s.id === state.activeStudentId || s.roll === (state.currentUser && state.currentUser.identifier);
+        }) || (state.students && state.students[0]) || { id: 's1', name: 'Aarav Sharma', roll: 'DC-101' };
+
+        const curBatch = (state.batches || []).find(function (b) {
+            return (b.studentIds || []).includes(curStudent.id) || (b.studentIds || []).includes(curStudent.roll);
+        }) || (state.batches && state.batches[0]) || { name: 'Alpha Batch', subject: 'Physics, Chemistry, Maths', room: 'Lecture Hall 101', teacher: 'Er. Rajesh Chahar' };
+
+        const now = new Date();
+        const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+        const yDate = new Date(now.getTime() - 86400000);
+        const yesterday = [yDate.getFullYear(), String(yDate.getMonth() + 1).padStart(2, '0'), String(yDate.getDate()).padStart(2, '0')].join('-');
+
+        if (!state.studentAttendanceDate) {
+            state.studentAttendanceDate = today;
+        }
+        if (!state.studentAttendanceMonth) {
+            state.studentAttendanceMonth = state.studentAttendanceDate.slice(0, 7);
+        }
+
+        const data = getStudentAttendanceData(curStudent.id, state.studentAttendanceMonth);
+        const monthDate = new Date(data.year, data.monthNum - 1, 1);
+        const monthLabel = monthDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+        const selectedDate = state.studentAttendanceDate;
+        const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+        const selectedDateLabel = selectedDateObj.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+
+        let selectedRecord = data.records.find(function (r) { return r.date === selectedDate; });
+        if (!selectedRecord) {
+            const isSun = selectedDateObj.getDay() === 0;
+            selectedRecord = {
+                date: selectedDate,
+                status: isSun ? 'Holiday' : 'Present',
+                remarks: isSun ? 'Sunday Weekly Off' : 'Regular Class Session • Verified'
+            };
+        }
+
+        const batchStudents = getAttendanceBatchStudents(curBatch, state.batches || [], state.students || []);
+        const classmatesOnDate = batchStudents.map(function (s) {
+            const isCur = String(s.id) === String(curStudent.id) || String(s.roll) === String(curStudent.roll);
+            if (isCur) {
+                return { student: s, status: selectedRecord.status, remarks: selectedRecord.remarks };
+            }
+            const sData = getStudentAttendanceData(s.id, selectedDate.slice(0, 7));
+            const sRec = sData.records.find(function (r) { return r.date === selectedDate; }) || {
+                status: (selectedDateObj.getDay() === 0) ? 'Holiday' : 'Present',
+                remarks: 'Regular Session'
+            };
+            return { student: s, status: sRec.status, remarks: sRec.remarks };
+        });
+        const classmatesPresentCount = classmatesOnDate.filter(function (c) { return c.status === 'Present' || c.status === 'Late'; }).length;
+
+        const pct = data.percentage;
+        const pctBadge = pct >= 85
+            ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300"><i class="fa-solid fa-circle-check mr-1"></i>Excellent (> 85%)</span>'
+            : (pct >= 75
+                ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Good (75-84%)</span>'
+                : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300"><i class="fa-solid fa-circle-xmark mr-1"></i>Low (< 75%)</span>');
+
+        const initials = (curStudent.name || 'S').split(/\s+/).slice(0, 2).map(function (p) { return p.charAt(0); }).join('').toUpperCase();
+        const photo = curStudent.photo || curStudent.photoUrl || '';
+
+        return `
+            <div class="fade-in space-y-6">
+                <!-- Header Banner -->
+                <div class="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-5 sm:p-7 shadow-lg border border-indigo-800/40">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-white/10 border-2 border-indigo-400/40 p-1 flex items-center justify-center shrink-0 shadow-md">
+                                ${photo
+                                    ? `<img src="${escapeAttr(photo)}" alt="${escapeAttr(curStudent.name)}" class="w-full h-full object-cover rounded-xl">`
+                                    : `<div class="w-full h-full rounded-xl bg-indigo-600 flex items-center justify-center text-lg font-bold text-white">${escapeHtml(initials)}</div>`}
+                            </div>
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 class="text-xl sm:text-2xl font-bold font-heading text-white">${escapeHtml(curStudent.name)}</h2>
+                                    <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white/20 text-indigo-200">Roll: ${escapeHtml(curStudent.roll)}</span>
+                                </div>
+                                <p class="text-xs text-indigo-200 mt-1 flex items-center gap-2">
+                                    <i class="fa-solid fa-graduation-cap"></i> ${escapeHtml(curBatch.name)} • Mentor: ${escapeHtml(curBatch.teacher || 'Faculty')}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Month Selector Controls -->
+                        <div class="flex items-center gap-2 bg-white/10 backdrop-blur-xs p-1.5 rounded-xl border border-white/10 self-start md:self-auto">
+                            <button type="button" onclick="changeStudentAttendanceMonth(-1)" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer" title="Previous Month">
+                                <i class="fa-solid fa-chevron-left text-xs"></i>
+                            </button>
+                            <span class="px-3 text-xs font-bold text-white tracking-wide min-w-[120px] text-center">${monthLabel}</span>
+                            <button type="button" onclick="changeStudentAttendanceMonth(1)" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer" title="Next Month">
+                                <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date Picker & Daily Attendance Spotlight (Optimized for Mobile) -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 shadow-xs">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-base shrink-0">
+                                <i class="fa-solid fa-calendar-day"></i>
+                            </span>
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Select Class Date</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">View daily attendance status & student roster for any day</p>
+                            </div>
+                        </div>
+
+                        <!-- Date input and quick toggles -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="date" value="${selectedDate}" onchange="changeStudentAttendanceDate(this.value)" class="rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-100 shadow-2xs focus:ring-2 focus:ring-indigo-500">
+                            <button type="button" onclick="changeStudentAttendanceDate('${today}')" class="px-3 py-2 rounded-xl text-xs font-bold ${selectedDate === today ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'} transition cursor-pointer">Today</button>
+                            <button type="button" onclick="changeStudentAttendanceDate('${yesterday}')" class="px-3 py-2 rounded-xl text-xs font-bold ${selectedDate === yesterday ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'} transition cursor-pointer">Yesterday</button>
+                        </div>
+                    </div>
+
+                    <!-- Daily Status Spotlight Card for the Selected Date -->
+                    <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/60">
+                        <div class="rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border ${
+                            selectedRecord.status === 'Present' ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' :
+                            (selectedRecord.status === 'Late' ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' :
+                            (selectedRecord.status === 'Absent' ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800' :
+                            (selectedRecord.status === 'Leave' ? 'bg-sky-50/80 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800' :
+                            'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700')))
+                        }">
+                            <div class="flex items-start gap-3.5">
+                                <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 ${
+                                    selectedRecord.status === 'Present' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' :
+                                    (selectedRecord.status === 'Late' ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20' :
+                                    (selectedRecord.status === 'Absent' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20' :
+                                    (selectedRecord.status === 'Leave' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' :
+                                    'bg-slate-400 text-white')))
+                                }">
+                                    <i class="fa-solid ${
+                                        selectedRecord.status === 'Present' ? 'fa-check' :
+                                        (selectedRecord.status === 'Late' ? 'fa-clock' :
+                                        (selectedRecord.status === 'Absent' ? 'fa-xmark' :
+                                        (selectedRecord.status === 'Leave' ? 'fa-envelope-open-text' : 'fa-moon')))
+                                    }"></i>
+                                </div>
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">${selectedDateLabel}</span>
+                                        <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                                            selectedRecord.status === 'Present' ? 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-200' :
+                                            (selectedRecord.status === 'Late' ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-900 dark:text-amber-200' :
+                                            (selectedRecord.status === 'Absent' ? 'bg-rose-200/80 text-rose-900 dark:bg-rose-900 dark:text-rose-200' :
+                                            (selectedRecord.status === 'Leave' ? 'bg-sky-200/80 text-sky-900 dark:bg-sky-900 dark:text-sky-200' :
+                                            'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300')))
+                                        }">
+                                            ${selectedRecord.status === 'Holiday' ? 'Sunday Weekly Off' : selectedRecord.status.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <h4 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                                        ${curStudent.name} is marked <span class="underline">${selectedRecord.status === 'Holiday' ? 'Off' : selectedRecord.status}</span>
+                                    </h4>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                                        ${escapeHtml(selectedRecord.remarks || 'Regular class session verified in institute ledger')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-200/60 dark:border-slate-700/60 text-xs text-slate-500 dark:text-slate-400">
+                                <span class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs font-semibold">
+                                    <i class="fa-solid fa-graduation-cap text-indigo-500"></i> ${escapeHtml(curBatch.name)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Classmates / Students on this Date (Mobile & Desktop) -->
+                        <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                            <div class="flex items-center justify-between mb-2.5">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    <i class="fa-solid fa-users text-indigo-500 mr-1.5"></i>Batch Students on this Date (${classmatesPresentCount}/${classmatesOnDate.length} Present)
+                                </span>
+                                <span class="text-[11px] text-slate-400">Class Roster</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                ${classmatesOnDate.map(function (c) {
+                                    const isMe = String(c.student.id) === String(curStudent.id) || String(c.student.roll) === String(curStudent.roll);
+                                    const sInitials = (c.student.name || '?').split(/\s+/).slice(0, 2).map(function(p){ return p.charAt(0); }).join('').toUpperCase();
+                                    const sBadge = c.status === 'Present' ? '<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">Present</span>' :
+                                        (c.status === 'Late' ? '<span class="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">Late</span>' :
+                                        (c.status === 'Absent' ? '<span class="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Absent</span>' :
+                                        (c.status === 'Leave' ? '<span class="text-[10px] font-bold text-sky-600 bg-sky-50 dark:bg-sky-950 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-800">Leave</span>' :
+                                        '<span class="text-[10px] font-medium text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md">Off</span>')));
+                                    return `
+                                        <div class="p-2.5 rounded-xl border ${isMe ? 'bg-indigo-50/70 border-indigo-300 dark:bg-indigo-950/40 dark:border-indigo-800 ring-1 ring-indigo-400/30' : 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700/60'} flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-2.5 min-w-0">
+                                                <div class="w-7 h-7 rounded-lg ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'} text-[10px] font-bold flex items-center justify-center shrink-0">
+                                                    ${sInitials}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <p class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(c.student.name || 'Student')} ${isMe ? '<span class="text-[10px] text-indigo-600 font-bold">(You)</span>' : ''}</p>
+                                                    <p class="text-[10px] text-slate-500 dark:text-slate-400">${escapeHtml(c.student.roll || '')}</p>
+                                                </div>
+                                            </div>
+                                            <div class="shrink-0">
+                                                ${sBadge}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4 Key Attendance Metric Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <!-- Metric 1: Rate -->
+                    <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Attendance Rate</p>
+                            <div class="flex items-baseline gap-2 mt-1">
+                                <h3 class="text-2xl sm:text-3xl font-bold font-heading text-slate-900 dark:text-slate-100">${pct}%</h3>
+                            </div>
+                        </div>
+                        <div class="mt-3">${pctBadge}</div>
+                    </div>
+
+                    <!-- Metric 2: Present Days -->
+                    <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Classes Attended</p>
+                            <h3 class="text-2xl sm:text-3xl font-bold font-heading text-emerald-600 dark:text-emerald-400 mt-1">${data.summary.Present} <span class="text-xs font-normal text-slate-400">Days</span></h3>
+                            <p class="text-[11px] text-slate-500 mt-1">+${data.summary.Late} Late entries</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                    </div>
+
+                    <!-- Metric 3: Missed Days -->
+                    <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Classes Missed</p>
+                            <h3 class="text-2xl sm:text-3xl font-bold font-heading text-rose-600 dark:text-rose-400 mt-1">${data.summary.Absent} <span class="text-xs font-normal text-slate-400">Absent</span></h3>
+                            <p class="text-[11px] text-slate-500 mt-1">${data.summary.Leave} Authorized Leave</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-user-xmark"></i>
+                        </div>
+                    </div>
+
+                    <!-- Metric 4: Total Working Days -->
+                    <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Sessions</p>
+                            <h3 class="text-2xl sm:text-3xl font-bold font-heading text-indigo-600 dark:text-indigo-400 mt-1">${data.summary.totalWorking} <span class="text-xs font-normal text-slate-400">Days</span></h3>
+                            <p class="text-[11px] text-slate-500 mt-1">${data.summary.Holiday} Weekly Offs</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly Calendar Grid View -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-xs">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-700/60">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">Monthly Attendance Calendar</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Day-by-day attendance status for ${monthLabel}</p>
+                        </div>
+                        <!-- Legend -->
+                        <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                            <span class="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Present</span>
+                            <span class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Late</span>
+                            <span class="inline-flex items-center gap-1 text-rose-700 dark:text-rose-400 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Absent</span>
+                            <span class="inline-flex items-center gap-1 text-sky-700 dark:text-sky-400 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Leave</span>
+                            <span class="inline-flex items-center gap-1 text-slate-500 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></span> Sunday</span>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 mt-4">
+                        ${data.records.map(function (rec) {
+                            const dParts = rec.date.split('-');
+                            const dayNum = parseInt(dParts[2], 10);
+                            const dayDate = new Date(rec.date + 'T00:00:00');
+                            const dayName = dayDate.toLocaleDateString('en-IN', { weekday: 'short' });
+
+                            let bgClass = 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 text-slate-400';
+                            let badgeHtml = '<span class="text-[10px] text-slate-400 font-medium">Weekly Off</span>';
+                            let icon = '<i class="fa-solid fa-moon text-slate-300"></i>';
+
+                            if (rec.status === 'Present') {
+                                bgClass = 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-200';
+                                badgeHtml = '<span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">Present</span>';
+                                icon = '<i class="fa-solid fa-check text-emerald-600 text-xs"></i>';
+                            } else if (rec.status === 'Late') {
+                                bgClass = 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-200';
+                                badgeHtml = '<span class="text-[10px] font-bold text-amber-700 dark:text-amber-300">Late</span>';
+                                icon = '<i class="fa-solid fa-clock text-amber-600 text-xs"></i>';
+                            } else if (rec.status === 'Absent') {
+                                bgClass = 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-200';
+                                badgeHtml = '<span class="text-[10px] font-bold text-rose-700 dark:text-rose-300">Absent</span>';
+                                icon = '<i class="fa-solid fa-xmark text-rose-600 text-xs"></i>';
+                            } else if (rec.status === 'Leave') {
+                                bgClass = 'bg-sky-50/70 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-200';
+                                badgeHtml = '<span class="text-[10px] font-bold text-sky-700 dark:text-sky-300">Leave</span>';
+                                icon = '<i class="fa-solid fa-envelope-open-text text-sky-600 text-xs"></i>';
+                            }
+
+                            const isSelected = rec.date === selectedDate;
+                            const activeRing = isSelected ? 'ring-2 ring-indigo-600 dark:ring-indigo-400 shadow-md scale-[1.02]' : '';
+                            return `
+                                <div onclick="changeStudentAttendanceDate('${rec.date}')" class="rounded-xl border p-2.5 flex flex-col justify-between transition hover:shadow-sm cursor-pointer ${bgClass} ${activeRing}">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : ''}">${dayNum}</span>
+                                        <span class="text-[10px] uppercase font-semibold text-slate-400">${dayName}</span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        ${badgeHtml}
+                                        <span>${icon}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+
+                <!-- Detailed Day-by-Day History Log Table -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xs">
+                    <div class="p-5 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">Attendance Record Log</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Verified daily record maintained by institute management</p>
+                        </div>
+                        <button type="button" onclick="window.print()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-print"></i> Print Statement
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 dark:bg-slate-900/60 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <th class="px-5 py-3">Date</th>
+                                    <th class="px-5 py-3">Day</th>
+                                    <th class="px-5 py-3">Batch & Subject</th>
+                                    <th class="px-5 py-3">Status</th>
+                                    <th class="px-5 py-3">Remarks / Verification</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                                ${data.records.slice().reverse().map(function (rec) {
+                                    const dDate = new Date(rec.date + 'T00:00:00');
+                                    const dayName = dDate.toLocaleDateString('en-IN', { weekday: 'long' });
+                                    const formattedDate = dDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+                                    let badge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Weekly Off</span>';
+                                    if (rec.status === 'Present') badge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"><i class="fa-solid fa-check mr-1"></i>Present</span>';
+                                    else if (rec.status === 'Late') badge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"><i class="fa-solid fa-clock mr-1"></i>Late</span>';
+                                    else if (rec.status === 'Absent') badge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"><i class="fa-solid fa-xmark mr-1"></i>Absent</span>';
+                                    else if (rec.status === 'Leave') badge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"><i class="fa-solid fa-envelope mr-1"></i>Leave</span>';
+
+                                    return `
+                                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                                            <td class="px-5 py-3.5 font-bold text-slate-800 dark:text-slate-200">${formattedDate}</td>
+                                            <td class="px-5 py-3.5 text-slate-500 dark:text-slate-400">${dayName}</td>
+                                            <td class="px-5 py-3.5 text-slate-700 dark:text-slate-300 font-medium">${escapeHtml(curBatch.name)}</td>
+                                            <td class="px-5 py-3.5">${badge}</td>
+                                            <td class="px-5 py-3.5 text-slate-500 dark:text-slate-400 text-[11px]">${escapeHtml(rec.remarks || 'Regular class session')}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 </script>

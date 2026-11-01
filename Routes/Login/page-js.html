@@ -1,0 +1,8 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+            const mount = document.getElementById('login-screen-mount');
+            if (mount && typeof renderLoginScreenView === 'function') {
+                mount.innerHTML = renderLoginScreenView();
+            }
+        });
+</script>

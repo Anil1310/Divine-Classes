@@ -1,0 +1,215 @@
+# Divine Classes — Complete User & Operations Guide
+## Step-by-Step Instructions for Administrators, Faculty, Students & Parents
+
+---
+
+## 📌 Table of Contents
+1. [General Overview & System Access](#1-general-overview--system-access)
+2. [Administrator & Director Guide](#2-administrator--director-guide)
+3. [Teacher & Faculty Guide](#3-teacher--faculty-guide)
+4. [Student & Parent Guide](#4-student--parent-guide)
+5. [Report Card Generation & Verification Guide](#5-report-card-generation--verification-guide)
+6. [Fee Management & UPI Receipts](#6-fee-management--upi-receipts)
+7. [System Settings & Database Maintenance](#7-system-settings--database-maintenance)
+8. [Troubleshooting & FAQs](#8-troubleshooting--faqs)
+
+---
+
+## 1. General Overview & System Access
+
+The **Divine Classes Web App** runs in any web browser on smartphones, tablets, laptops, and desktops.
+
+### Web App Access URL
+Open the Google Apps Script Web App URL provided by your administrator:
+```text
+https://script.google.com/macros/s/.../exec
+```
+
+### The Quick Persona Switcher (For Testing & Demo)
+At the top of the interface, a demo/switch pill bar lets you switch between personas instantly:
+- Click **Admin** to manage institute operations.
+- Click **Teacher** to test faculty tools.
+- Click **Student (Priya Patel)** to experience the student portal.
+
+---
+
+## 2. Administrator & Director Guide
+
+### 2.1 Logging In as Administrator
+1. Click the **Profile / Login** button in the header.
+2. Select **Admin Portal**.
+3. Enter your configured **Admin Email** and **Password** (defaults: `admin@divineclasses.in` / `admin123`).
+4. Click **Sign In as Administrator**.
+
+### 2.2 Managing Batches & Student Rosters
+1. Navigate to **Batches & Students** from the sidebar.
+2. **Create a Batch**:
+   - Click `+ Add Batch`.
+   - Enter Batch Name (e.g., *Alpha Batch (JEE Target 2026)*), target subjects (PCM/PCB), and assign a faculty mentor.
+3. **Enroll a Student**:
+   - Click `+ Add Student`.
+   - Input Roll Number (e.g. `DC-102`), Student Name, Contact Number, Parent Name, Total Agreed Fee, and select the Target Batch.
+   - Click **Save Student**.
+
+### 2.3 Recording Tuition Fee Payments
+1. Go to the **Fee Management** module.
+2. Search for the student by Name or Roll Number.
+3. Click **Record Payment**:
+   - Enter Amount Paid (₹).
+   - Select Payment Mode (`UPI`, `Cash`, `Bank Transfer`).
+   - Enter Transaction / Reference ID.
+4. Click **Record & Print Receipt** to generate an official tuition fee receipt immediately.
+
+### 2.4 Managing Faculty & Teachers
+1. Open the **Teachers** module.
+2. Click `+ Add Faculty`.
+3. Fill in Faculty Name, Subject, Qualifications (e.g. *Ex-IITian / Senior Faculty*), Phone, and Batch assignments.
+
+---
+
+## 3. Teacher & Faculty Guide
+
+### 3.1 Logging In as Teacher
+1. Open the login modal and choose **Teacher Login**.
+2. Enter your registered Phone or Email (e.g. `+91 95556 78753`).
+3. Enter your password (default: `teacher123`).
+
+### 3.2 Taking Daily Class Attendance
+1. Click **Attendance** from the navigation sidebar.
+2. Select your assigned batch from the batch dropdown.
+3. The student roster for that batch will load.
+4. Click the attendance status pills for each student:
+   - 🟢 **P**: Present
+   - 🔴 **A**: Absent
+   - 🟡 **L**: Late
+5. Click **Submit Attendance Register** to save.
+
+### 3.3 Entering Offline Test Scores
+1. Go to **Offline Marks Tracker**.
+2. Click `+ Record Test Scores`.
+3. Enter Test Title (e.g., *Minor Test #1 - Kinematics & Vectors*), Date, and Max Marks (e.g., 100).
+4. Enter the obtained score and remarks for each student.
+5. Click **Save Marks**. The system automatically assigns letter grades ($A+, A, B, C$) and calculates percentages.
+
+### 3.4 Uploading Study Materials & DPPs
+1. Go to **Assignments & DPPs**.
+2. Click `Upload Study Material`.
+3. Choose the **Target Batch** (strictly scoped so other batches cannot access it).
+4. Enter Title, Subject, Topic, and paste the Google Drive or PDF link.
+5. Click **Publish Material**.
+
+---
+
+## 4. Student & Parent Guide
+
+### 4.1 Logging In as Student / Parent
+1. Select **Student / Parent Mode** on the login screen.
+2. Enter your **Roll Number** (e.g., `DC-102`).
+3. Enter your registered **Mobile Number** or password (default: `student123`).
+4. Click **Sign In to Student Portal**.
+
+### 4.2 Checking Historical Attendance by Date
+1. On mobile or laptop, tap **Attendance** in the menu.
+2. You will see your batch attendance summary (Present %, Total Classes).
+3. **To check a specific date**:
+   - Use the **Date Picker** calendar input.
+   - Pick any day on the calendar to see if you were marked Present, Absent, or Late with the teacher's time stamp.
+
+### 4.3 Downloading Batch-Specific Study Materials
+1. Tap **Assignments & DPPs** in the menu.
+2. You will strictly see only materials uploaded for **your enrolled batch**.
+3. Tap **Download PDF** on any material card to open or download the practice problem sheet.
+
+### 4.4 Viewing Fee Receipts
+1. Open the student fee summary section on your dashboard.
+2. Tap **Print / View Receipt** to inspect your paid installments, balance due, and official receipt with the institute emblem.
+
+---
+
+## 5. Report Card Generation & Verification Guide
+
+### 5.1 How to Open the Academic Report Card
+1. Navigate to **Offline Marks Tracker** (or student dashboard).
+2. Click the purple **🎓 Print / View Report Card** button next to your name.
+
+### 5.2 What the Report Card Contains:
+- **Institute Emblem Logo**: Official circular Divine Classes badge.
+- **Accreditation Header**: Premier coaching for JEE (Advanced) • NEET-UG • CBSE Boards.
+- **Student Demographics**: Name, Roll Number, Parent Name, Batch, Helpline.
+- **Performance Ledger**: Complete list of offline tests, scores, max marks, percentages, and teacher remarks.
+- **Cumulative Grade**: Automatically calculated overall percentage and grade ($A+, A, B, C$).
+- **Official Seal**: Rotated emerald academic cell verification stamp.
+- **Dynamic Director Signature**: Cursive signature dynamically matched to the active **Admin Name** (`state.settings.adminName`).
+- **Security Hash**: Immutable verification ID (e.g. `DC-VRF-DC102-M4Z8`).
+
+### 5.3 Exporting & Sharing the Report Card
+At the bottom of the report card modal, click any of the action buttons:
+1. **📥 Download PDF**: Generates a high-resolution, pixel-perfect single-page PDF saved directly to your downloads folder.
+2. **🖼️ Download JPEG**: Downloads a high-DPI image copy suitable for gallery viewing.
+3. **🖨️ Print Report Card**: Opens your system print dialog for physical printing on A4 paper.
+4. **💬 Share on WhatsApp**: Opens WhatsApp with a pre-formatted message summary containing marks, grade, verification hash, and signature to send directly to parents or mentors.
+
+---
+
+## 6. Fee Management & UPI Receipts
+
+### 6.1 Recording a Payment:
+1. As Admin, open **Fee Management**.
+2. Click **Record Payment** on the student's row.
+3. Choose Payment Mode: `UPI`, `Cash`, `Bank Transfer`, or `Cheque`.
+4. Enter the Transaction/UTR number.
+
+### 6.2 Generating Receipt:
+- Click **Print / View Receipt** on any student row.
+- The receipt includes the coaching logo, student roll number, breakdown of course fees, total paid, balance due, and authorized signatory.
+
+---
+
+## 7. System Settings & Database Maintenance
+
+### 7.1 Updating Institute & Director Name
+1. Click **Settings** from the Admin navigation.
+2. **Institute Name**: Change from `Divine Classes` if needed.
+3. **Admin Name**: Enter the Director / Academic Head's name (e.g. `Er. Rajesh Chahar`).
+   > *Note: Changing this automatically updates the digital signature on all report cards.*
+4. **Helpline & Address**: Update contact phone numbers and institute address.
+5. Click **Save Settings**.
+
+### 7.2 Cloud Database & Real-Time Sync
+- **Primary Cloud Database**: Manages live, secure cloud storage for students, batches, tests, materials, gallery, and settings.
+- **Cloud Mirror Backup**: When enabled, copies data to the secondary backup ledger automatically.
+- **Sync with Cloud Button**: Tapping the **Cloud icon** (`<i class="fa-solid fa-cloud"></i>`) in the top navigation manually triggers an instant cloud sync and badge refresh (`✓ Cloud Synced`).
+- **Live Multi-Device Sync**: Settings or records edited on a desktop or laptop browser appear automatically on mobile APKs within 4 seconds or when resuming the app.
+
+### 7.3 Master Admin Password & Developer Recovery
+- Administrators can update their master login password at any time via **Access Control** or **Settings**.
+- Whenever changed, the new password is automatically saved to the Cloud database.
+- The Lead Developer console features an **eye toggle** next to the Master Admin Password field, allowing the developer to reveal the plaintext password and assist the administrator if forgotten.
+
+### 7.4 Client Handover & Permanent Demo Data Clearance
+- **Create Dummy Data**: Initializes standard demo records and tables for walkthroughs and testing.
+- **Clear Dummy Data**: Permanently removes all sample students, batches, tests, and demo notifications (clearing notification badges to 0).
+- **Protected Permanently**: All genuine client records, external study links, and institute configuration settings remain safely intact forever.
+
+---
+
+## 8. Troubleshooting & FAQs
+
+### Q1: Why is my student attendance screen blank?
+**A**: Ensure your student account has an assigned `batchId`. When logged in as a student, the register automatically filters by your batch. If you are newly enrolled, verify your batch assignment in the Admin portal.
+
+### Q2: Why can't I see study materials from other batches?
+**A**: This is an intentional security and privacy feature. The system strictly scopes study materials so each student only sees resources uploaded for their specific batch.
+
+### Q3: How do I change the Director's name on the report card?
+**A**: Go to **Settings** $\rightarrow$ **Admin Name**, edit the name, and click Save. The signature and printed title will update immediately across all report cards.
+
+### Q4: How do I save the report card as a PDF on my smartphone?
+**A**: Tap the **Download PDF** button at the bottom of the report card modal. Your smartphone will save the `.pdf` file directly to your Files / Downloads folder.
+
+### Q5: How can I recover the Admin password if it is forgotten?
+**A**: Master admin passwords are saved securely to the Cloud. The Lead Developer (`anil.chahar170@gmail.com`) can inspect the password via the eye toggle in the Settings Console and restore access for the administrator.
+
+### Q6: If I change a setting on my computer, will it update on my phone?
+**A**: Yes. The system runs an automated bi-directional live sync loop every 4 seconds. Any update made on a computer browser is instantly pushed to the mobile APK as soon as the app is opened or focused.
+

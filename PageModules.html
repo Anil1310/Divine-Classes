@@ -1,0 +1,206 @@
+<style>
+#main-content[data-page-module="attendance"] .dc-page-root { display: contents; }
+#main-content[data-page-module="batches"] .dc-page-root { display: contents; }
+#main-content[data-page-module="fees"] .dc-page-root { display: contents; }
+#main-content[data-page-module="materials"] .dc-page-root { display: contents; }
+#main-content[data-page-module="marks"] .dc-page-root { display: contents; }
+#main-content[data-page-module="teachers"] .dc-page-root { display: contents; }
+#main-content[data-page-module="gallery"] .dc-page-root { display: contents; }
+#main-content[data-page-module="links"] .dc-page-root { display: contents; }
+#main-content[data-page-module="feedback"] .dc-page-root { display: contents; }
+#main-content[data-page-module="settings"] .dc-page-root { display: contents; }
+</style>
+<div hidden aria-hidden="true">
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-attendance" data-app-section="attendance" data-sheet-tab="Attendance_Register"><section class="dc-page-root" data-page-root="attendance"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-batches" data-app-section="batches" data-sheet-tab="Batches_Roster"><section class="dc-page-root" data-page-root="batches"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-fees" data-app-section="fees" data-sheet-tab="Students_Master"><section class="dc-page-root" data-page-root="fees"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-materials" data-app-section="materials" data-sheet-tab="Materials_Repository"><section class="dc-page-root" data-page-root="materials"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-marks" data-app-section="marks" data-sheet-tab="Offline_Test_Marks"><section class="dc-page-root" data-page-root="marks"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-teachers" data-app-section="teachers" data-sheet-tab="Teachers_Roster"><section class="dc-page-root" data-page-root="teachers"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-gallery" data-app-section="gallery" data-sheet-tab="Gallery_Banners"><section class="dc-page-root" data-page-root="gallery"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-links" data-app-section="links" data-sheet-tab="External_Links_Hub"><section class="dc-page-root" data-page-root="links"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-feedback" data-app-section="feedback" data-sheet-tab="Feedback_Responses"><section class="dc-page-root" data-page-root="feedback"></section></template>
+<!-- The legacy renderer supplies this page's content. -->
+<template id="dc-page-settings" data-app-section="settings" data-sheet-tab="Settings_Config"><section class="dc-page-root" data-page-root="settings"></section></template>
+</div>
+<script>
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["attendance"] = {
+  "id": "attendance",
+  "sheet": "Attendance_Register",
+  "templateId": "dc-page-attendance",
+  "renderer": "renderAttendanceView",
+  "access": [
+    "admin",
+    "developer",
+    "teacher",
+    "student"
+  ]
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["batches"] = {
+  "id": "batches",
+  "sheet": "Batches_Roster",
+  "templateId": "dc-page-batches",
+  "renderer": "renderBatchesView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["fees"] = {
+  "id": "fees",
+  "sheet": "Students_Master",
+  "templateId": "dc-page-fees",
+  "renderer": "renderFeesView",
+  "access": [
+    "admin",
+    "developer"
+  ]
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["materials"] = {
+  "id": "materials",
+  "sheet": "Materials_Repository",
+  "templateId": "dc-page-materials",
+  "renderer": "renderMaterialsView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["marks"] = {
+  "id": "marks",
+  "sheet": "Offline_Test_Marks",
+  "templateId": "dc-page-marks",
+  "renderer": "renderMarksView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["teachers"] = {
+  "id": "teachers",
+  "sheet": "Teachers_Roster",
+  "templateId": "dc-page-teachers",
+  "renderer": "renderTeachersView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["gallery"] = {
+  "id": "gallery",
+  "sheet": "Gallery_Banners",
+  "templateId": "dc-page-gallery",
+  "renderer": "renderGalleryView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["links"] = {
+  "id": "links",
+  "sheet": "External_Links_Hub",
+  "templateId": "dc-page-links",
+  "renderer": "renderLinksView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["feedback"] = {
+  "id": "feedback",
+  "sheet": "Feedback_Responses",
+  "templateId": "dc-page-feedback",
+  "renderer": "renderFeedbackView",
+  "access": []
+};
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["settings"] = {
+  "id": "settings",
+  "sheet": "Settings_Config",
+  "templateId": "dc-page-settings",
+  "renderer": "renderSettingsView",
+  "access": [
+    "developer"
+  ]
+};
+window.DIVINE_PAGE_BACKENDS = {
+  "attendance": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiGetMonthlyAttendance",
+      "apiSaveDailyAttendance"
+    ]
+  },
+  "batches": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave",
+      "apiDatabaseGet",
+      "apiDatabaseUpdateStudentStatus"
+    ]
+  },
+  "fees": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave",
+      "apiGetNotifications"
+    ]
+  },
+  "materials": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiUploadMaterialToDrive",
+      "apiDeleteMaterial"
+    ]
+  },
+  "marks": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave"
+    ]
+  },
+  "teachers": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave",
+      "apiUpdateTeacherAuth",
+      "apiUpdateTeacherProfile"
+    ]
+  },
+  "gallery": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave"
+    ]
+  },
+  "links": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave"
+    ]
+  },
+  "feedback": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave"
+    ]
+  },
+  "settings": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiDatabaseSave",
+      "apiUpdateAdminPassword"
+    ]
+  }
+};
+</script>
