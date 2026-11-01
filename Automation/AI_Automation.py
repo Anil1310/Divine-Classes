@@ -10,6 +10,8 @@ import subprocess
 import datetime
 import shutil
 import json
+import re
+import urllib.request
 from urllib.parse import urlencode, urlparse
 
 # Color Codes
@@ -91,11 +93,14 @@ def print_banner(project_path):
     branch, remote = get_git_info(project_path) if project_path else ("unknown", None)
     border = "━" * 74
     print(f"\n{CYAN}{border}{RESET}")
-    print(f"{CYAN}  {BOLD}DEVOPS CONTROL CENTER{RESET}{CYAN}  /  GitHub · Netlify · Apps Script{RESET}")
+    print(f"{CYAN}  {BOLD}DEVOPS CONTROL CENTER{RESET}{CYAN}  /  GitHub · Vercel · Netlify · Apps Script{RESET}")
     print(f"{CYAN}{border}{RESET}")
     print(f"  {DIM}PROJECT{RESET}  {BOLD}{proj_name}{RESET}  {DIM}·  BRANCH{RESET}  {GREEN}{branch}{RESET}")
     print(f"  {DIM}PATH{RESET}     {project_path}")
     print(f"  {DIM}ORIGIN{RESET}   {remote or 'Not configured'}")
+    vercel_url = get_vercel_site_url(project_path) if project_path else None
+    if vercel_url:
+        print(f"  {DIM}VERCEL{RESET}   {CYAN}{vercel_url}{RESET} {DIM}(Dashboard: {get_vercel_dashboard_url(project_path)}){RESET}")
     print(f"{CYAN}{border}{RESET}\n")
 
 
@@ -178,8 +183,149 @@ def get_netlify_site_url(project_dir):
     return f"{site_url.rstrip('/')}/"
 
 
+def get_vercel_site_url(project_dir):
+    """Read the configured Vercel site URL for a project."""
+    if not project_dir:
+        return None
+    config_path = os.path.join(project_dir, ".vercel-site.json")
+    if os.path.isfile(config_path):
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("siteUrl") or data.get("url")
+        except Exception:
+            pass
+    if os.path.isfile(os.path.join(project_dir, "vercel.json")):
+        return "https://divineclasses.vercel.app"
+    return None
+
+
+def get_vercel_dashboard_url(project_dir=None):
+    """Return the Vercel dashboard URL."""
+    if project_dir:
+        config_path = os.path.join(project_dir, ".vercel-site.json")
+        if os.path.isfile(config_path):
+            try:
+                with open(config_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data.get("dashboardUrl"):
+                        return data.get("dashboardUrl")
+            except Exception:
+                pass
+    return "https://vercel.com/anil-392f"
+
+
+def compile_index_html(project_dir):
+    """Compile modular Apps Script components into a unified standalone index.html for Vercel/Web."""
+    page_path = os.path.join(project_dir, "Routes", "Home", "page.html")
+    if not os.path.isfile(page_path):
+        return False
+
+    includes = {
+        "css": os.path.join(project_dir, "css.html"),
+        "PageModules": os.path.join(project_dir, "PageModules.html"),
+        "supabase": os.path.join(project_dir, "supabase.html"),
+        "attendance": os.path.join(project_dir, "attendance.html"),
+        "javascript": os.path.join(project_dir, "javascript.html"),
+    }
+
+    try:
+        with open(page_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        pattern = re.compile(r"<\?!=\s*include\('([^']+)'\)\s*;\s*\?>")
+
+        def replacer(match):
+            name = match.group(1)
+            inc_file = includes.get(name)
+            if inc_file and os.path.isfile(inc_file):
+                with open(inc_file, "r", encoding="utf-8") as inc:
+                    return inc.read()
+            return match.group(0)
+
+        compiled = pattern.sub(replacer, content)
+        out_path = os.path.join(project_dir, "index.html")
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(compiled)
+
+        lines = len(compiled.splitlines())
+        size_kb = len(compiled.encode("utf-8")) / 1024
+        print(f"{GREEN}✓ Compiled index.html for Vercel ({lines:,} lines, {size_kb:.1f} KB){RESET}")
+        return True
+    except Exception as e:
+        print(f"{RED}Error compiling index.html: {e}{RESET}")
+        return False
+
+
+def deploy_vercel(project_dir):
+    """Compile index.html and trigger Vercel edge deployment via GitHub."""
+    print(f"\n{CYAN}⚡ Building and Deploying to Vercel...{RESET}")
+    compiled = compile_index_html(project_dir)
+    if not compiled:
+        print(f"{RED}Could not compile index.html. Ensure project has Routes/Home/page.html.{RESET}")
+        return
+
+    branch, remote = get_git_info(project_dir)
+    if remote:
+        print(f"\n{CYAN}Pushing latest build to GitHub to trigger Vercel Edge build...{RESET}")
+        quick_push(project_dir)
+    else:
+        print(f"{YELLOW}No GitHub remote found. Vercel auto-deploys via GitHub commits.{RESET}")
+
+    url = get_vercel_site_url(project_dir) or "https://divineclasses.vercel.app"
+    dash = get_vercel_dashboard_url(project_dir)
+    print(f"\n{GREEN}{BOLD}🎉 Live Vercel Site: {url}{RESET}")
+    print(f"  {DIM}Vercel Dashboard: {dash}{RESET}")
+    try:
+        choice = input(f"{YELLOW}Open site in web browser? (Y/n): {RESET}").strip().lower()
+        if choice in ("", "y", "yes"):
+            subprocess.run(["open", url])
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
+def check_vercel_status(project_dir):
+    """Check live status of the Vercel site."""
+    url = get_vercel_site_url(project_dir) or "https://divineclasses.vercel.app"
+    dash = get_vercel_dashboard_url(project_dir)
+    print(f"\n{CYAN}Checking Vercel site status: {url}...{RESET}")
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            code = response.getcode()
+            headers = dict(response.info())
+            server = headers.get("server", "Vercel")
+            cache = headers.get("cache-control", "None")
+            age = headers.get("age", "0")
+            print(f"{GREEN}✅ HTTP Status: {code} OK{RESET}")
+            print(f"  {DIM}Server:{RESET} {server}")
+            print(f"  {DIM}Cache-Control:{RESET} {cache}")
+            print(f"  {DIM}Cache Age:{RESET} {age}s")
+            print(f"  {DIM}Live Site:{RESET} {url}")
+            print(f"  {DIM}Dashboard:{RESET} {dash}")
+    except Exception as e:
+        print(f"{RED}❌ Could not connect to {url}: {e}{RESET}")
+
+
+def open_vercel_site(project_dir):
+    """Open the live Vercel site in the default browser."""
+    url = get_vercel_site_url(project_dir) or "https://divineclasses.vercel.app"
+    print(f"\n{CYAN}Opening {url}...{RESET}")
+    subprocess.run(["open", url])
+
+
+def open_vercel_dashboard(project_dir=None):
+    """Open Vercel dashboard in the browser."""
+    dash = get_vercel_dashboard_url(project_dir)
+    print(f"\n{CYAN}Opening Vercel Dashboard: {dash}...{RESET}")
+    subprocess.run(["open", dash])
+
+
 def quick_push(project_dir):
-    """Stage, commit, push, and automatically deploy to Netlify."""
+    """Stage, commit, push, and automatically deploy to Vercel and Netlify."""
     proj_name = os.path.basename(project_dir)
     branch, remote = get_git_info(project_dir)
 
@@ -187,6 +333,9 @@ def quick_push(project_dir):
         print(f"{RED}❌ No 'origin' remote is configured for this project.{RESET}")
         print("Add your GitHub repository with: git remote add origin <repository-url>")
         return
+
+    # Automatically compile index.html for Vercel edge deployment if applicable
+    compile_index_html(project_dir)
 
     print(f"\n{CYAN}--------------------------------------------------------{RESET}")
     print(f"🚀 {BOLD}Auto-Pushing:{RESET} {GREEN}{proj_name}{RESET} -> {BLUE}{remote}{RESET}")
@@ -221,8 +370,13 @@ def quick_push(project_dir):
 
     if success:
         print(f"\n{GREEN}{BOLD}🎉 SUCCESS! All changes pushed to GitHub successfully.{RESET}")
-        print(f"\n{CYAN}🚀 Automatically deploying updated changes to Netlify...{RESET}")
-        deploy_netlify(project_dir, auto=True)
+        vercel_url = get_vercel_site_url(project_dir)
+        if vercel_url:
+            print(f"\n{GREEN}⚡ Vercel Edge Deployment triggered:{RESET} {CYAN}{vercel_url}{RESET}")
+            print(f"  {DIM}Dashboard:{RESET} {get_vercel_dashboard_url(project_dir)}")
+        if os.path.exists(os.path.join(project_dir, ".netlify-site.json")) or os.path.exists(os.path.join(project_dir, "netlify.toml")):
+            print(f"\n{CYAN}🚀 Automatically deploying updated changes to Netlify...{RESET}")
+            deploy_netlify(project_dir, auto=True)
     else:
         print(f"\n{RED}❌ Push failed. Please check remote origin.{RESET}")
 
@@ -602,24 +756,31 @@ def main():
     auto_choice = sys.argv[1].strip() if len(sys.argv) > 1 else None
     menu_groups = {
         "1": ("GITHUB", [
-            (1, "Quick Push", "Stage, commit, push changes, and auto-deploy to Netlify", "↑"),
+            (1, "Quick Push", "Stage, commit, push changes, and auto-deploy to Vercel/Netlify", "↑"),
             (2, "Quick Pull", "Fetch and merge the latest remote changes", "↓"),
             (3, "Create Repository", "Create and publish a new GitHub repository", "+"),
             (4, "Clone Repository", "Clone a GitHub repository to your Desktop", "⇩"),
             (5, "Delete Repository", "Permanently delete a GitHub repository", "×"),
         ]),
-        "2": ("NETLIFY", [
-            (6, "Deploy Site", "Deploy a project to Netlify", "▲"),
-            (7, "Connect GitHub Repository", "Set up a Netlify site from a GitHub repository", "↗"),
-            (8, "Delete Netlify Site", "Permanently delete a Netlify project", "×"),
+        "2": ("VERCEL", [
+            (6, "Compile / Build index.html", "Package modular components into unified index.html for Vercel", "⚡"),
+            (7, "Deploy to Vercel", "Build index.html and push to GitHub edge deployment", "▲"),
+            (8, "Live Site Status", "Verify HTTP response and status from divineclasses.vercel.app", "✓"),
+            (9, "Open Vercel Live Site", "Open divineclasses.vercel.app in web browser", "↗"),
+            (10, "Open Vercel Dashboard", "Open vercel.com/anil-392f management console", "⚙"),
         ]),
-        "3": ("GOOGLE APPS SCRIPT", [
-            (9, "Deploy Apps Script", "Push source and update or create deployment", "↥"),
+        "3": ("NETLIFY", [
+            (11, "Deploy Site", "Deploy a project to Netlify", "▲"),
+            (12, "Connect GitHub Repository", "Set up a Netlify site from a GitHub repository", "↗"),
+            (13, "Delete Netlify Site", "Permanently delete a Netlify project", "×"),
         ]),
-        "4": ("WORKSPACE", [
-            (10, "Project Status", "View recent commits and working-tree changes", "≡"),
-            (11, "Switch Project", "Choose another local Git project", "⇄"),
-            (12, "Exit", "Close the automation center", "×"),
+        "4": ("GOOGLE APPS SCRIPT", [
+            (14, "Deploy Apps Script", "Push source and update or create deployment", "↥"),
+        ]),
+        "5": ("WORKSPACE", [
+            (15, "Project Status", "View recent commits and working-tree changes", "≡"),
+            (16, "Switch Project", "Choose another local Git project", "⇄"),
+            (17, "Exit", "Close the automation center", "×"),
         ]),
     }
 
@@ -631,13 +792,14 @@ def main():
             print_banner(target_project)
             print(f"  {DIM}CATEGORIES{RESET}")
             print(f"  {GREEN}[1]{RESET}  {CYAN}{BOLD}GitHub{RESET}               {DIM}Repository and source control{RESET}")
-            print(f"  {GREEN}[2]{RESET}  {CYAN}{BOLD}Netlify{RESET}              {DIM}Hosting and deployments{RESET}")
-            print(f"  {GREEN}[3]{RESET}  {CYAN}{BOLD}Google Apps Script{RESET}   {DIM}Script source and deployments{RESET}")
-            print(f"  {GREEN}[4]{RESET}  {CYAN}{BOLD}Workspace{RESET}            {DIM}Project tools and exit{RESET}")
+            print(f"  {GREEN}[2]{RESET}  {CYAN}{BOLD}Vercel{RESET}               {DIM}Edge deployment & web build{RESET}")
+            print(f"  {GREEN}[3]{RESET}  {CYAN}{BOLD}Netlify{RESET}              {DIM}Hosting and deployments{RESET}")
+            print(f"  {GREEN}[4]{RESET}  {CYAN}{BOLD}Google Apps Script{RESET}   {DIM}Script source and deployments{RESET}")
+            print(f"  {GREEN}[5]{RESET}  {CYAN}{BOLD}Workspace{RESET}            {DIM}Project tools and exit{RESET}")
             print(f"  {DIM}[0]  Exit{RESET}\n")
 
             try:
-                category = input(f"{YELLOW}{BOLD}  SELECT CATEGORY [0-4]: {RESET}").strip()
+                category = input(f"{YELLOW}{BOLD}  SELECT CATEGORY [0-5]: {RESET}").strip()
             except (EOFError, KeyboardInterrupt):
                 print("\nExiting...")
                 break
@@ -648,7 +810,7 @@ def main():
 
             menu_group = menu_groups.get(category)
             if not menu_group:
-                print(f"{RED}Invalid category. Choose a number from 0 to 4.{RESET}")
+                print(f"{RED}Invalid category. Choose a number from 0 to 5.{RESET}")
                 continue
 
             choice = print_menu_section(*menu_group)
@@ -670,16 +832,26 @@ def main():
         elif choice == "5":
             delete_github(target_project)
         elif choice == "6":
-            deploy_netlify(target_project)
+            compile_index_html(target_project)
         elif choice == "7":
-            create_netlify_site(target_project)
+            deploy_vercel(target_project)
         elif choice == "8":
-            delete_netlify(target_project)
+            check_vercel_status(target_project)
         elif choice == "9":
-            deploy_apps_script(target_project)
+            open_vercel_site(target_project)
         elif choice == "10":
-            view_status(target_project)
+            open_vercel_dashboard(target_project)
         elif choice == "11":
+            deploy_netlify(target_project)
+        elif choice == "12":
+            create_netlify_site(target_project)
+        elif choice == "13":
+            delete_netlify(target_project)
+        elif choice == "14":
+            deploy_apps_script(target_project)
+        elif choice == "15":
+            view_status(target_project)
+        elif choice == "16":
             all_projs = list_desktop_projects()
             print(f"\n{BOLD}Available Desktop Projects:{RESET}")
             for i, p in enumerate(all_projs, start=1):
@@ -692,11 +864,11 @@ def main():
                     print(f"{GREEN}Switched to: {os.path.basename(target_project)}{RESET}")
             except (EOFError, KeyboardInterrupt):
                 pass
-        elif choice in ("12", "q", "exit"):
+        elif choice in ("17", "q", "exit"):
             print(f"\n{GREEN}Goodbye! 👋{RESET}\n")
             break
         else:
-            print(f"{RED}Invalid selection. Please choose 1 to 12.{RESET}")
+            print(f"{RED}Invalid selection. Please choose 1 to 17.{RESET}")
 
         try:
             input(f"\n{DIM}Press [ENTER] to return to menu...{RESET}")
