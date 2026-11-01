@@ -58,12 +58,15 @@ def get_current_project():
 def list_desktop_projects():
     """List all Desktop git projects."""
     projects = []
-    if os.path.isdir(DESKTOP_DIR):
-        for entry in sorted(os.listdir(DESKTOP_DIR)):
-            full_path = os.path.join(DESKTOP_DIR, entry)
-            if os.path.isdir(full_path) and os.path.exists(os.path.join(full_path, ".git")):
-                if entry not in ("GitHub Automation", "_GitHub Automation"):
-                    projects.append(full_path)
+    try:
+        if os.path.isdir(DESKTOP_DIR):
+            for entry in sorted(os.listdir(DESKTOP_DIR)):
+                full_path = os.path.join(DESKTOP_DIR, entry)
+                if os.path.isdir(full_path) and os.path.exists(os.path.join(full_path, ".git")):
+                    if entry not in ("GitHub Automation", "_GitHub Automation"):
+                        projects.append(full_path)
+    except (OSError, PermissionError):
+        pass
     return projects
 
 
