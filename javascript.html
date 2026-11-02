@@ -33,6 +33,8 @@
                     schedule: 'Mon - Fri • 08:00 AM - 12:30 PM',
                     room: 'Lecture Hall 101 (Smart AC)',
                     teacher: 'Er. Rajesh Chahar (Ex-IITian)',
+                    teacherId: 'tr1',
+                    teacherEmail: 'rajesh.chahar@divineclasses.in',
                     studentIds: ['s1', 's2', 's3', 's4', 's10']
                 },
                 {
@@ -42,6 +44,8 @@
                     schedule: 'Mon - Sat • 01:30 PM - 06:00 PM',
                     room: 'Medical Hall 202',
                     teacher: 'Dr. Sunita Sharma (M.D. AIIMS)',
+                    teacherId: 'tr2',
+                    teacherEmail: 'dr.sunita@divineclasses.in',
                     studentIds: ['s5', 's6', 's7']
                 },
                 {
@@ -51,6 +55,8 @@
                     schedule: 'Tue, Thu, Sat • 04:30 PM - 07:00 PM',
                     room: 'Classroom 104',
                     teacher: 'Mr. Arvind Verma (M.Sc. Gold Medalist)',
+                    teacherId: 'tr3',
+                    teacherEmail: 'arvind.verma@divineclasses.in',
                     studentIds: ['s8', 's9']
                 }
             ],
@@ -1725,10 +1731,41 @@
          ********************************************************************/
         function isBatchAssignedToCurrentTeacher(batch) {
             if (state.currentRole !== 'teacher') return true;
-            const teacher = (state.teachers || []).find(function(item) { return String(item.id) === String(state.activeTeacherId); });
-            return !!teacher && (String(batch.teacherId || '') === String(teacher.id) ||
-                String(batch.teacher || '').trim().toLowerCase() === String(teacher.name || '').trim().toLowerCase() ||
-                String(batch.teacherEmail || '').trim().toLowerCase() === String(teacher.email || '').trim().toLowerCase());
+            if (!batch) return false;
+            const teacher = (state.teachers || []).find(function(item) { 
+                return String(item.id) === String(state.activeTeacherId); 
+            }) || (state.currentUser && state.currentUser.role === 'teacher' ? state.currentUser : null);
+            if (!teacher) return false;
+
+            const tId = String(teacher.id || '').trim();
+            const tEmail = String(teacher.email || teacher.identifier || '').trim().toLowerCase();
+            const bTeacherId = String(batch.teacherId || batch.teacher_id || '').trim();
+            const bTeacherEmail = String(batch.teacherEmail || batch.teacher_email || '').trim().toLowerCase();
+
+            // 1. Direct ID match
+            if (tId && bTeacherId && tId === bTeacherId) return true;
+
+            // 2. Direct Email match
+            if (tEmail && bTeacherEmail && tEmail === bTeacherEmail) return true;
+
+            // 3. Name match with normalized titles / suffixes stripped (e.g. "Er. Rajesh Chahar (Ex-IITian)" matches "Er. Rajesh Chahar")
+            const cleanTName = String(teacher.name || '')
+                .toLowerCase()
+                .replace(/\(.*?\)/g, '')
+                .replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '')
+                .trim();
+            const cleanBTeacher = String(batch.teacher || batch.lead_faculty || '')
+                .toLowerCase()
+                .replace(/\(.*?\)/g, '')
+                .replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '')
+                .trim();
+
+            if (cleanTName && cleanBTeacher) {
+                if (cleanTName === cleanBTeacher) return true;
+                if (cleanBTeacher.includes(cleanTName) || cleanTName.includes(cleanBTeacher)) return true;
+            }
+
+            return false;
         }
 
         function canCurrentUserViewStudentProfile(studentId) {
@@ -1765,9 +1802,11 @@
                         <button onclick="openCreateBatchModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
                             <i class="fa-solid fa-plus"></i> Create New Batch
                         </button>
+                        ` : (state.currentRole === 'teacher' ? `
+                        <span class="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5"><i class="fa-solid fa-chalkboard-user"></i> Faculty Portal • Assigned Batches</span>
                         ` : `
                         <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg font-medium">Read-Only in Student View</span>
-                        `}
+                        `)}
                     </div>
 
                     <!-- Batch Cards Grid -->
@@ -1798,7 +1837,7 @@
                                             <h3 class="text-base font-bold text-slate-900 mt-2 font-heading">${escapeHtml(bName)}</h3>
                                             <p class="text-xs text-slate-600 mt-0.5"><strong>Subjects:</strong> ${escapeHtml(bSubject)} • <strong>Mentor:</strong> ${escapeHtml(bTeacher)}</p>
                                         </div>
-                                        ${canManageBatches ? `
+                                        ${(canManageBatches || state.currentRole === 'teacher') ? `
                                         <button onclick="openAddStudentToBatchModal('${bId}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-2xs transition">
                                             <i class="fa-solid fa-user-plus"></i> Add Student
                                         </button>
@@ -1937,8 +1976,8 @@
         }
 
         function openAddStudentToBatchModal(batchId) {
-            if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
-                showToast('Only an administrator can assign students to batches.', 'error');
+            if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
+                showToast('Only administrators or assigned faculty can assign students to batches.', 'error');
                 return;
             }
             const batch = state.batches.find(b => b.id === batchId);
@@ -2055,8 +2094,8 @@
 
         function handleAddExistingStudent(e, batchId) {
             e.preventDefault();
-            if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
-                showToast('Only an administrator can assign students to batches.', 'error');
+            if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
+                showToast('Only administrators or assigned faculty can assign students to batches.', 'error');
                 return;
             }
             const stuId = document.getElementById('existing-student-id').value;
@@ -2074,8 +2113,8 @@
 
         function handleAddNewStudentToBatch(e, batchId) {
             e.preventDefault();
-            if (state.currentRole !== 'admin' && state.currentRole !== 'developer') {
-                showToast('Only an administrator can enroll students into batches.', 'error');
+            if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
+                showToast('Only administrators or assigned faculty can enroll students into batches.', 'error');
                 return;
             }
             if (window.newStudentPhotoProcessing) {
