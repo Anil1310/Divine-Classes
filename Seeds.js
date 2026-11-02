@@ -16,8 +16,7 @@ function getDefaultSeedData() {
         schedule: 'Mon - Fri • 08:00 AM - 12:30 PM',
         room: 'Lecture Hall 101 (Smart AC)',
         teacher: 'Er. Rajesh Chahar (Ex-IITian)',
-        teacherId: 'tr1',
-        studentIds: ['s1', 's2', 's3', 's4', 's10', 's11']
+        studentIds: ['s1', 's2', 's3', 's4', 's10']
       },
       {
         id: 'b2',
@@ -26,7 +25,6 @@ function getDefaultSeedData() {
         schedule: 'Mon - Sat • 01:30 PM - 06:00 PM',
         room: 'Medical Hall 202',
         teacher: 'Dr. Sunita Sharma (M.D. AIIMS)',
-        teacherId: 'tr2',
         studentIds: ['s5', 's6', 's7']
       },
       {
@@ -36,7 +34,6 @@ function getDefaultSeedData() {
         schedule: 'Tue, Thu, Sat • 04:30 PM - 07:00 PM',
         room: 'Classroom 104',
         teacher: 'Mr. Arvind Verma (M.Sc. Gold Medalist)',
-        teacherId: 'tr3',
         studentIds: ['s8', 's9']
       }
     ],
