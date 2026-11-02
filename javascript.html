@@ -437,6 +437,7 @@
             } else {
                 state.notifications = state.notifications.filter(n => n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_') || n.id.startsWith('monthly_fee_')));
             }
+            normalizeAppCollections();
         }
 
         function escapeHtml(str) {
@@ -597,9 +598,33 @@
                     dueDate: s.dueDate || s.fee_due_date || 'Fully Paid',
                     lastReminder: s.lastReminder || s.last_reminder_sent || '-',
                     admissionDate: s.admissionDate || s.admission_date || '',
-                    batchId: s.batchId || s.batch_id || (state.batches[0] ? state.batches[0].id : 'b1')
+                    batchId: s.batchId || s.batch_id || (state.batches[0] ? state.batches[0].id : 'b1'),
+                    photo: s.photo || s.avatar_url || '',
+                    avatarColor: s.avatarColor || s.avatar_color || '#4f46e5',
+                    isDummy: s.isDummy || false,
+                    paymentHistory: Array.isArray(s.paymentHistory) ? s.paymentHistory : []
                 };
             });
+
+            // Auto-heal teachers if any fields are missing or undefined
+            if (Array.isArray(state.teachers)) {
+                state.teachers = state.teachers.map(function (t, idx) {
+                    if (!t || typeof t !== 'object') return t;
+                    const tId = t.id || t.teacher_id || 'tr' + (idx + 1);
+                    return {
+                        id: tId,
+                        name: (t.name && t.name !== 'undefined') ? t.name : (t.teacher_name || ('Faculty ' + tId)),
+                        email: t.email || t.login_email || '',
+                        phone: t.phone || t.contact_phone || '',
+                        password: t.password || t.login_password || 'teacher123',
+                        status: t.status || t.access_status || 'Active',
+                        subject: t.subject || t.subjects || 'Expert Faculty',
+                        qualification: t.qualification || '',
+                        experience: t.experience || '',
+                        avatarColor: t.avatarColor || t.avatar_color || '#4f46e5'
+                    };
+                });
+            }
 
             if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) state.settings = {};
             if (!state.activeTab) state.activeTab = 'dashboard';
@@ -990,12 +1015,33 @@
                 showToast('This section is restricted for the current role. Redirected to Dashboard.', 'warning');
             }
 
-            // Verify authorization if switching to Student
-            if (newRole === 'student') {
-                const cur = state.students.find(s => s.id === state.activeStudentId) || state.students[0];
-                if (cur && cur.status === 'Blocked') {
-                    showAccessBlockedModal('student', cur.name, cur.roll);
+            // Sync active ID, authorization, and currentUser
+            if (newRole === 'teacher') {
+                if (!state.activeTeacherId || !(state.teachers || []).some(t => String(t.id) === String(state.activeTeacherId))) {
+                    state.activeTeacherId = (state.teachers && state.teachers[0] && state.teachers[0].id) || 'tr1';
                 }
+                const curTch = (state.teachers || []).find(t => String(t.id) === String(state.activeTeacherId)) || (state.teachers && state.teachers[0]);
+                if (curTch) {
+                    state.currentUser = { role: 'teacher', id: curTch.id, name: curTch.name, identifier: curTch.email };
+                    if (curTch.status === 'Blocked') {
+                        showAccessBlockedModal('teacher', curTch.name, curTch.email);
+                    }
+                }
+            } else if (newRole === 'student') {
+                if (!state.activeStudentId || !(state.students || []).some(s => String(s.id) === String(state.activeStudentId))) {
+                    state.activeStudentId = (state.students && state.students[0] && state.students[0].id) || 's1';
+                }
+                const curStu = (state.students || []).find(s => String(s.id) === String(state.activeStudentId)) || (state.students && state.students[0]);
+                if (curStu) {
+                    state.currentUser = { role: 'student', id: curStu.id, name: curStu.name, identifier: curStu.roll };
+                    if (curStu.status === 'Blocked') {
+                        showAccessBlockedModal('student', curStu.name, curStu.roll);
+                    }
+                }
+            } else if (newRole === 'admin') {
+                state.currentUser = { role: 'admin', name: (state.settings && state.settings.adminName) || 'Administrator', identifier: 'Admin Master' };
+            } else if (newRole === 'developer') {
+                state.currentUser = { role: 'developer', name: 'Anil', identifier: 'Lead Dev' };
             }
 
             updateRoleUI();
@@ -1319,7 +1365,7 @@
 
             const pageModule = window.DIVINE_PAGE_MODULES && window.DIVINE_PAGE_MODULES[state.activeTab];
             if (pageModule) {
-                container.dataset.pageModule = pageModule.id;
+                if (container.dataset) container.dataset.pageModule = pageModule.id;
                 const allowed = !pageModule.access || pageModule.access.length === 0 || pageModule.access.includes(state.currentRole) || (state.activeTab === 'attendance' && state.currentRole === 'student');
                 const templateExists = document.getElementById(pageModule.templateId);
                 const renderer = (state.activeTab === 'attendance' && state.currentRole === 'student' && typeof window.renderStudentAttendanceView === 'function')
@@ -1330,18 +1376,26 @@
                     return;
                 }
                 if (templateExists && typeof renderer === 'function') {
-                    const pageShell = templateExists.content.cloneNode(true);
-                    const pageRoot = pageShell.querySelector('[data-page-root]');
-                    if (pageRoot) {
-                        pageRoot.innerHTML = renderer();
-                        container.replaceChildren(pageShell);
-                    } else {
-                        container.innerHTML = renderer();
+                    const content = templateExists.content;
+                    if (content && typeof content.cloneNode === 'function') {
+                        const pageShell = content.cloneNode(true);
+                        const pageRoot = pageShell.querySelector('[data-page-root]');
+                        if (pageRoot) {
+                            pageRoot.innerHTML = renderer();
+                            if (typeof container.replaceChildren === 'function') {
+                                container.replaceChildren(pageShell);
+                            } else {
+                                container.innerHTML = '';
+                                container.appendChild(pageShell);
+                            }
+                            return;
+                        }
                     }
+                    container.innerHTML = renderer();
                     return;
                 }
             } else {
-                delete container.dataset.pageModule;
+                if (container.dataset) delete container.dataset.pageModule;
             }
 
             switch (state.activeTab) {
@@ -1742,7 +1796,9 @@
         function isBatchAssignedToCurrentTeacher(batch) {
             if (!batch) return false;
             if (state.currentRole !== 'teacher') return true;
-            const teacher = (state.teachers || []).find(function(item) { return String(item.id) === String(state.activeTeacherId); });
+            const teacher = (state.teachers || []).find(function(item) {
+                return String(item.id) === String(state.activeTeacherId) || (state.currentUser && String(item.id) === String(state.currentUser.id));
+            }) || (state.teachers && state.teachers[0]);
             if (!teacher) return false;
 
             // Direct ID match (supports string, array, or camelCase / snake_case)
@@ -7891,26 +7947,28 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 }
             });
 
-            initTheme();
-            loadCachedData();
-            applyPersistentSettingsOverrides();
+            try { initTheme(); } catch (e) { console.warn('Theme init warning:', e); }
+            try { loadCachedData(); } catch (e) { console.warn('Cache load warning:', e); }
+            try { applyPersistentSettingsOverrides(); } catch (e) { console.warn('Settings overrides warning:', e); }
 
             // Restore Supabase config from dedicated localStorage key (survives cache clears)
-            const savedSupabaseConfig = loadSupabaseConfigFromLocal();
-            if (savedSupabaseConfig && savedSupabaseConfig.supabaseEnabled === true) {
-                if (!state.settings) state.settings = {};
-                state.settings.supabaseEnabled = true;
-                state.settings.supabaseUrl = savedSupabaseConfig.supabaseUrl || '';
-                state.settings.supabaseKey = savedSupabaseConfig.supabaseKey || '';
-                console.log('[Supabase] Restored config from localStorage:', state.settings.supabaseUrl ? 'URL set' : 'URL missing');
-            }
+            try {
+                const savedSupabaseConfig = loadSupabaseConfigFromLocal();
+                if (savedSupabaseConfig && savedSupabaseConfig.supabaseEnabled === true) {
+                    if (!state.settings) state.settings = {};
+                    state.settings.supabaseEnabled = true;
+                    state.settings.supabaseUrl = savedSupabaseConfig.supabaseUrl || '';
+                    state.settings.supabaseKey = savedSupabaseConfig.supabaseKey || '';
+                    console.log('[Supabase] Restored config from localStorage:', state.settings.supabaseUrl ? 'URL set' : 'URL missing');
+                }
+            } catch (e) { console.warn('Supabase local config restore warning:', e); }
 
-            loadAuthSession();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            updateNotificationBadge();
-            startNotificationPoller();
+            try { loadAuthSession(); } catch (e) { console.warn('Auth session load warning:', e); }
+            try { updateRoleUI(); } catch (e) { console.warn('Role UI update warning:', e); }
+            try { renderSidebar(); } catch (e) { console.warn('Sidebar render warning:', e); }
+            try { renderMainContent(); } catch (e) { console.warn('Main content render warning:', e); }
+            try { updateNotificationBadge(); } catch (e) { console.warn('Notification badge update warning:', e); }
+            try { startNotificationPoller(); } catch (e) { console.warn('Notification poller warning:', e); }
 
             // If Supabase is already enabled from localStorage, load immediately (don't wait for Apps Script)
             if (state.settings && state.settings.supabaseEnabled === true && state.settings.supabaseUrl && state.settings.supabaseKey) {
@@ -7990,6 +8048,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             }
 
                             state.notifications = Array.from(notifMap.values()).filter(n => n && typeof n.id === 'string' && (n.id.startsWith('notif_fee_') || n.id.startsWith('notif_mat_') || n.id.startsWith('monthly_fee_')));
+                            normalizeAppCollections();
                             applyPersistentSettingsOverrides();
                             saveStateLocally();
             if (typeof syncPendingDataToSupabase === 'function') {
