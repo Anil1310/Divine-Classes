@@ -427,7 +427,7 @@
             } catch (e) {
                 console.warn('Could not read local cache', e);
             }
-            if (state.settings && typeof state.settings === 'object' && Object.prototype.hasOwnProperty.call(state.settings, 'devPassword')) {
+            if (state.settings && Object.prototype.hasOwnProperty.call(state.settings, 'devPassword')) {
                 delete state.settings.devPassword;
                 try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) {}
             }
@@ -544,9 +544,6 @@
         }
 
         function normalizeAppCollections() {
-            if (!state.settings || typeof state.settings !== 'object') {
-                state.settings = {};
-            }
             ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'notifications'].forEach(function (key) {
                 if (!Array.isArray(state[key])) state[key] = [];
             });
@@ -7938,9 +7935,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         }
 
         // Initialize Application
-        function bootApp() {
-            if (window._appBooted) return;
-            window._appBooted = true;
+        window.onload = function () {
             window.addEventListener('offline', function () {
                 if (typeof showToast === 'function') {
                     showToast('Offline Mode: Using saved data on your phone', 'info');
@@ -8091,18 +8086,5 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     })
                     .apiGetInitialData();
             }
-        }
-
-        // Multi-stage boot guarantee for Google Apps Script HtmlService iframe & standalone web app:
-        // 1. If DOM is already interactive/complete, trigger immediately
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(bootApp, 1);
-        } else {
-            document.addEventListener('DOMContentLoaded', bootApp);
-            window.addEventListener('load', bootApp);
-        }
-        window.onload = bootApp;
-        // 2. Safety fallbacks for embedded sandbox iframes
-        setTimeout(bootApp, 150);
-        setTimeout(bootApp, 600);
+        };
     </script>
