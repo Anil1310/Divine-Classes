@@ -4821,7 +4821,7 @@ window.DIVINE_PAGE_BACKENDS = {
                                         <span class="text-[10px] font-semibold">Add photo</span>
                                     </div>
                                 </div>
-                                <input type="file" id="new-stu-photo-input" accept="image/*" aria-required="true" aria-label="Required student photo. Click to upload or change the photo." class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleNewStudentPhotoPick(event)">
+                                <input type="file" id="new-stu-photo-input" accept="image/jpeg,image/png,image/webp" aria-required="true" aria-label="Required student photo. Click to upload or change the photo." class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleNewStudentPhotoPick(event)">
                                 <span class="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-indigo-600 text-white border-2 border-white flex items-center justify-center shadow-sm pointer-events-none"><i class="fa-solid fa-plus text-xs"></i></span>
                             </label>
                             <div class="text-center">
@@ -5362,7 +5362,7 @@ window.DIVINE_PAGE_BACKENDS = {
                                 ${stu.photo ? `<img src="${stu.photo}" class="w-full h-full object-cover" alt="Student photo">` : `<span class="text-indigo-600 font-bold text-xl">${stu.name.split(' ').map(n=>n[0]).join('')}</span>`}
                             </div>
                             <span class="absolute inset-0 flex items-end justify-center pb-1.5 bg-slate-900/0 group-hover:bg-slate-900/30 transition" aria-hidden="true"><i class="fa-solid fa-camera text-white text-xs opacity-0 group-hover:opacity-100 drop-shadow"></i></span>
-                            <input type="file" id="edit-stu-photo-input" accept="image/*" class="sr-only" onchange="handleEditStudentPhotoPick(event)">
+                            <input type="file" id="edit-stu-photo-input" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="handleEditStudentPhotoPick(event)">
                         </label>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-bold text-slate-800">Student Passport Photo</p>
@@ -6071,7 +6071,7 @@ window.DIVINE_PAGE_BACKENDS = {
                 `Dear ${stu.parentName},\nGreetings from *Divine Classes*.\nThis is a gentle reminder regarding ${stu.name}'s (Roll: ${stu.roll}) pending tuition fee balance of *₹${balance.toLocaleString('en-IN')}* due on ${stu.dueDate}.\nKindly clear the dues at your earliest convenience to ensure uninterrupted class materials & test series.\nUPI ID: ${state.settings.upiId}\nThank you,\nAdministration, Divine Classes`
             );
 
-            const waUrl = `https://wa.me/${phoneParam}?text=${text}`;
+            const waUrl = 'https://wa.me/' + phoneParam + '?text=' + text;
             window.open(waUrl, '_blank');
             showToast(`WhatsApp reminder opened & added to Bell Icon for ${stu.parentName}!`, 'success');
         }
@@ -7588,9 +7588,10 @@ _Verified Seal Ref: ${verificationHash}_
 _Tamper-evident record synced with Divine Classes cloud database._`;
 
             const cleanPhone = String(stu.phone || '').replace(/[^0-9]/g, '');
+            const phoneParam = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone.replace(/^91/, '');
             const waUrl = cleanPhone
-                ? `https://wa.me/91${cleanPhone.length === 10 ? cleanPhone : cleanPhone.replace(/^91/, '')}?text=${encodeURIComponent(message)}`
-                : `https://wa.me/?text=${encodeURIComponent(message)}`;
+                ? ('https://wa.me/' + phoneParam + '?text=' + encodeURIComponent(message))
+                : ('https://wa.me/?text=' + encodeURIComponent(message));
 
             window.open(waUrl, '_blank');
             showToast('Opening WhatsApp with official digitally signed report...', 'success');
@@ -8931,7 +8932,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
 
             if (cleanPhone) {
-                const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+                const waUrl = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg);
                 const win = window.open(waUrl, '_blank');
                 if (win) {
                     showToast(`Opening WhatsApp chat with ${target.name} (${phone}) & copied credentials to clipboard!`, 'success');
@@ -10290,7 +10291,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     const dd = document.getElementById('notification-dropdown');
                     if (dd && !dd.classList.contains('hidden')) renderNotificationsUI();
                 })
-                .withFailureHandler(function () { /* silent — polling is best-effort */ })
+                .withFailureHandler(function () {})
                 .apiGetNotifications();
         }
 
