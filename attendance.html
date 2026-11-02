@@ -304,7 +304,7 @@
         if (!month || !state.isAuthenticated) return;
         const handleResult = function (result) {
             if (!result || result.success !== true || !Array.isArray(result.records)) {
-                if (typeof onSuccess === 'function') onSuccess(result);
+                showToast((result && result.error) || 'Could not load attendance for this month.', 'error');
                 return;
             }
             state.attendanceRecords = result.records;
@@ -319,10 +319,8 @@
             if (typeof onSuccess === 'function') onSuccess(result);
         };
         const handleFailure = function (error) {
-            console.warn('Attendance load notice:', error);
-            // In standalone / preview mode, keep state gracefully without intrusive error toast
-            state.attendanceLoadedMonth = month;
-            if (typeof onSuccess === 'function') onSuccess({ success: true, records: state.attendanceRecords || [] });
+            console.error('Attendance load failed:', error);
+            showToast('Could not load attendance. Please try again.', 'error');
         };
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
@@ -331,10 +329,13 @@
                 .apiGetMonthlyAttendance(month, state.currentRole === 'teacher' ? state.activeTeacherId : '');
             return;
         }
-        // Standalone / Preview / Offline mode: Gracefully use locally cached records
-        state.attendanceLoadedMonth = month;
-        const currentRecords = Array.isArray(state.attendanceRecords) ? state.attendanceRecords : [];
-        handleResult({ success: true, records: currentRecords });
+        supabaseFetch(getSupabaseApiUrl() + '?action=getAttendance&month=' + encodeURIComponent(month))
+            .then(function (response) {
+                if (!response.ok) throw new Error('Attendance request failed.');
+                return response.json();
+            })
+            .then(handleResult)
+            .catch(handleFailure);
     }
 
     function syncAttendanceFromDatabase() {
@@ -519,30 +520,16 @@
                 .apiSaveDailyAttendance(payload);
             return;
         }
-        // Standalone / Preview / Offline mode: Save directly to state.attendanceRecords
-        if (!Array.isArray(state.attendanceRecords)) state.attendanceRecords = [];
-        (payload.entries || []).forEach(function (entry) {
-            const existingIdx = state.attendanceRecords.findIndex(function (r) {
-                return r.date === payload.date && r.batchId === payload.batchId && r.studentId === entry.studentId;
-            });
-            const rec = {
-                date: payload.date,
-                batchId: payload.batchId,
-                studentId: entry.studentId,
-                status: entry.status,
-                markedBy: (state.currentUser && state.currentUser.name) || (state.currentRole === 'teacher' ? 'Faculty' : 'Admin'),
-                updatedAt: new Date().toISOString()
-            };
-            if (existingIdx >= 0) {
-                state.attendanceRecords[existingIdx] = rec;
-            } else {
-                state.attendanceRecords.push(rec);
-            }
-        });
-        if (typeof syncPendingDataToSupabase === 'function') {
-            syncPendingDataToSupabase().catch(function (e) { console.warn('Supabase sync notice:', e); });
-        }
-        handleResult({ success: true, count: (payload.entries || []).length });
+        supabaseFetch(getSupabaseApiUrl(), {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveAttendance', data: payload })
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('Attendance save request failed.');
+                return response.json();
+            })
+            .then(handleResult)
+            .catch(handleFailure);
     }
 
     /********************************************************************
