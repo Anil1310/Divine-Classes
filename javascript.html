@@ -433,7 +433,7 @@
             } catch (e) {
                 console.warn('Could not read local cache', e);
             }
-            if (state.settings && Object.prototype.hasOwnProperty.call(state.settings, 'devPassword')) {
+            if (state.settings && typeof state.settings === 'object' && Object.prototype.hasOwnProperty.call(state.settings, 'devPassword')) {
                 delete state.settings.devPassword;
                 try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) {}
             }
@@ -549,6 +549,9 @@
         }
 
         function normalizeAppCollections() {
+            if (!state.settings || typeof state.settings !== 'object') {
+                state.settings = {};
+            }
             ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'notifications'].forEach(function (key) {
                 if (!Array.isArray(state[key])) state[key] = [];
             });
@@ -557,15 +560,33 @@
             state.batches = state.batches.map(function (b, idx) {
                 if (!b || typeof b !== 'object') return b;
                 const bId = b.id || b.batch_id || 'b' + (idx + 1);
-                return {
+                const teacherName = (b.teacher && b.teacher !== 'undefined') ? b.teacher : (b.lead_faculty || 'Faculty Mentor');
+                let teacherId = b.teacherId || b.teacher_id || null;
+                let teacherEmail = b.teacherEmail || b.teacher_email || null;
+                if ((!teacherId || !teacherEmail) && Array.isArray(state.teachers)) {
+                    const cleanB = String(teacherName).toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
+                    const matched = state.teachers.find(function(t) {
+                        if (!t) return false;
+                        if (teacherId && String(t.id) === String(teacherId)) return true;
+                        const cleanT = String(t.name || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
+                        return cleanT && cleanB && (cleanT === cleanB || cleanB.includes(cleanT) || cleanT.includes(cleanB));
+                    });
+                    if (matched) {
+                        if (!teacherId) teacherId = matched.id;
+                        if (!teacherEmail) teacherEmail = matched.email;
+                    }
+                }
+                return Object.assign({}, b, {
                     id: bId,
                     name: (b.name && b.name !== 'undefined') ? b.name : (b.batch_name || ('Batch ' + bId.toUpperCase())),
                     subject: (b.subject && b.subject !== 'undefined') ? b.subject : (b.subjects || 'Physics, Chemistry & Mathematics'),
                     room: (b.room && b.room !== 'undefined') ? b.room : (b.classroom_hall || b.room_no || 'Lecture Hall 101'),
-                    teacher: (b.teacher && b.teacher !== 'undefined') ? b.teacher : (b.lead_faculty || 'Faculty Mentor'),
+                    teacher: teacherName,
+                    teacherId: teacherId,
+                    teacherEmail: teacherEmail,
                     schedule: (b.schedule && b.schedule !== 'undefined') ? b.schedule : (b.schedule_time || 'Mon - Fri • 08:00 AM - 12:30 PM'),
                     studentIds: Array.isArray(b.studentIds) ? b.studentIds : (Array.isArray(b.student_ids) ? b.student_ids : [])
-                };
+                });
             });
 
             // Auto-heal students if any fields are missing or undefined
@@ -1309,7 +1330,7 @@
 
             const pageModule = window.DIVINE_PAGE_MODULES && window.DIVINE_PAGE_MODULES[state.activeTab];
             if (pageModule) {
-                container.dataset.pageModule = pageModule.id;
+                if (container.dataset) container.dataset.pageModule = pageModule.id;
                 const allowed = !pageModule.access || pageModule.access.length === 0 || pageModule.access.includes(state.currentRole) || (state.activeTab === 'attendance' && state.currentRole === 'student');
                 const templateExists = document.getElementById(pageModule.templateId);
                 const renderer = (state.activeTab === 'attendance' && state.currentRole === 'student' && typeof window.renderStudentAttendanceView === 'function')
@@ -1324,14 +1345,19 @@
                     const pageRoot = pageShell.querySelector('[data-page-root]');
                     if (pageRoot) {
                         pageRoot.innerHTML = renderer();
-                        container.replaceChildren(pageShell);
+                        if (typeof container.replaceChildren === 'function') {
+                            container.replaceChildren(pageShell);
+                        } else {
+                            container.innerHTML = '';
+                            container.appendChild(pageShell);
+                        }
                     } else {
                         container.innerHTML = renderer();
                     }
                     return;
                 }
             } else {
-                delete container.dataset.pageModule;
+                if (container.dataset) delete container.dataset.pageModule;
             }
 
             switch (state.activeTab) {
@@ -7846,38 +7872,44 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         }
 
         // Initialize Application
-        window.onload = function () {
-            window.addEventListener('offline', function () {
-                if (typeof showToast === 'function') {
-                    showToast('Offline Mode: Using saved data on your phone', 'info');
-                }
-            });
-            window.addEventListener('online', function () {
-                if (typeof showToast === 'function') {
-                    showToast('Back Online: Cloud sync restored', 'success');
-                }
-            });
+        function bootApp() {
+            if (window._appBooted) return;
+            window._appBooted = true;
+            try {
+                window.addEventListener('offline', function () {
+                    if (typeof showToast === 'function') {
+                        showToast('Offline Mode: Using saved data on your phone', 'info');
+                    }
+                });
+                window.addEventListener('online', function () {
+                    if (typeof showToast === 'function') {
+                        showToast('Back Online: Cloud sync restored', 'success');
+                    }
+                });
+            } catch (e) { }
 
-            initTheme();
-            loadCachedData();
-            applyPersistentSettingsOverrides();
+            try { initTheme(); } catch (e) { console.warn('Theme init warning:', e); }
+            try { loadCachedData(); } catch (e) { console.warn('Cache load warning:', e); }
+            try { applyPersistentSettingsOverrides(); } catch (e) { console.warn('Settings overrides warning:', e); }
 
             // Restore Supabase config from dedicated localStorage key (survives cache clears)
-            const savedSupabaseConfig = loadSupabaseConfigFromLocal();
-            if (savedSupabaseConfig && savedSupabaseConfig.supabaseEnabled === true) {
-                if (!state.settings) state.settings = {};
-                state.settings.supabaseEnabled = true;
-                state.settings.supabaseUrl = savedSupabaseConfig.supabaseUrl || '';
-                state.settings.supabaseKey = savedSupabaseConfig.supabaseKey || '';
-                console.log('[Supabase] Restored config from localStorage:', state.settings.supabaseUrl ? 'URL set' : 'URL missing');
-            }
+            try {
+                const savedSupabaseConfig = loadSupabaseConfigFromLocal();
+                if (savedSupabaseConfig && savedSupabaseConfig.supabaseEnabled === true) {
+                    if (!state.settings) state.settings = {};
+                    state.settings.supabaseEnabled = true;
+                    state.settings.supabaseUrl = savedSupabaseConfig.supabaseUrl || '';
+                    state.settings.supabaseKey = savedSupabaseConfig.supabaseKey || '';
+                    console.log('[Supabase] Restored config from localStorage:', state.settings.supabaseUrl ? 'URL set' : 'URL missing');
+                }
+            } catch (e) { console.warn('Supabase local config restore warning:', e); }
 
-            loadAuthSession();
-            updateRoleUI();
-            renderSidebar();
-            renderMainContent();
-            updateNotificationBadge();
-            startNotificationPoller();
+            try { loadAuthSession(); } catch (e) { console.warn('Auth session load warning:', e); }
+            try { updateRoleUI(); } catch (e) { console.warn('Role UI update warning:', e); }
+            try { renderSidebar(); } catch (e) { console.warn('Sidebar render warning:', e); }
+            try { renderMainContent(); } catch (e) { console.warn('Main content render warning:', e); }
+            try { updateNotificationBadge(); } catch (e) { console.warn('Notification badge update warning:', e); }
+            try { startNotificationPoller(); } catch (e) { console.warn('Notification poller warning:', e); }
 
             // If Supabase is already enabled from localStorage, load immediately (don't wait for Apps Script)
             if (state.settings && state.settings.supabaseEnabled === true && state.settings.supabaseUrl && state.settings.supabaseKey) {
@@ -7994,5 +8026,19 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     })
                     .apiGetInitialData();
             }
-        };
+        }
+
+        // Multi-stage boot guarantee for Google Apps Script HtmlService iframe & standalone web app:
+        // 1. If DOM is already interactive/complete, trigger immediately
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            bootApp();
+        } else {
+            document.addEventListener('DOMContentLoaded', bootApp);
+            window.addEventListener('load', bootApp);
+        }
+        window.onload = bootApp;
+        // 2. Safety fallbacks for embedded sandbox iframes
+        setTimeout(bootApp, 10);
+        setTimeout(bootApp, 100);
+        setTimeout(bootApp, 500);
     </script>

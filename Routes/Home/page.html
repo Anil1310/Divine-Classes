@@ -274,6 +274,12 @@
     <?!= include('attendance'); ?>
     <?!= include('javascript'); ?>
 
+    <script>
+        if (typeof bootApp === 'function') {
+            bootApp();
+        }
+    </script>
+
     <!-- Mobile Bottom Navigation Bar (Android Native App Experience) -->
     <div id="mobile-nav"
         class="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around text-slate-400"
