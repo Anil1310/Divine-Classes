@@ -321,8 +321,12 @@ function mergeStudentsFromSheet_(dbData) {
 | **Faculty Profile & ID Card**             |  ✅ Full  |  ✅ Full  |   **✅ Self-Edit Profile & Print ID Card**   |    👁️ Read-Only Faculty    |
 | **Study Materials & Assignments**         |  ✅ Full  |  ✅ Full  |              ✅ Upload Files              |      👁️ Download Only      |
 
-> **Note on Faculty Experience:**
-> Teachers logged in to Divine Classes see a dedicated **Faculty Portal** with an emerald status badge. All coaching batches are visible with direct student enrollment options, while assigned batches are prominently highlighted (`My Assigned Batch`). Teachers can also self-edit their faculty profile (qualifications, experience, specialization, bio, photo) and print their official Faculty Identity Card directly from the portal. Fellow mentors are presented in a clean, read-only grid.
+> **Note on Faculty & Student Profile Experience:**
+> - **Top-Bar & Header Navigation**: Teacher profile is decoupled from the sidebar and placed at the top (Header & Role Banner) providing direct access to credentials, photo editor, ID card, and student/parent feedback.
+> - **Universal Batch Enrollment**: Teachers can add students to any coaching batch via `+ Add Student to Any Batch`.
+> - **Offline Marks Entry**: Teachers have full access to create tests and enter offline marks with auto-calculated class statistics.
+> - **Student/Parent Feedback**: Students and parents can access the `Faculty & Feedback` portal directly at the top to browse active mentors and submit 5-star ratings and reviews.
+> - **Universal Footers**: All views, login, and logout portals include official institute contact info and developer attribution: `Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition`.
 
 ### 7.2 Google Apps Script Compiler Defense (Lexer Safety)
 When authoring client JavaScript embedded inside Google Apps Script `.html` templates, observe these critical rules to prevent silent code stripping by the Apps Script HTML compiler:

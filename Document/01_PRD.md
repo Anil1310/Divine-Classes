@@ -123,17 +123,21 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 - **FR-5.5**: Multi-batch filtering enabling faculty to seamlessly toggle between assigned batches or view all institute tests.
 
 ### Module 6: Faculty Self-Profile & Mentor Directory Architecture
-- **FR-6.1**: **Teacher Self-Profile Parity**: When a teacher logs in, they see their own profile prominently:
-  - Dedicated "My Faculty Profile" banner at the top of the Teacher Profiles view.
-  - Dashboard profile card showing Faculty Name, Subject, Experience, Qualification, and one-click access to their official Faculty ID Card.
-- **FR-6.2**: **Faculty Self-Management Controls**: Logged-in teachers have dedicated actions to maintain their profile:
+- **FR-6.1**: **Top-Bar & Role Banner Profile Placement**:
+  - The teacher's own profile is accessible directly from the top header navigation and top role banner (`[My Faculty Profile & Reviews]`), completely removing teacher profiles from the non-admin "People & Community" sidebar navigation.
+  - Clicking this top-bar action opens `openTeacherSelfProfileModal()`, displaying Faculty Name, Subject, Experience, Qualifications, official Faculty ID Card generator, live photo updater, and real-time student/parent feedback and average star ratings received.
+- **FR-6.2**: **Student & Parent Faculty Feedback Portal**:
+  - For students, a prominent top header and role banner action (`[Faculty & Feedback]`) opens `openStudentFacultyFeedbackModal()`.
+  - Displays active faculty mentor cards with qualifications, doubt-clearing timings, and an interactive feedback submission form allowing students and parents to submit 5-star ratings and constructive reviews.
+- **FR-6.3**: **Faculty Self-Management Controls**: Logged-in teachers have dedicated actions to maintain their profile:
   - *Edit My Profile*: Update academic qualifications, teaching experience, specialization, biography, and contact phone.
   - *Update Photo*: Live camera capture or file upload with automatic client-side resizing.
   - *Faculty Identity Card*: Official Divine Classes Faculty ID Card with photo, qualifications, faculty ID, and authorized institute seal.
-- **FR-6.3**: **Administrative Isolation & Data Security**:
-  - Administrative actions (editing other teachers, changing access status to Blocked/Inactive) are strictly hidden for non-admin teachers.
-  - The rest of the faculty roster is displayed as clean, read-only mentor cards just like in student login (showing photo, name, subject, qualification, experience, specialization, and bio).
-- **FR-6.4**: **Student Action Separation**: Student-specific controls (such as `Book Doubt Slot`) are exclusively shown to logged-in students, ensuring a clean peer interface for faculty.
+- **FR-6.4**: **Administrative Isolation & Navigation Cleanliness**:
+  - Administrative faculty roster management is strictly isolated to Admin under Administration.
+  - The legacy "Fees Hidden from Teacher" badge has been permanently eliminated and replaced by an elegant, positive "Faculty Portal" emerald badge.
+- **FR-6.5**: **Universal Developer Attribution & Footers**:
+  - All views (Login portal, Logout screen, and workspace footer) prominently feature official institute address and helpline alongside developer attribution: `Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition`.
 
 ### Module 7: Official Academic Report Card & Digital Verification
 - **FR-6.1**: Produce an official Academic Progress Report Card with:

@@ -278,3 +278,25 @@ const adminName = (state.settings && state.settings.adminName)
 ### 6.4 Client-Facing White-Label Layer
 - All user-facing views, alerts, toasts, badges, and modals for Admin, Teacher, and Student roles strictly use **"Cloud"** terminology with cloud icons (`fa-solid fa-cloud`).
 - Technical infrastructure terms ("Google Sheet", "Google Sheets", "spreadsheet", "Supabase", "GSheet") are completely shielded from end-users.
+
+---
+
+## 7. Role-Based Navigation & Profile Component Architecture
+
+### 7.1 Top-Level Profile & Faculty Feedback Orchestration
+- **Sidebar Decoupling**: Teacher profiles have been removed from the `sidebarNavigationGroups.community` menu. Non-admin users cannot access faculty directory from the sidebar.
+- **Teacher Workspace**:
+  - Top header avatar and `renderAuthHeader()` render `[My Profile]` button bound to `openTeacherSelfProfileModal()`.
+  - Top role banner features `[My Faculty Profile & Reviews]` button.
+  - Faculty modal presents teacher identity, photo upload, ID card download, and verified student/parent feedback entries.
+- **Student Workspace**:
+  - Top header and role banner render `[Faculty & Feedback]` and `[My Profile]`.
+  - `openStudentFacultyFeedbackModal()` displays active faculty mentor cards alongside an interactive feedback form to submit star ratings and qualitative reviews.
+- **Legacy Stigma Elimination**:
+  - The previous amber badge "Fees Hidden from Teacher" is eradicated and superseded by an affirmative emerald "Faculty Portal" indicator.
+
+### 7.2 Developer Attribution & Global Footers
+- Appended synchronously across Login Screen (`renderLoginScreenView`), Logout Screen (`Routes/Logout/page.html`), and all active workspace views (`appendAppFooter`).
+- Layout specification:
+  - Line 1: `© 2026 Divine Classes • 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063 • Contact: 9555-6787-53`
+  - Line 2: `Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition`

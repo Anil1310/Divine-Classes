@@ -351,6 +351,31 @@ REQUIREMENTS:
 
 ---
 
+### PROMPT 15: Header Profile Navigation, Student/Parent Faculty Reviews & Developer Attribution
+```text
+SYSTEM ROLE: Educational Portal UX Architect & RBAC Engineering Lead
+GOAL: Decouple Teacher Profile from sidebar navigation, promote Teacher & Student profiles to top-bar actions, implement interactive Parent/Student Teacher Reviews, and standardize developer attribution footers.
+
+REQUIREMENTS:
+1. Sidebar Cleanliness:
+   - Remove 'teachers' from sidebar navigation groups under 'community' for non-admin users.
+   - Restrict full faculty roster administration strictly to 'admin' role.
+2. Top-Bar & Role Banner Placement:
+   - For Teachers: Render [My Profile] in header and [My Faculty Profile & Reviews] in role banner to open openTeacherSelfProfileModal().
+   - For Students: Render [Faculty & Feedback] and [My Profile] in header and role banner.
+3. Interactive Faculty Feedback Portal:
+   - Enable students and parents to view faculty mentors, select a teacher, give a 1-5 star rating, choose feedback categories, and submit verified reviews.
+   - Reviews automatically sync to local state and Supabase cloud.
+4. Legacy Badge Eradication:
+   - Ensure the negative "Fees Hidden from Teacher" badge is replaced with positive "Faculty Portal" styling.
+5. Developer Branding & Attribution:
+   - Display official institute address, helpline, and developer attribution:
+     "Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition"
+   - Apply consistently across Login screen, Logout screen, and active workspace views.
+```
+
+---
+
 ## 4. Operational Playbook & Best Practices
 
 ### 4.1 Deployment Workflow

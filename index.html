@@ -460,7 +460,7 @@
             class="fixed inset-0 bg-slate-950/60 z-30 lg:hidden hidden backdrop-blur-2xs transition-opacity"></div>
 
         <!-- Sidebar Navigation -->
-        <aside id="sidebar"
+        <aside id="sidebar" style="display:none;"
             class="fixed inset-y-0 left-0 z-40 w-[256px] max-w-[78vw] lg:w-72 lg:max-w-none bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:inset-0 shrink-0 border-r border-slate-800 shadow-2xl lg:shadow-none">
             <!-- Brand Logo -->
             <div class="flex items-center justify-between px-5 h-16 bg-slate-950 border-b border-slate-800">
@@ -561,7 +561,7 @@
         <!-- Main Content Wrapper -->
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
             <!-- Top Header with Role Switcher & Live Database Sync -->
-            <header id="app-header" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
+            <header id="app-header" style="display:none;" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
                 <div class="px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3">
                     <!-- Left: Hamburger & Page Title -->
                     <div id="header-brand-block" class="flex items-center gap-3 min-w-0">
@@ -654,7 +654,7 @@
             </header>
 
             <!-- Desktop primary menu bar; on mobile the sidebar and bottom menu are used -->
-            <nav id="primary-menu-bar" aria-label="Primary navigation"
+            <nav id="primary-menu-bar" aria-label="Primary navigation" style="display:none;"
                 class="hidden lg:flex items-center gap-1 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 overflow-x-auto">
                 <div id="primary-menu-links" class="flex items-center gap-1 min-w-max"></div>
             </nav>
@@ -3559,7 +3559,7 @@ window.DIVINE_PAGE_BACKENDS = {
             { id: 'access', label: 'Access Control', icon: 'fa-user-gear', roles: ['admin'], req: '11' },
             { id: 'materials', label: 'Assignments & DPPs', icon: 'fa-file-pdf', roles: ['admin', 'teacher', 'student'], req: '3' },
             { id: 'marks', label: 'Offline Marks Tracker', icon: 'fa-chart-line', roles: ['admin', 'teacher', 'student'], req: '4' },
-            { id: 'teachers', label: 'Teacher Profiles', icon: 'fa-chalkboard-user', roles: ['admin', 'teacher', 'student'], req: '6' },
+            { id: 'teachers', label: 'Faculty Management', icon: 'fa-chalkboard-user', roles: ['admin'], req: '6' },
             { id: 'gallery', label: 'Results & Gallery', icon: 'fa-images', roles: ['admin', 'teacher', 'student'], req: '8' },
             { id: 'links', label: 'External Study Hub', icon: 'fa-arrow-up-right-from-square', roles: ['admin', 'teacher', 'student'], req: '9' },
             { id: 'feedback', label: 'Parent & Student Feedback', icon: 'fa-comments', roles: ['admin', 'teacher', 'student'], req: '10' },
@@ -3570,8 +3570,8 @@ window.DIVINE_PAGE_BACKENDS = {
             { id: 'overview', label: 'Overview', items: ['dashboard'] },
             { id: 'academics', label: 'Academics', items: ['batches', 'attendance', 'marks'] },
             { id: 'resources', label: 'Learning Resources', items: ['materials', 'gallery', 'links'] },
-            { id: 'community', label: 'People & Community', items: ['teachers', 'feedback'] },
-            { id: 'administration', label: 'Administration', items: ['fees', 'access', 'settings'] }
+            { id: 'community', label: 'People & Community', items: ['feedback'] },
+            { id: 'administration', label: 'Administration', items: ['teachers', 'fees', 'access', 'settings'] }
         ];
         const primaryMenuIds = ['dashboard', 'batches', 'attendance', 'materials', 'marks', 'fees'];
 
@@ -3727,21 +3727,45 @@ window.DIVINE_PAGE_BACKENDS = {
                 roleText = 'Teacher';
             }
 
-            container.innerHTML = `
-                <div class="flex items-center gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                    <div class="flex items-center gap-1.5 sm:gap-2 text-xs">
-                        <button type="button" onclick="handleProfileIconClick(event)" title="View account details" aria-label="View account details" class="w-7 h-7 rounded-lg ${badgeBg} border flex items-center justify-center font-bold text-xs cursor-pointer hover:ring-2 hover:ring-indigo-400/50 transition">
-                            <i class="fa-solid ${icon}"></i>
-                        </button>
-                        <div id="header-user-info" class="hidden sm:block leading-tight text-left">
-                            <p class="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[130px] sm:max-w-[120px]">${u.name}</p>
-                            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">${roleText}${u.identifier && u.role !== 'developer' ? ` • ${u.identifier}` : ''}</p>
-                        </div>
-                    </div>
-                    <button onclick="handleLogout()" title="Log out of Divine Classes" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800/60 transition cursor-pointer shadow-2xs">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                        <span class="hidden md:inline">Log Out</span>
+            let roleActions = '';
+            if (u.role === 'teacher') {
+                roleActions = `
+                    <button type="button" onclick="openTeacherSelfProfileModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 transition cursor-pointer shadow-2xs" title="My Faculty Profile & Student Reviews">
+                        <i class="fa-solid fa-chalkboard-user"></i>
+                        <span class="hidden sm:inline">My Profile</span>
                     </button>
+                `;
+            } else if (u.role === 'student') {
+                roleActions = `
+                    <button type="button" onclick="openStudentFacultyFeedbackModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shadow-2xs" title="Faculty Mentors & Feedback">
+                        <i class="fa-solid fa-star text-amber-500"></i>
+                        <span class="hidden sm:inline">Faculty & Feedback</span>
+                    </button>
+                    <button type="button" onclick="openStudentSelfProfileModal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800 transition cursor-pointer shadow-2xs" title="My Student Profile & ID Card">
+                        <i class="fa-solid fa-id-card"></i>
+                        <span class="hidden md:inline">My Profile</span>
+                    </button>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="flex items-center gap-2">
+                    ${roleActions}
+                    <div class="flex items-center gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <div class="flex items-center gap-1.5 sm:gap-2 text-xs">
+                            <button type="button" onclick="handleProfileIconClick(event)" title="View account details" aria-label="View account details" class="w-7 h-7 rounded-lg ${badgeBg} border flex items-center justify-center font-bold text-xs cursor-pointer hover:ring-2 hover:ring-indigo-400/50 transition">
+                                <i class="fa-solid ${icon}"></i>
+                            </button>
+                            <div id="header-user-info" class="hidden sm:block leading-tight text-left">
+                                <p class="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[130px] sm:max-w-[120px]">${u.name}</p>
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">${roleText}${u.identifier && u.role !== 'developer' ? ` • ${u.identifier}` : ''}</p>
+                            </div>
+                        </div>
+                        <button onclick="handleLogout()" title="Log out of Divine Classes" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800/60 transition cursor-pointer shadow-2xs">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            <span class="hidden md:inline">Log Out</span>
+                        </button>
+                    </div>
                 </div>
             `;
         }
@@ -3749,22 +3773,10 @@ window.DIVINE_PAGE_BACKENDS = {
         let mobileProfileTimer = null;
         function handleProfileIconClick(event) {
             if (event) event.stopPropagation();
-            if (window.innerWidth < 640) {
-                const infoEl = document.getElementById('header-user-info');
-                if (!infoEl) return;
-                if (mobileProfileTimer) {
-                    clearTimeout(mobileProfileTimer);
-                    mobileProfileTimer = null;
-                }
-                infoEl.classList.remove('hidden');
-                infoEl.classList.add('block');
-                mobileProfileTimer = setTimeout(() => {
-                    if (infoEl) {
-                        infoEl.classList.remove('block');
-                        infoEl.classList.add('hidden');
-                    }
-                    mobileProfileTimer = null;
-                }, 2000);
+            if (state.currentRole === 'teacher') {
+                openTeacherSelfProfileModal();
+            } else if (state.currentRole === 'student') {
+                openStudentSelfProfileModal();
             } else {
                 showCurrentUserDetails();
             }
@@ -3916,6 +3928,8 @@ window.DIVINE_PAGE_BACKENDS = {
             const mainContent = document.getElementById('main-content');
             const body = document.body;
 
+            const primaryMenu = document.getElementById('primary-menu-bar');
+
             // Toggle Developer-only Drive and database links — visible ONLY in Developer role
             const isDev = state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
             document.querySelectorAll('.dev-only-link').forEach(el => {
@@ -3927,6 +3941,7 @@ window.DIVINE_PAGE_BACKENDS = {
                 if (sidebar) sidebar.style.display = 'none';
                 if (backdrop) backdrop.style.display = 'none';
                 if (header) header.style.display = 'none';
+                if (primaryMenu) primaryMenu.style.display = 'none';
                 if (roleBanner) {
                     roleBanner.innerHTML = '';
                     roleBanner.style.display = 'none';
@@ -3943,10 +3958,16 @@ window.DIVINE_PAGE_BACKENDS = {
                 return;
             }
 
+            // If a teacher or student was on the 'teachers' tab, redirect to dashboard since profiles are now at top
+            if ((state.currentRole === 'teacher' || state.currentRole === 'student') && state.activeTab === 'teachers') {
+                state.activeTab = 'dashboard';
+            }
+
             // Authenticated State - Restore Portal Chrome
             if (sidebar) sidebar.style.display = '';
             if (backdrop) backdrop.style.display = '';
             if (header) header.style.display = '';
+            if (primaryMenu) primaryMenu.style.display = '';
             if (roleBanner) roleBanner.style.display = '';
             if (mobileNav) mobileNav.style.display = '';
             if (body) {
@@ -4002,9 +4023,14 @@ window.DIVINE_PAGE_BACKENDS = {
                     roleBanner.innerHTML = `
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <span><strong>Teacher Mode Active:</strong> Welcome to your faculty workspace. You can manage your assigned batches, student attendance, assignments, and test marks.</span>
+                            <span><strong>Faculty Portal:</strong> Welcome to your teaching workspace. Manage your assigned batches, student attendance, assignments, and test marks.</span>
                         </div>
-                        <span class="text-[11px] font-semibold text-emerald-800 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-md">Faculty Portal</span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openTeacherSelfProfileModal()" class="text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300 px-3 py-1 rounded-lg border border-amber-300 dark:border-amber-700 flex items-center gap-1.5 transition cursor-pointer">
+                                <i class="fa-solid fa-chalkboard-user"></i> My Faculty Profile & Reviews
+                            </button>
+                            <span class="text-[11px] font-semibold text-emerald-800 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-md">Faculty Portal</span>
+                        </div>
                     `;
                 } else {
                     const currentStudent = state.students.find(s => s.id === state.activeStudentId && s.status !== 'Inactive') || state.students.find(s => s.status !== 'Inactive') || state.students[0];
@@ -4012,9 +4038,16 @@ window.DIVINE_PAGE_BACKENDS = {
                     roleBanner.innerHTML = `
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full ${isCurBlocked ? 'bg-rose-500 animate-ping' : 'bg-sky-500'}"></span>
-                            <span><strong>Student / Parent Mode:</strong> Logged in as <strong>${currentStudent.name}</strong> (${currentStudent.roll}). ${isCurBlocked ? '<span class="text-rose-700 font-bold bg-rose-100 px-2 py-0.5 rounded ml-1">🚫 ACCESS BLOCKED BY ADMIN</span>' : 'Download assignments, track offline test marks, view teacher profiles, and submit feedback.'}</span>
+                            <span><strong>Student / Parent Mode:</strong> Logged in as <strong>${currentStudent ? currentStudent.name : 'Student'}</strong> (${currentStudent ? currentStudent.roll : ''}). ${isCurBlocked ? '<span class="text-rose-700 font-bold bg-rose-100 px-2 py-0.5 rounded ml-1">🚫 ACCESS BLOCKED BY ADMIN</span>' : 'Download assignments, track offline test marks, view faculty mentors, and submit feedback.'}</span>
                         </div>
-                        <span class="text-[11px] font-semibold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md">Student Portal</span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openStudentFacultyFeedbackModal()" class="text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 px-3 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5 transition cursor-pointer">
+                                <i class="fa-solid fa-star text-amber-500"></i> Faculty & Feedback
+                            </button>
+                            <button type="button" onclick="openStudentSelfProfileModal()" class="text-xs font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 dark:bg-sky-950 dark:text-sky-300 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800 flex items-center gap-1.5 transition cursor-pointer">
+                                <i class="fa-solid fa-user-graduate"></i> My Profile
+                            </button>
+                        </div>
                     `;
                 }
             }
@@ -4147,8 +4180,23 @@ window.DIVINE_PAGE_BACKENDS = {
         }
 
         /********************************************************************
-         * MAIN CONTENT ROUTER
+         * MAIN CONTENT ROUTER & GLOBAL FOOTER
          ********************************************************************/
+        function appendAppFooter(container) {
+            if (!container || !state.isAuthenticated) return;
+            const footerHtml = `
+                <footer class="mt-12 pt-6 pb-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                    <p>© 2026 Divine Classes • ${getShortAddress()} • Helpline: ${state.settings.contactDisplay || '9555-6787-53'}</p>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Designed & Engineered with ❤️ by <span class="font-semibold text-slate-600 dark:text-slate-300">Er. Anil Kumar Chahar</span> • v2.5 Cloud Edition</p>
+                </footer>
+            `;
+            const footerWrapper = document.createElement('div');
+            footerWrapper.innerHTML = footerHtml;
+            if (footerWrapper.firstElementChild) {
+                container.appendChild(footerWrapper.firstElementChild);
+            }
+        }
+
         function renderMainContent() {
             const container = document.getElementById('main-content');
             const titleEl = document.getElementById('page-title');
@@ -4215,6 +4263,7 @@ window.DIVINE_PAGE_BACKENDS = {
                     } else {
                         container.innerHTML = renderer();
                     }
+                    appendAppFooter(container);
                     return;
                 }
             } else {
@@ -4259,6 +4308,7 @@ window.DIVINE_PAGE_BACKENDS = {
                     container.innerHTML = renderFeedbackView();
                     break;
             }
+            appendAppFooter(container);
             } catch (renderError) {
                 console.error('App page render failed:', renderError);
                 container.innerHTML = `<div class="m-6 rounded-2xl border border-rose-200 bg-white p-6 text-slate-800 shadow-sm"><h2 class="text-base font-bold text-rose-700">This page could not be displayed</h2><p class="mt-2 text-sm text-slate-600">Your data is still available. Reload the page to try again.</p><button type="button" onclick="renderMainContent()" class="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Reload this page</button></div>`;
@@ -6814,6 +6864,400 @@ window.DIVINE_PAGE_BACKENDS = {
                 </div>
             `;
             openModal(cardHtml);
+        }
+
+        /********************************************************************
+         * TOP HEADER & MODAL PROFILES FOR TEACHER & STUDENT PORTALS
+         ********************************************************************/
+        function openTeacherSelfProfileModal() {
+            const tch = (state.teachers || []).find(t => 
+                (state.currentUser && (String(t.id) === String(state.currentUser.id) || String(t.name).toLowerCase() === String(state.currentUser.name).toLowerCase() || String(t.phone) === String(state.currentUser.phone))) ||
+                (state.activeTeacherId && String(t.id) === String(state.activeTeacherId))
+            ) || (typeof getCurrentTeacher === 'function' ? getCurrentTeacher() : null) || (state.teachers && state.teachers[0]);
+
+            if (!tch) {
+                showToast('Faculty profile record not found.', 'error');
+                return;
+            }
+
+            // Find reviews/feedback specific to this teacher
+            const teacherFeedbacks = (state.feedbacks || []).filter(f => 
+                (f.teacherId && String(f.teacherId) === String(tch.id)) ||
+                (f.targetFaculty && String(f.targetFaculty).toLowerCase() === String(tch.name).toLowerCase())
+            );
+
+            const avgRating = teacherFeedbacks.length > 0 
+                ? (teacherFeedbacks.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / teacherFeedbacks.length).toFixed(1)
+                : '5.0';
+
+            const modalHtml = `
+                <div class="space-y-5 text-slate-800 dark:text-slate-100">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-4">
+                            <div class="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-500 shadow-md bg-amber-50 shrink-0">
+                                ${tch.photo ? `
+                                    <img src="${escapeAttr(tch.photo)}" alt="${escapeHtml(tch.name)}" class="w-full h-full object-cover">
+                                ` : `
+                                    <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-700 text-white font-bold text-xl">
+                                        ${escapeHtml(tch.initials || tch.name.slice(0, 2))}
+                                    </div>
+                                `}
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-lg font-bold font-heading">${escapeHtml(tch.name)}</h3>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700">Faculty</span>
+                                </div>
+                                <p class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">${escapeHtml(tch.subject)} Faculty • ${escapeHtml(tch.qualification || 'M.Sc., B.Ed.')}</p>
+                                <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                    <span><i class="fa-solid fa-phone text-indigo-500 mr-1"></i>${escapeHtml(tch.phone || '9555-6787-53')}</span>
+                                    <span>•</span>
+                                    <span><i class="fa-solid fa-star text-amber-500 mr-1"></i>${avgRating} (${teacherFeedbacks.length} reviews)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Actions & ID Card -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="openTeacherIdCard('${tch.id}')" class="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
+                            <i class="fa-solid fa-id-badge"></i>
+                            <span>View Faculty ID Card</span>
+                        </button>
+                        <button type="button" onclick="closeModal(); openEditTeacherModal('${tch.id}');" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer">
+                            <i class="fa-solid fa-user-pen"></i>
+                            <span>Edit Details / Photo</span>
+                        </button>
+                    </div>
+
+                    <!-- Faculty Profile Details -->
+                    <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Specialization:</span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(tch.specialization || 'IIT-JEE / NEET Specialist')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Teaching Experience:</span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(tch.experience || '5+ Years')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Doubt Session Hours:</span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(tch.doubt_hours || '4:00 PM - 7:00 PM (Daily)')}</span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span class="text-slate-500 font-medium">Email:</span>
+                            <span class="font-medium font-mono text-slate-700 dark:text-slate-300">${escapeHtml(tch.email || 'faculty@divineclasses.com')}</span>
+                        </div>
+                    </div>
+
+                    <!-- Student & Parent Feedback / Reviews for this Teacher -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <i class="fa-solid fa-comments text-amber-500"></i>
+                                <span>Student & Parent Reviews (${teacherFeedbacks.length})</span>
+                            </h4>
+                            <span class="text-[11px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md">
+                                ★ ${avgRating} / 5.0
+                            </span>
+                        </div>
+
+                        <div class="max-h-56 overflow-y-auto space-y-2 pr-1">
+                            ${teacherFeedbacks.length === 0 ? `
+                                <div class="text-center py-6 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                                    <i class="fa-regular fa-comment-dots text-slate-300 text-2xl mb-1"></i>
+                                    <p class="text-xs text-slate-500">No student or parent feedback submitted yet.</p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Reviews submitted by students & parents in your batches will appear here.</p>
+                                </div>
+                            ` : teacherFeedbacks.map(fb => `
+                                <div class="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-2xs space-y-1.5">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(fb.authorName || fb.studentName || 'Student/Parent')}</span>
+                                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">${escapeHtml(fb.role || 'Student')}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 text-amber-400 text-xs">
+                                            ${'★'.repeat(Math.min(5, Number(fb.rating) || 5))}${'☆'.repeat(Math.max(0, 5 - (Number(fb.rating) || 5)))}
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${escapeHtml(fb.comment || fb.message || '')}</p>
+                                    <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-50 dark:border-slate-700/50">
+                                        <span>Category: ${escapeHtml(fb.category || 'General Guidance')}</span>
+                                        <span>${escapeHtml(fb.date || '')}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button type="button" onclick="closeModal()" class="px-5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-xs transition cursor-pointer">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            openModal(modalHtml);
+        }
+
+        function openStudentFacultyFeedbackModal(preselectedTeacherId) {
+            const teachers = state.teachers || [];
+            const selectedTeacher = preselectedTeacherId 
+                ? teachers.find(t => String(t.id) === String(preselectedTeacherId))
+                : teachers[0];
+
+            const modalHtml = `
+                <div class="space-y-5 text-slate-800 dark:text-slate-100">
+                    <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div>
+                            <h3 class="text-lg font-bold font-heading flex items-center gap-2">
+                                <i class="fa-solid fa-chalkboard-user text-indigo-600"></i>
+                                <span>Faculty Mentors & Feedback</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Rate your teachers, submit parent/student feedback, or schedule doubt-clearing assistance.</p>
+                        </div>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Teacher Mentor Cards -->
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Our Dedicated Faculty</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-52 overflow-y-auto pr-1">
+                            ${teachers.map(t => {
+                                const tFeedbacks = (state.feedbacks || []).filter(f => (f.teacherId && String(f.teacherId) === String(t.id)) || (f.targetFaculty && String(f.targetFaculty).toLowerCase() === String(t.name).toLowerCase()));
+                                const rating = tFeedbacks.length ? (tFeedbacks.reduce((s, f) => s + (Number(f.rating) || 5), 0) / tFeedbacks.length).toFixed(1) : '5.0';
+                                return `
+                                    <div class="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-xl overflow-hidden bg-amber-50 border border-amber-300 shrink-0">
+                                            ${t.photo ? `<img src="${escapeAttr(t.photo)}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-700 text-white font-bold text-sm">${escapeHtml(t.initials || t.name.slice(0, 2))}</div>`}
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="font-bold text-xs text-slate-800 dark:text-slate-100 truncate">${escapeHtml(t.name)}</p>
+                                            <p class="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold truncate">${escapeHtml(t.subject)}</p>
+                                            <div class="flex items-center justify-between mt-1">
+                                                <span class="text-[10px] text-amber-500 font-bold">★ ${rating}</span>
+                                                <button type="button" onclick="selectTeacherForFeedback('${t.id}', '${escapeAttr(t.name)}')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 cursor-pointer">
+                                                    Rate / Feedback
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Direct Feedback Form -->
+                    <form id="student-faculty-feedback-form" onsubmit="handleFacultyFeedbackSubmit(event)" class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-pen-nib text-indigo-600"></i>
+                                <span>Submit Feedback for Faculty</span>
+                            </h4>
+                            <span class="text-[10px] text-slate-400">Directly visible to Teacher & Admin</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Select Faculty Teacher</label>
+                                <select id="feedback-teacher-id" class="w-full text-xs p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium" required>
+                                    ${teachers.map(t => `<option value="${escapeAttr(t.id)}" ${selectedTeacher && selectedTeacher.id === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.subject)})</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Your Role</label>
+                                <select id="feedback-author-role" class="w-full text-xs p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium">
+                                    <option value="Student">Student</option>
+                                    <option value="Parent">Parent / Guardian</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Rating</label>
+                                <select id="feedback-star-rating" class="w-full text-xs p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium text-amber-500">
+                                    <option value="5">★★★★★ (5/5) - Outstanding</option>
+                                    <option value="4">★★★★☆ (4/5) - Very Good</option>
+                                    <option value="3">★★★☆☆ (3/5) - Good / Satisfactory</option>
+                                    <option value="2">★★☆☆☆ (2/5) - Needs Improvement</option>
+                                    <option value="1">★☆☆☆☆ (1/5) - Unsatisfactory</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Feedback Category</label>
+                                <select id="feedback-category" class="w-full text-xs p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium">
+                                    <option value="Teaching & Concept Clarity">Teaching & Concept Clarity</option>
+                                    <option value="Doubt Clearing Support">Doubt Clearing Support</option>
+                                    <option value="Homework & Assignment Review">Homework & Assignment Review</option>
+                                    <option value="Test Series & Exam Prep">Test Series & Exam Prep</option>
+                                    <option value="General Appreciation">General Appreciation</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Detailed Review / Feedback</label>
+                            <textarea id="feedback-comments" rows="3" class="w-full text-xs p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-sans resize-none" placeholder="Share your experience, appreciation, or specific suggestions for this teacher..." required></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-[11px] text-slate-400">From: <strong>${escapeHtml(state.currentUser ? state.currentUser.name : 'Student/Parent')}</strong></span>
+                            <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span>Submit Teacher Feedback</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            openModal(modalHtml);
+        }
+
+        function selectTeacherForFeedback(teacherId, teacherName) {
+            const selectEl = document.getElementById('feedback-teacher-id');
+            if (selectEl) {
+                selectEl.value = teacherId;
+                showToast('Selected ' + teacherName + ' for rating.', 'info');
+            }
+        }
+
+        function handleFacultyFeedbackSubmit(event) {
+            if (event) event.preventDefault();
+            const teacherSelect = document.getElementById('feedback-teacher-id');
+            const roleSelect = document.getElementById('feedback-author-role');
+            const ratingSelect = document.getElementById('feedback-star-rating');
+            const catSelect = document.getElementById('feedback-category');
+            const commentEl = document.getElementById('feedback-comments');
+
+            if (!teacherSelect || !commentEl || !commentEl.value.trim()) {
+                showToast('Please enter your feedback comments.', 'error');
+                return;
+            }
+
+            const teacherId = teacherSelect.value;
+            const teacherObj = (state.teachers || []).find(t => String(t.id) === String(teacherId));
+            const teacherName = teacherObj ? teacherObj.name : 'Faculty';
+            const authorRole = roleSelect ? roleSelect.value : 'Student';
+            const rating = ratingSelect ? Number(ratingSelect.value) || 5 : 5;
+            const category = catSelect ? catSelect.value : 'Teaching & Concept Clarity';
+            const comment = commentEl.value.trim();
+            const authorName = state.currentUser ? state.currentUser.name : 'Student';
+
+            const newFb = {
+                id: 'FB' + Date.now(),
+                teacherId: teacherId,
+                targetFaculty: teacherName,
+                authorName: authorName,
+                studentName: authorName,
+                studentId: state.currentUser ? state.currentUser.id : '',
+                role: authorRole,
+                rating: rating,
+                category: category,
+                comment: comment,
+                message: comment,
+                date: new Date().toISOString().split('T')[0],
+                created_at: new Date().toISOString(),
+                status: 'Published'
+            };
+
+            if (!state.feedbacks) state.feedbacks = [];
+            state.feedbacks.unshift(newFb);
+            saveStateLocally();
+
+            // Cloud sync if available
+            if (typeof syncCollectionToSupabase === 'function' && state.settings && state.settings.supabaseEnabled) {
+                syncCollectionToSupabase('feedbacks', state.feedbacks);
+            }
+
+            showToast('Thank you! Your feedback for ' + teacherName + ' has been submitted successfully.', 'success');
+            closeModal();
+        }
+
+        function openStudentSelfProfileModal() {
+            const { student, batch } = getCurrentStudentAndBatch();
+            if (!student) {
+                showToast('Student profile not found.', 'error');
+                return;
+            }
+
+            const batches = (state.batches || []).filter(b => 
+                (b.studentIds || []).some(id => String(id) === String(student.id) || String(id) === String(student.roll))
+            );
+            const batchNames = batches.map(b => b.name).join(', ') || (batch ? batch.name : 'General Batch');
+            const totalFee = Number(student.totalFee || student.fee || 0);
+            const paidFee = Number(student.paidFee || 0);
+            const balanceFee = Math.max(0, totalFee - paidFee);
+
+            const modalHtml = `
+                <div class="space-y-5 text-slate-800 dark:text-slate-100">
+                    <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-3">
+                            <div class="w-14 h-14 rounded-2xl overflow-hidden bg-sky-50 border-2 border-sky-400 flex items-center justify-center text-sky-700 font-bold text-xl shrink-0">
+                                ${escapeHtml(student.name.slice(0, 2))}
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-base font-bold font-heading">${escapeHtml(student.name)}</h3>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">Roll: ${escapeHtml(student.roll || student.id)}</span>
+                                </div>
+                                <p class="text-xs text-slate-500 font-medium mt-0.5">${escapeHtml(batchNames)}</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Personal & Academic Details -->
+                    <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Student Mobile:</span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(student.phone || 'N/A')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Parent / Guardian:</span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(student.parentName || student.guardian || 'Parent')} (${escapeHtml(student.parentPhone || student.phone || '')})</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Target Exam / Class:</span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(student.class || student.target || 'Class 12 / JEE')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                            <span class="text-slate-500 font-medium">Enrollment Status:</span>
+                            <span class="font-bold ${student.status === 'Blocked' ? 'text-rose-600' : 'text-emerald-600'}">${escapeHtml(student.status || 'Active')}</span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span class="text-slate-500 font-medium">Fee Summary:</span>
+                            <span class="font-bold ${balanceFee > 0 ? 'text-amber-600' : 'text-emerald-600'}">₹${paidFee.toLocaleString('en-IN')} paid of ₹${totalFee.toLocaleString('en-IN')} ${balanceFee > 0 ? `(₹${balanceFee.toLocaleString('en-IN')} balance)` : '✓ Fully Cleared'}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="printStudentIdCard('${student.id}')" class="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
+                            <i class="fa-solid fa-id-card"></i>
+                            <span>Download Student ID</span>
+                        </button>
+                        <button type="button" onclick="closeModal(); openStudentFacultyFeedbackModal();" class="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold rounded-xl text-xs flex items-center justify-center gap-2 transition border border-amber-300 dark:border-amber-700 cursor-pointer">
+                            <i class="fa-solid fa-star"></i>
+                            <span>Rate Mentors</span>
+                        </button>
+                    </div>
+
+                    <div class="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button type="button" onclick="closeModal()" class="px-5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-xs transition cursor-pointer">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            openModal(modalHtml);
         }
 
         /********************************************************************

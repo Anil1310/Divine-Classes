@@ -117,20 +117,16 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 4. Enter Title, Subject, Topic, and paste the Google Drive or PDF link.
 5. Click **Publish Material**.
 
-### 3.6 Managing Your Faculty Profile & Identity Card
-1. Navigate to **Teachers** (or click **My Profile** on your Overview Dashboard).
-2. You will see your dedicated **"My Faculty Profile"** card highlighted at the top.
-3. **Edit Your Profile**:
-   - Click `Edit My Profile` to update your qualifications, teaching experience, specialization, biography, and contact phone.
-   - Click **Save Faculty Record** to commit changes to the cloud database.
-4. **Update Photo**:
-   - Click `Update Photo` to capture a live photo or upload a new faculty image.
-5. **View & Print Faculty ID Card**:
-   - Click `Faculty ID Card` to view your official Divine Classes Faculty Identity Card with photo, subject, qualification, faculty ID, and institute seal.
-   - Click `Print Faculty ID` to print a physical ID badge.
-6. **Active Faculty Mentors**:
-   - All other educators are displayed in a clean, read-only mentor grid just like in student view (photo, name, subject, qualifications, experience, bio, and specialization).
-   - Administrative edit controls and student-specific "Book Doubt Slot" buttons are automatically hidden.
+### 3.6 Accessing Your Faculty Profile & Identity Card
+1. Your profile is accessible right at the top of your workspace:
+   - Click **My Profile** in the top navigation header, or
+   - Click **My Faculty Profile & Reviews** in your top role banner.
+2. **View & Edit Your Profile**:
+   - View your credentials, qualifications, subjects, contact phone, and student/parent reviews received.
+   - Click `Edit Photo` to capture a live photo or upload an image.
+   - Click `Faculty ID Card` to view and print your official Divine Classes Identity Card with institute seal.
+3. **Peer Isolation**:
+   - Other teachers' profiles are not cluttering your sidebar; your faculty tools are streamlined and focused directly on your teaching activities.
 
 ---
 
@@ -143,6 +139,25 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 4. Click **Sign In to Student Portal**.
 
 ### 4.2 Checking Historical Attendance by Date
+1. Navigate to **Attendance**.
+2. Select any **Month** from the dropdown filter (e.g., *October 2026*).
+3. View your overall attendance percentage and day-by-day record (`P`, `A`, `L`).
+
+### 4.3 Downloading Batch Study Materials
+1. Navigate to **Study Materials**.
+2. Only materials designated for your enrolled batch will be visible.
+3. Click **Download / Open PDF** to open the assignment or DPP.
+
+### 4.4 Viewing Offline Test Marks & Progress Card
+1. Navigate to **Marks Tracker**.
+2. Inspect your scores, maximum marks, percentage, and teacher remarks.
+3. Click **Print Report Card** to view and download your verified Academic Report Card.
+
+### 4.5 Submitting Teacher & Faculty Feedback
+1. Click **Faculty & Feedback** in the top header or role banner.
+2. Browse active faculty mentor profiles and their doubt-clearing timings.
+3. Select your teacher from the dropdown, give a **1 to 5 star rating**, choose a category (Teaching Quality, Doubt Resolution, Punctuality), and write your constructive comments.
+4. Click **Submit Feedback to Institute** to record your review.
 1. On mobile or laptop, tap **Attendance** in the menu.
 2. You will see your batch attendance summary (Present %, Total Classes).
 3. **To check a specific date**:
