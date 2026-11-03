@@ -4581,7 +4581,6 @@ window.DIVINE_PAGE_BACKENDS = {
             const { student: ownStudent, batch: myBatch, batchId: myBatchId } = getCurrentStudentAndBatch();
 
             const visibleBatches = (state.batches || []).filter(batch => {
-                if (state.currentRole === 'teacher') return isBatchAssignedToCurrentTeacher(batch);
                 if (isStudent) {
                     if (myBatchId && String(batch.id) === String(myBatchId)) return true;
                     if (ownStudent && String(batch.id) === String(ownStudent.batchId)) return true;
@@ -4597,14 +4596,19 @@ window.DIVINE_PAGE_BACKENDS = {
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                         <div>
                             <h2 class="text-base font-bold text-slate-900 font-heading">${isStudent ? 'My Enrolled Batch' : `Coaching Batches (${visibleBatches.length})`}</h2>
-                            <p class="text-xs text-slate-500">${isStudent ? 'You are viewing your assigned batch details and classmates.' : (state.currentRole === 'teacher' ? 'Only batches assigned to your faculty profile are shown.' : 'Create dedicated batches and manage their student rosters.')}</p>
+                            <p class="text-xs text-slate-500">${isStudent ? 'You are viewing your assigned batch details and classmates.' : (state.currentRole === 'teacher' ? 'View all institute coaching batches and add students directly to any batch.' : 'Create dedicated batches and manage their student rosters.')}</p>
                         </div>
                         ${canManageBatches ? `
                         <button onclick="openCreateBatchModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
                             <i class="fa-solid fa-plus"></i> Create New Batch
                         </button>
                         ` : (state.currentRole === 'teacher' ? `
-                        <span class="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5"><i class="fa-solid fa-chalkboard-user"></i> Faculty Portal • Assigned Batches</span>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5"><i class="fa-solid fa-chalkboard-user"></i> Faculty Portal</span>
+                            <button onclick="openAddStudentToBatchModal()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+                                <i class="fa-solid fa-user-plus"></i> + Add Student to Any Batch
+                            </button>
+                        </div>
                         ` : `
                         <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg font-medium">Read-Only in Student View</span>
                         `)}
@@ -4620,6 +4624,7 @@ window.DIVINE_PAGE_BACKENDS = {
                             const bSubject = (batch.subject && batch.subject !== 'undefined') ? batch.subject : (batch.subjects || 'Physics, Chemistry & Mathematics');
                             const bTeacher = (batch.teacher && batch.teacher !== 'undefined') ? batch.teacher : (batch.lead_faculty || 'Faculty Mentor');
                             const bStudentIds = Array.isArray(batch.studentIds) ? batch.studentIds : (Array.isArray(batch.student_ids) ? batch.student_ids : []);
+                            const isMyBatch = state.currentRole === 'teacher' && isBatchAssignedToCurrentTeacher(batch);
                             const enrolledStudents = (state.students || []).filter(s =>
                                 s && s.status !== 'Inactive' && (
                                     String(s.batchId) === String(bId) ||
@@ -4627,13 +4632,16 @@ window.DIVINE_PAGE_BACKENDS = {
                                 )
                             );
                             return `
-                                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+                                <div class="bg-white rounded-2xl border ${isMyBatch ? 'border-emerald-300 ring-2 ring-emerald-100' : 'border-slate-200'} shadow-xs overflow-hidden flex flex-col">
                                     <!-- Batch Header -->
-                                    <div class="p-5 bg-slate-50/70 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3">
+                                    <div class="p-5 ${isMyBatch ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : 'bg-slate-50/70 dark:bg-slate-800'} border-b border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3">
                                         <div>
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2 flex-wrap">
                                                 <span class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">${escapeHtml(bRoom)}</span>
                                                 <span class="text-xs text-slate-500 font-medium"><i class="fa-regular fa-clock mr-1"></i>${escapeHtml(bSchedule)}</span>
+                                                ${isMyBatch ? `
+                                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 flex items-center gap-1"><i class="fa-solid fa-star text-[9px]"></i> My Assigned Batch</span>
+                                                ` : ''}
                                             </div>
                                             <h3 class="text-base font-bold text-slate-900 mt-2 font-heading">${escapeHtml(bName)}</h3>
                                             <p class="text-xs text-slate-600 mt-0.5"><strong>Subjects:</strong> ${escapeHtml(bSubject)} • <strong>Mentor:</strong> ${escapeHtml(bTeacher)}</p>
@@ -4776,27 +4784,48 @@ window.DIVINE_PAGE_BACKENDS = {
             showToast(`Batch "${newBatch.name}" created! You can now add students.`, 'success');
         }
 
-        function openAddStudentToBatchModal(batchId) {
+        function openAddStudentToBatchModal(initialBatchId) {
             if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
-                showToast('Only administrators or assigned faculty can assign students to batches.', 'error');
+                showToast('Only administrators or faculty can assign students to batches.', 'error');
                 return;
             }
-            const batch = state.batches.find(b => b.id === batchId);
-            const availableStudents = state.students.filter(s => s.status !== 'Inactive' && !(batch.studentIds || []).includes(s.id));
+            const allBatches = state.batches || [];
+            if (!allBatches.length) {
+                showToast('No batches exist yet to add students to.', 'warning');
+                return;
+            }
+            const currentBatchId = initialBatchId || (allBatches.find(isBatchAssignedToCurrentTeacher) || allBatches[0]).id;
+            const batch = allBatches.find(b => b.id === currentBatchId) || allBatches[0];
+            const batchStudentIds = Array.isArray(batch.studentIds) ? batch.studentIds : (Array.isArray(batch.student_ids) ? batch.student_ids : []);
+            const availableStudents = (state.students || []).filter(s => s && s.status !== 'Inactive' && !batchStudentIds.includes(s.id) && !batchStudentIds.includes(s.roll));
 
             const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="text-base font-bold text-slate-900 font-heading">Add Student to Batch</h3>
-                        <p class="text-xs text-slate-500">${batch.name}</p>
+                        <p class="text-xs text-slate-500">${escapeHtml(batch.name || ('Batch ' + batch.id))}</p>
                     </div>
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
 
-                <div class="mt-4 space-y-5">
+                <div class="mt-4 space-y-4">
+                    <!-- Batch Selector -->
+                    <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
+                        <label class="block text-xs font-bold text-indigo-950 mb-1 flex items-center gap-1.5">
+                            <i class="fa-solid fa-users-rectangle text-indigo-600"></i> Target Coaching Batch:
+                        </label>
+                        <select id="modal-target-batch-id" onchange="openAddStudentToBatchModal(this.value)" class="w-full px-3 py-2 text-xs border border-indigo-200 rounded-lg bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            ${allBatches.map(b => `
+                                <option value="${b.id}" ${b.id === batch.id ? 'selected' : ''}>
+                                    ${escapeHtml(b.name || b.id)}${isBatchAssignedToCurrentTeacher(b) ? ' ★ (My Batch)' : ''}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+
                     <!-- Option A: Select Existing Student -->
                     ${availableStudents.length > 0 ? `
-                    <form onsubmit="handleAddExistingStudent(event, '${batchId}')" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <form onsubmit="handleAddExistingStudent(event, '${batch.id}')" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                         <label class="block text-xs font-bold text-slate-700">Option 1: Select from Existing Institute Directory</label>
                         <div class="flex gap-2">
                             <select id="existing-student-id" class="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none">
@@ -4805,10 +4834,14 @@ window.DIVINE_PAGE_BACKENDS = {
                             <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shrink-0">Add to Batch</button>
                         </div>
                     </form>
-                    ` : ''}
+                    ` : `
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs text-slate-500">
+                        All active institute students are already enrolled in this batch. You can enroll a brand-new student below.
+                    </div>
+                    `}
 
                     <!-- Option B: Register Brand New Student -->
-                    <form onsubmit="handleAddNewStudentToBatch(event, '${batchId}')" class="space-y-3">
+                    <form onsubmit="handleAddNewStudentToBatch(event, '${batch.id}')" class="space-y-3">
                         <label class="block text-xs font-bold text-slate-700">Option 2: Enroll Brand New Student</label>
                         <div class="flex flex-col items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-5">
                             <label for="new-stu-photo-input" class="student-photo-picker relative block w-28 h-28 rounded-full bg-white border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:ring-4 hover:ring-indigo-100 overflow-hidden cursor-pointer transition group" title="Click to upload or change the student photo">
@@ -4896,26 +4929,39 @@ window.DIVINE_PAGE_BACKENDS = {
         function handleAddExistingStudent(e, batchId) {
             e.preventDefault();
             if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
-                showToast('Only administrators or assigned faculty can assign students to batches.', 'error');
+                showToast('Only administrators or faculty can assign students to batches.', 'error');
                 return;
             }
+            const targetBatchId = (document.getElementById('modal-target-batch-id') && document.getElementById('modal-target-batch-id').value) || batchId;
             const stuId = document.getElementById('existing-student-id').value;
-            const batch = state.batches.find(b => b.id === batchId);
+            const batch = state.batches.find(b => b.id === targetBatchId);
             const stu = state.students.find(s => s.id === stuId);
-            if (batch && !(batch.studentIds || []).includes(stuId)) {
-                if (!batch.studentIds) batch.studentIds = [];
-                batch.studentIds.push(stuId);
+            if (batch && stu) {
+                if (!Array.isArray(batch.studentIds)) batch.studentIds = [];
+                if (!batch.studentIds.includes(stu.id)) {
+                    batch.studentIds.push(stu.id);
+                }
+                stu.batchId = batch.id;
                 saveStateLocally();
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.apiSyncAllData(state);
+                }
             }
             closeModal();
             renderMainContent();
-            showToast(`${stu.name} added to ${batch.name}`, 'success');
+            showToast(`${stu ? stu.name : 'Student'} added to ${batch ? batch.name : 'batch'}`, 'success');
         }
 
         function handleAddNewStudentToBatch(e, batchId) {
             e.preventDefault();
             if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
-                showToast('Only administrators or assigned faculty can enroll students into batches.', 'error');
+                showToast('Only administrators or faculty can enroll students into batches.', 'error');
+                return;
+            }
+            const targetBatchId = (document.getElementById('modal-target-batch-id') && document.getElementById('modal-target-batch-id').value) || batchId;
+            const batch = state.batches.find(b => b.id === targetBatchId);
+            if (!batch) {
+                showToast('Target batch could not be found.', 'error');
                 return;
             }
             if (window.newStudentPhotoProcessing) {
@@ -4949,16 +4995,19 @@ window.DIVINE_PAGE_BACKENDS = {
                 dueDate,
                 monthlyPaidThisCycle: 0,
                 lastReminder: 'Never',
-                photo: window.newStudentPhotoData || ''
+                photo: window.newStudentPhotoData || '',
+                batchId: batch.id
             };
             window.newStudentPhotoData = '';
 
             state.students.push(newStu);
-            const batch = state.batches.find(b => b.id === batchId);
-            if (!batch.studentIds) batch.studentIds = [];
+            if (!Array.isArray(batch.studentIds)) batch.studentIds = [];
             batch.studentIds.push(newStu.id);
 
             saveStateLocally();
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.apiSyncAllData(state);
+            }
             closeModal();
             renderMainContent();
             showToast(`New student ${name} (${newStu.roll}) registered & added to ${batch.name}!`, 'success');
