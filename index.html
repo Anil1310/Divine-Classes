@@ -12157,47 +12157,93 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function showMicrophonePermissionHelpModal() {
             if (typeof openModal !== 'function') return;
+            const ua = navigator.userAgent || '';
+            const isEdge = /Edg\//i.test(ua);
+            const isChrome = /Chrome\//i.test(ua) && !isEdge;
+            const isAndroid = /Android/i.test(ua);
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const browserName = isEdge ? 'Microsoft Edge' : (isChrome ? 'Google Chrome' : 'Your Browser');
+
             const html = `
-                <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100">
+                <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100 max-w-lg">
                     <div class="flex items-center gap-3">
                         <div class="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center text-xl shrink-0">
                             <i class="fa-solid fa-microphone-slash"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold">How to Enable Your Microphone</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Follow these 2 quick steps to turn on voice speech:</p>
+                            <h3 class="text-base font-bold">Microphone Access is Blocked</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Detected: <span class="font-semibold text-indigo-600 dark:text-indigo-400">${isAndroid ? '📱 Android Mobile APK' : (isMac ? '🍎 macOS (' + browserName + ')' : browserName)}</span>
+                            </p>
                         </div>
                     </div>
+
+                    ${isAndroid ? `
                     <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
                         <div class="space-y-1.5">
                             <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                                <span>1️⃣ In Google Chrome (Address Bar):</span>
+                                <span>📱 In Android Phone Settings (Mobile APK):</span>
                             </div>
-                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
-                                <li>Look at the top URL bar of your browser (where the web address is).</li>
-                                <li>Click the <strong>Tune / Sliders (🎚️)</strong> or <strong>Padlock (🔒)</strong> icon on the left of the address.</li>
-                                <li>Find <strong>Microphone</strong> and switch it from <em>"Block"</em> to <strong>"Allow"</strong>.</li>
+                            <ul class="list-disc list-inside space-y-1.5 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Open your phone's <strong>Settings</strong> app &gt; <strong>Apps</strong> (or <em>Manage Apps</em>).</li>
+                                <li>Find and tap <strong>Divine Classes</strong> (this app).</li>
+                                <li>Tap <strong>Permissions</strong> &gt; <strong>Microphone</strong>.</li>
+                                <li>Select <strong>"Allow only while using the app"</strong>.</li>
+                                <li>Return here and tap <strong>"Try Again"</strong> below!</li>
                             </ul>
                         </div>
-                        <div class="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
-                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                                <span>2️⃣ In Mac System Settings (macOS):</span>
-                            </div>
-                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
-                                <li>Click <strong>Apple menu ()</strong> at the very top-left of your Mac screen &gt; <strong>System Settings</strong>.</li>
-                                <li>Go to <strong>Privacy & Security</strong> &gt; <strong>Microphone</strong>.</li>
-                                <li>Ensure the switch next to <strong>Google Chrome</strong> is turned <strong>ON (Green)</strong>.</li>
-                            </ul>
+                        <div class="pt-2 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400">
+                            💡 <em>Note for APK Developer: Ensure WebChromeClient.onPermissionRequest grants RECORD_AUDIO permission to the WebView.</em>
                         </div>
                     </div>
-                    <div class="flex gap-2 justify-end pt-2">
+                    ` : `
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
+                        <div class="space-y-1.5">
+                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <span>1️⃣ In ${browserName} (Address Bar):</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Look at the top URL bar of ${browserName}.</li>
+                                <li>Click the <strong>Tune / Sliders (🎚️)</strong> or <strong>Padlock (🔒)</strong> icon on the left of the address.</li>
+                                <li>Ensure <strong>Microphone</strong> is toggled to <strong>"Allow" / ON</strong>.</li>
+                            </ul>
+                        </div>
+
+                        ${isMac ? `
+                        <div class="pt-2.5 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
+                            <div class="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                <span>2️⃣ In Mac System Settings (Crucial macOS Step):</span>
+                            </div>
+                            <p class="text-slate-600 dark:text-slate-300">Even if allowed in the browser, macOS blocks hardware access if ${browserName} is disabled in Mac settings:</p>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Click <strong>Apple menu ()</strong> at the very top-left corner &gt; <strong>System Settings</strong>.</li>
+                                <li>Go to <strong>Privacy & Security</strong> &gt; <strong>Microphone</strong>.</li>
+                                <li>Find <strong>${browserName}</strong> in the list and turn the switch <strong>ON (Green)</strong>.</li>
+                                <li><em>If you just turned it on, close & reopen ${browserName} or click Reload Page below.</em></li>
+                            </ul>
+                        </div>
+                        ` : `
+                        <div class="pt-2.5 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
+                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <span>2️⃣ Windows Privacy Settings:</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Open Windows <strong>Settings</strong> &gt; <strong>Privacy & Security</strong> &gt; <strong>Microphone</strong>.</li>
+                                <li>Ensure <em>"Let desktop apps access your microphone"</em> is turned <strong>ON</strong>.</li>
+                            </ul>
+                        </div>
+                        `}
+                    </div>
+                    `}
+
+                    <div class="flex flex-wrap gap-2 justify-end pt-2">
                         <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">
                             Close
                         </button>
                         <button type="button" onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
                             <i class="fa-solid fa-rotate-right"></i> Reload Page
                         </button>
-                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 200);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
+                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 300);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
                             <i class="fa-solid fa-microphone"></i> Try Again
                         </button>
                     </div>
@@ -12206,7 +12252,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             openModal(html);
         }
 
-        function toggleChatbotVoiceRecognition() {
+        async function toggleChatbotVoiceRecognition() {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) {
                 showToast('Voice recognition requires Google Chrome, Microsoft Edge, Safari, or an Android browser with microphone access.', 'warning');
@@ -12218,10 +12264,24 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
 
+            // Proactively request media stream to trigger native OS/browser prompt if not yet prompted
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(t => t.stop());
+                } catch(err) {
+                    console.warn('[Microphone getUserMedia check]', err);
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        showMicrophonePermissionHelpModal();
+                        return;
+                    }
+                }
+            }
+
             startChatbotVoiceRecognition();
         }
 
-        function startChatbotVoiceRecognition() {
+        function startChatbotVoiceRecognition(langOverride) {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) return;
 
@@ -12235,7 +12295,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 recognition.continuous = false;
                 recognition.interimResults = true;
                 recognition.maxAlternatives = 1;
-                recognition.lang = 'en-IN'; // Optimized for Indian English & Hindi terms
+                recognition.lang = langOverride || 'en-IN'; // Optimized for Indian English & Hindi terms
 
                 const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
                 const banner = document.getElementById('chatbot-voice-banner');
@@ -12274,8 +12334,15 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 recognition.onerror = function(event) {
                     console.warn('[Voice Recognition Error]', event.error);
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                        showToast('Microphone access blocked. Click the lock/settings icon in your browser address bar to allow microphone.', 'error');
+                        showToast('Microphone access blocked. Please check your Mac/Phone settings.', 'error');
                         showMicrophonePermissionHelpModal();
+                    } else if (event.error === 'language-not-supported' && (!langOverride || langOverride !== 'en-US')) {
+                        console.log('Language en-IN not supported in this browser, falling back to en-US');
+                        stopChatbotVoiceRecognition();
+                        setTimeout(function() {
+                            startChatbotVoiceRecognition('en-US');
+                        }, 200);
+                        return;
                     } else if (event.error === 'no-speech') {
                         showToast('No speech detected. Please speak closer to the microphone.', 'info');
                     } else if (event.error === 'network') {
@@ -12344,11 +12411,24 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         /********************************************************************
          * ORAL VOICE FORM FILL INSIDE "ADD STUDENT" MODAL
          ********************************************************************/
-        function startModalVoiceFill() {
+        async function startModalVoiceFill() {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) {
                 showToast('Voice recognition not supported in this browser.', 'warning');
                 return;
+            }
+
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(t => t.stop());
+                } catch(err) {
+                    console.warn('[Modal Voice getUserMedia check]', err);
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        showMicrophonePermissionHelpModal();
+                        return;
+                    }
+                }
             }
 
             const btn = document.getElementById('modal-voice-fill-btn');
