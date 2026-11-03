@@ -369,6 +369,14 @@ def quick_push(project_dir):
         print(f'  git remote set-url origin "{corrected_remote}"')
         return
 
+    # Pre-sync remote updates to avoid non-fast-forward push rejections
+    print(f"{CYAN}Syncing with remote ({branch})...{RESET}")
+    pull_ok = run_cmd(f"git pull --rebase origin {branch}", cwd=project_dir, check=False)
+    if not pull_ok:
+        subprocess.run("git rebase --abort", shell=True, cwd=project_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Attempt standard pull fallback
+        run_cmd(f"git pull origin {branch} --no-rebase", cwd=project_dir, check=False)
+
     success = run_cmd(f"git push origin {branch}", cwd=project_dir)
 
     if success:
