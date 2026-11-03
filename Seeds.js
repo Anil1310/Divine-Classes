@@ -704,7 +704,7 @@ function createDefaultSeedRecords_(appData) {
   try {
     PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
     PropertiesService.getScriptProperties().deleteProperty('DB_tomb_linkUrls');
-  } catch (e) {}
+  } catch (e) { }
   return mergeDefaultDummySeeds_(appData);
 }
 
