@@ -9347,101 +9347,16 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">
                             Close
                         </button>
-                        <button type="button" onclick="openVoiceInputPopup('chatbot')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
-                            <i class="fa-solid fa-up-right-from-square"></i> Open Speech Window
+                        <button type="button" onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-rotate-right"></i> Reload Page
                         </button>
-                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 200);" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
-                            <i class="fa-solid fa-microphone"></i> Retry Inline
+                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 200);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-microphone"></i> Try Again
                         </button>
                     </div>
                 </div>
             `;
             openModal(html);
-        }
-
-        function openVoiceInputPopup(targetType) {
-            if (typeof closeModal === 'function') closeModal();
-            const w = 440;
-            const h = 360;
-            const left = Math.max(0, (window.screen.width - w) / 2);
-            const top = Math.max(0, (window.screen.height - h) / 2);
-            const popup = window.open('about:blank', 'DivineVoiceWindow', `width=${w},height=${h},top=${top},left=${left},menubar=no,toolbar=no,location=no,status=no`);
-            if (!popup) {
-                showToast('Popup blocked! Please allow popups for this site in your address bar.', 'warning');
-                return;
-            }
-
-            const targetName = targetType === 'modal' ? 'Student Voice Admission' : 'Divine AI Assistant';
-            const html = [
-                '<!DOCTYPE html>',
-                '<html><head><meta charset="utf-8">',
-                '<title>Voice Speech - Divine Classes</title>',
-                '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-                '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">',
-                '<style>',
-                'body{background:#0f172a;color:#fff;font-family:system-ui,-apple-system,sans-serif;padding:20px;margin:0;display:flex;flex-direction:column;justify-content:space-between;height:100vh;box-sizing:border-box;}',
-                '.btn{padding:10px;border-radius:12px;font-size:12px;font-weight:700;border:none;cursor:pointer;}',
-                '.btn-done{background:#4f46e5;color:#fff;flex:1;}',
-                '.btn-cancel{background:#334155;color:#cbd5e1;flex:1;}',
-                '#mic{width:56px;height:56px;margin:0 auto;border-radius:50%;background:#e11d48;display:flex;align-items:center;justify-content:center;font-size:22px;animation:pulse 1.5s infinite;}',
-                '@keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(225,29,72,0.7);}50%{transform:scale(1.08);box-shadow:0 0 0 14px rgba(225,29,72,0);}}',
-                '</style></head><body>',
-                '<div style="text-align:center;">',
-                '<div id="mic"><i class="fa-solid fa-microphone"></i></div>',
-                '<h3 style="margin:12px 0 4px 0;font-size:16px;">Listening: ' + targetName + '</h3>',
-                '<p id="status" style="margin:0;font-size:12px;color:#f43f5e;">🎙️ Speak now clearly into your mic...</p>',
-                '</div>',
-                '<div style="background:#1e293b;border-radius:16px;padding:14px;border:1px solid #334155;min-height:80px;display:flex;align-items:center;justify-content:center;text-align:center;">',
-                '<p id="txt" style="margin:0;font-size:13px;color:#e2e8f0;font-style:italic;">"Waiting for speech..."</p>',
-                '</div>',
-                '<div style="display:flex;gap:10px;">',
-                '<button class="btn btn-cancel" onclick="window.close()">Cancel</button>',
-                '<button class="btn btn-done" onclick="finishSpeech()">Done / Send</button>',
-                '</div>',
-                '<' + 'script' + '>',
-                'let res="";const SR=window.SpeechRecognition||window.webkitSpeechRecognition;',
-                'if(!SR){document.getElementById("status").innerText="Speech recognition not supported.";}else{',
-                'const r=new SR();r.continuous=false;r.interimResults=true;r.lang="en-IN";',
-                'r.onstart=function(){document.getElementById("status").innerText="🎙️ Listening... Speak now!";};',
-                'r.onresult=function(e){let t="";for(let i=e.resultIndex;i<e.results.length;i++){t+=e.results[i][0].transcript;}res=t;document.getElementById("txt").innerText=\'"\'+t+\'"\';};',
-                'r.onerror=function(e){document.getElementById("status").innerText="Voice error: "+e.error;};',
-                'r.onend=function(){setTimeout(finishSpeech,400);};',
-                'try{r.start();}catch(err){document.getElementById("status").innerText="Error: "+err.message;}',
-                '}',
-                'function finishSpeech(){if(res&&window.opener){window.opener.postMessage({type:"DIVINE_VOICE_RESULT",transcript:res,target:"' + (targetType||'chatbot') + '"},"*");}window.close();}',
-                '<' + '/script' + '>',
-                '</body></html>'
-            ].join('\n');
-
-            popup.document.open();
-            popup.document.write(html);
-            popup.document.close();
-        }
-
-        if (!window.__hasVoiceMessageListener) {
-            window.__hasVoiceMessageListener = true;
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'DIVINE_VOICE_RESULT') {
-                    const text = String(event.data.transcript || '').trim();
-                    const target = event.data.target;
-                    if (!text) return;
-                    if (target === 'modal') {
-                        const parsed = extractStudentDetailsFromSpeech(text);
-                        applyParsedDetailsToModal(parsed);
-                        showToast('Student details extracted from speech!', 'success');
-                    } else {
-                        const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
-                        if (input) input.value = text;
-                        const floatingForm = document.getElementById('chatbot-form');
-                        const isDedicated = !floatingForm || floatingForm.offsetParent === null;
-                        if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
-                            handleDedicatedChatbotSubmit(new Event('submit'));
-                        } else if (typeof handleChatbotSubmit === 'function') {
-                            handleChatbotSubmit(new Event('submit'));
-                        }
-                    }
-                }
-            });
         }
 
         function toggleChatbotVoiceRecognition() {
@@ -9456,7 +9371,6 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
 
-            // Call start directly and synchronously to preserve the user-click gesture activation
             startChatbotVoiceRecognition();
         }
 
@@ -9513,7 +9427,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 recognition.onerror = function(event) {
                     console.warn('[Voice Recognition Error]', event.error);
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                        showToast('Microphone access blocked. Click "Open Speech Window" to speak!', 'warning');
+                        showToast('Microphone access blocked. Please allow microphone in your browser settings.', 'error');
                         showMicrophonePermissionHelpModal();
                     } else if (event.error === 'language-not-supported' && (!langOverride || langOverride !== 'en-US')) {
                         console.log('Language en-IN not supported in this browser, falling back to en-US');
@@ -9625,8 +9539,8 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
                 recognition.onerror = function(event) {
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                        showToast('Microphone access blocked. Click "Open Speech Window" to speak!', 'warning');
-                        openVoiceInputPopup('modal');
+                        showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
+                        showMicrophonePermissionHelpModal();
                     } else {
                         showToast('Voice error: ' + event.error, 'error');
                     }
