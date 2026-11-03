@@ -10078,14 +10078,6 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     })
                     .withFailureHandler(function () { showToast('Developer sign-in could not be verified. Please try again.', 'error'); })
                     .apiVerifyDeveloperLogin(idVal, pwd);
-                        closeModal();
-                        updateRoleUI();
-                        renderSidebar();
-                        renderMainContent();
-                        showToast('Lead Dev sign-in successful.', 'success');
-                    })
-                    .withFailureHandler(function () { showToast('Developer sign-in could not be verified. Please try again.', 'error'); })
-                    .apiVerifyDeveloperLogin(idVal, pwd);
                 return;
             }
 
