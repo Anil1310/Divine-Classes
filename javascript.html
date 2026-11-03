@@ -9261,7 +9261,6 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function showMicrophonePermissionHelpModal() {
             if (typeof openModal !== 'function') return;
-            const isHttps = window.location.protocol === 'https:';
             const html = `
                 <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100">
                     <div class="flex items-center gap-3">
@@ -9269,27 +9268,40 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             <i class="fa-solid fa-microphone-slash"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold">Microphone Access is Blocked</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Your browser has blocked microphone access for Divine Classes.</p>
+                            <h3 class="text-base font-bold">How to Enable Your Microphone</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Follow these 2 quick steps to turn on voice speech:</p>
                         </div>
                     </div>
                     <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                            <i class="fa-solid fa-circle-info"></i> How to Allow Microphone Access:
-                        </p>
-                        <ol class="list-decimal list-inside space-y-2 text-slate-600 dark:text-slate-300">
-                            <li><strong>Look at your browser's address bar</strong> at the top of this window.</li>
-                            <li>Click on the <strong>Tune / Settings / Padlock icon (🔒 or 🎚️)</strong> on the left side of the address.</li>
-                            <li>Find <strong>Microphone</strong> in the permissions menu and change it to <strong>"Allow"</strong>.</li>
-                            ${!isHttps && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? '<li class="text-amber-600 font-semibold">Note: Speech recognition requires HTTPS secure connection or localhost.</li>' : ''}
-                            <li>Once allowed, click <strong>"Try Again"</strong> below to start speaking!</li>
-                        </ol>
+                        <div class="space-y-1.5">
+                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <span>1️⃣ In Google Chrome (Address Bar):</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Look at the top URL bar of your browser (where the web address is).</li>
+                                <li>Click the <strong>Tune / Sliders (🎚️)</strong> or <strong>Padlock (🔒)</strong> icon on the left of the address.</li>
+                                <li>Find <strong>Microphone</strong> and switch it from <em>"Block"</em> to <strong>"Allow"</strong>.</li>
+                            </ul>
+                        </div>
+                        <div class="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
+                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <span>2️⃣ In Mac System Settings (macOS):</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Click <strong>Apple menu ()</strong> at the very top-left of your Mac screen &gt; <strong>System Settings</strong>.</li>
+                                <li>Go to <strong>Privacy & Security</strong> &gt; <strong>Microphone</strong>.</li>
+                                <li>Ensure the switch next to <strong>Google Chrome</strong> is turned <strong>ON (Green)</strong>.</li>
+                            </ul>
+                        </div>
                     </div>
                     <div class="flex gap-2 justify-end pt-2">
                         <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">
                             Close
                         </button>
-                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 300);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
+                        <button type="button" onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-rotate-right"></i> Reload Page
+                        </button>
+                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 200);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
                             <i class="fa-solid fa-microphone"></i> Try Again
                         </button>
                     </div>
@@ -9310,27 +9322,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
 
-            // Proactively request browser microphone permission via getUserMedia if available
-            if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(function(stream) {
-                        try {
-                            stream.getTracks().forEach(function(t) { t.stop(); });
-                        } catch(e){}
-                        startChatbotVoiceRecognition();
-                    })
-                    .catch(function(err) {
-                        console.warn('[Microphone Permission Error]', err);
-                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                            showToast('Microphone access was denied. Please allow microphone permissions in your browser address bar.', 'error');
-                            showMicrophonePermissionHelpModal();
-                        } else {
-                            startChatbotVoiceRecognition();
-                        }
-                    });
-            } else {
-                startChatbotVoiceRecognition();
-            }
+            startChatbotVoiceRecognition();
         }
 
         function startChatbotVoiceRecognition() {
