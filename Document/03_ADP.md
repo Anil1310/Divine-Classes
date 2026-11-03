@@ -425,9 +425,14 @@ clasp open --webapp
 1. **Multi-Surface AI Presence**:
    - Floating drawer `#divine-chatbot-window` and button `#divine-chatbot-btn` accessible on every view.
    - Dedicated full-page route (`?page=chatbot`) and modular page container (`Pages/Chatbot/`).
-2. **Auto-Connected Gemini Engine**:
+2. **Auto-Connected Gemini Engine & Developer Key Isolation**:
    - Backend `apiAskGeminiAi` in `Code.js` with direct client-side fallback to Gemini REST API endpoints.
    - Auto-connection to `gemini-2.5-flash` or `gemini-2.5-pro` with inline developer API key drawer `#gemini-config-drawer`.
+   - **Developer RBAC Restriction**: Gemini configuration triggers and drawers are strictly restricted to Developer mode (`state.currentRole === 'developer' || state.isDeveloper`) and hidden from Admin, Teacher, and Student roles.
+3. **Oral Voice Recognition & Diagnostics**:
+   - Direct Web Speech API capture without nested iframe getUserMedia blocking.
+   - Interactive recovery dialog (`showMicrophonePermissionHelpModal()`) for blocked microphone settings across Chrome and macOS.
+   - 1-click `"🎙️ Speak: Add Student"` pill activating speech recognition directly.
 3. **Oral Voice Recognition & Voice Admission**:
    - Web Speech API integration (`SpeechRecognition` / `webkitSpeechRecognition`) for oral microphone inputs.
    - Speech parser `extractStudentDetailsFromSpeech` extracting Name, Parent, Phone, Batch, and Fee.

@@ -83,3 +83,75 @@ Applies identically across Web Browsers and Mobile APK (WebView):
 - **Independence of Credentials vs. Session**:
   - Auto-logout or manual logout closes the active session (`DIVINE_AUTH_SESSION`), but keeps the 10-day remembered credentials intact. This allows the user to immediately log back in with their remembered credentials until the 10-day limit expires.
 
+---
+
+## 8. Dynamic Monthly Tuition Fees & Non-Editable Total Paid Field
+- **Non-Editable Total Fees Paid**:
+  - In student enrollment ("Add New Student" modal), the obsolete "Total Course Fee" input is completely removed.
+  - Replaced with **"Total Fees Paid (₹)"**, permanently initialized to **`0`** and strictly **non-editable by anyone, even for admin** (`readonly disabled cursor-not-allowed`).
+  - In student edit modals, "Total Fees Paid (₹)" remains strictly read-only and displays the student's cumulative payments till date.
+- **Dynamic Payment Accumulation & Due Date Advancement**:
+  - Tuition is paid on a monthly basis (default ₹1,000 / month, or any student-configured monthly rate).
+  - Recording fee payments (e.g. ₹1,000 for 1 month, or ₹12,000 for 12 months) automatically accumulates into `paidFee` (Total Fees Paid).
+  - Every recorded monthly payment advances the student's next fee due date forward by the exact number of months paid (`months = Math.floor(payment / monthlyFee)`).
+- **Fees Ledger & Receipts**:
+  - Ledger table header, mobile summary drawers, printed fee receipts, and CSV exports prominently highlight **"Total Paid (₹)"**, **"Monthly Fee (₹)"**, and real-time **"Fee Due Date"** status.
+
+---
+
+## 9. Divine AI Assistant, Gemini Auto-Connect & Oral Voice Recognition Architecture
+- **Interactive Multi-Mode Chatbot**:
+  - Available as both a persistent floating launcher (`#divine-chatbot-btn` + `#divine-chatbot-window`) and a full dedicated page module (`Pages/Chatbot/` and `Routes/Chatbot/page.html` with route `?page=chatbot`).
+  - Provides instant state-aware queries for students (live fee dues, total fees paid till date, enrolled batch, attendance, test marks) and institute knowledge (Paschimpuri campus address, helpline, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar).
+  - Academic doubt solver covering Physics (Ohm's law, Newton's laws), Chemistry, Mathematics, and Biology with pedagogical Markdown formatting.
+- **Auto-Connected Gemini AI Integration**:
+  - Direct integration with Google Gemini AI (`apiAskGeminiAi` in `Code.js` and direct client-side fallback `https://generativelanguage.googleapis.com/v1beta/models/`).
+  - Auto-connects to `gemini-2.5-flash` or `gemini-2.5-pro` with inline developer key management drawer (`#gemini-config-drawer`).
+  - Text-to-speech audio feedback (`speakChatbotResponse`) and Markdown-to-HTML parser (`formatGeminiMarkdown`).
+- **Oral Speech & Voice-Powered Student Admission**:
+  - Voice recognition via Web Speech API (`toggleChatbotVoiceRecognition` and `#modal-voice-fill-btn`).
+  - Natural speech parser (`extractStudentDetailsFromSpeech`) extracting Student Name, Father's Name, Phone, Batch, and Monthly Fee.
+  - Interactive Voice Admission Confirmation Card with 1-click enroll (`confirmVoiceStudentEnrollment`) strictly maintaining ₹0 initial Total Fees Paid.
+
+---
+
+## 10. Developer Settings Feature Governance & Master Chatbot Toggle
+- **Chatbot ON/OFF Control**:
+  - Managed via Developer Settings card (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
+  - State stored in `state.settings.chatbotEnabled` (default: `true`) and `localStorage ('DIVINE_CHATBOT_ENABLED')`.
+  - Synchronized across reloads and cloud database saves via `savePersistentSettingsToLocal()`, `applyPersistentSettingsOverrides()`, and `handleSaveSettings()`.
+- **Complete Disablement & Hiding**:
+  - When **switched OFF**:
+    - Floating launcher button (`#divine-chatbot-btn`) is completely hidden (`display: none` / `hidden`).
+    - Chat drawer (`#divine-chatbot-window`) is immediately closed, hidden, and active microphone recognition is stopped.
+    - Dedicated nav item is excluded from sidebar navigation (`renderSidebar`).
+    - Dedicated view renders an administrative notice with a shortcut button to Settings.
+  - When **switched ON**:
+    - Launcher button is visible and active across all views.
+    - Nav item appears in the sidebar under "Learning Resources".
+    - Full doubt-clearing and oral voice admission features are instantly accessible.
+
+---
+
+## 11. Developer-Only Gemini Key Management & Multi-Role RBAC Isolation
+- **Strict Role-Gated Configuration**:
+  - The Gemini AI Key configuration button / wand icon (`🪄` / `Gemini Key`) and the inline subscription drawer (`#gemini-config-drawer`) are **strictly restricted to Developer mode** (`state.currentRole === 'developer' || state.isDeveloper`).
+  - For all other roles (Admin, Teacher, and Student), the configuration controls are completely hidden (`display: none` / `dev-only-link`).
+  - Programmatic attempts to invoke `toggleGeminiSettingsDrawer()` or `saveGeminiSettingsFromDrawer()` by non-developers are rejected with user-facing warnings:
+    `"Gemini AI configuration is restricted to Developer mode."`
+- **Tamper-Proof Keys**:
+  - Gemini API keys, mode selection, and model endpoints are guarded against inspection or override by institute staff, educators, and students.
+
+---
+
+## 12. Resilient Microphone Voice Engine & Browser Permission Diagnostics
+- **Native Web Speech Execution**:
+  - Voice recognition operates directly through the browser speech interface (`SpeechRecognition` / `webkitSpeechRecognition`) without artificial `getUserMedia` policy blockades in nested iframes.
+  - Interactive listening feedback includes a pulsating red recording badge (`animate-pulse ring-4 ring-rose-300`), live status banner (`#chatbot-voice-banner`), and dynamic placeholder prompt (*"🎙️ Listening... Speak now clearly..."*).
+- **Proactive Permission Guidance Modal**:
+  - When browser security blocks microphone access (`not-allowed`), the application displays an interactive diagnostic dialog (`showMicrophonePermissionHelpModal()`).
+  - Provides step-by-step guidance for Google Chrome address bar (Tune/Padlock icon > Microphone > Allow) and macOS System Settings (Privacy & Security > Microphone > Google Chrome > ON).
+  - Includes a direct "Reload Page" action and "Try Again" trigger.
+- **1-Click Oral Prompt Activation**:
+  - Tapping the `"🎙️ Speak: Add Student"` quick prompt pill actively powers on the microphone, eliminating extra clicks for oral student admissions.
+

@@ -298,4 +298,20 @@ At the bottom of the report card modal, click any of the action buttons:
    - **OFF**: Chatbot is completely hidden, disabled, and voice listeners are shut down.
 4. Click **Save Settings** to apply immediately.
 
+### 9.4 Enabling Microphone Access in Google Chrome & macOS
+If the system displays *"Microphone Access is Blocked"*:
+1. **Google Chrome Address Bar**:
+   - Look at the URL bar at the top of Chrome.
+   - Click the **Tune / Sliders (🎚️)** or **Padlock (🔒)** icon on the left of the web address.
+   - Change **Microphone** from *"Block"* to **"Allow"**.
+2. **Mac System Settings**:
+   - Go to Apple menu () $\rightarrow$ **System Settings** $\rightarrow$ **Privacy & Security** $\rightarrow$ **Microphone**.
+   - Ensure the toggle next to **Google Chrome** is turned **ON (Green)**.
+3. Tap **"Try Again"** in the dialog to start speaking.
+
+### 9.5 Developer-Only Gemini Key & Model Configuration
+- To protect institute API quotas and credentials, only the **Lead Developer** role can configure or modify Gemini AI settings.
+- The **Gemini Key** button (`🪄`) in the chatbot header is visible exclusively in Developer mode.
+- Non-developers (Admins, Teachers, Students) can freely use AI doubt resolution, but cannot inspect or modify API keys.
+
 

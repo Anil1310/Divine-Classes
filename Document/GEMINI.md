@@ -117,10 +117,29 @@ Applies identically across Web Browsers and Mobile APK (WebView):
     - Chat drawer (`#divine-chatbot-window`) is immediately closed, hidden, and active microphone recognition is stopped.
     - Dedicated nav item is excluded from sidebar navigation (`renderSidebar`).
     - Dedicated view renders an administrative notice with a shortcut button to Settings.
-  - When **switched ON**:
-    - Launcher button is visible and active across all views.
-    - Nav item appears in the sidebar under "Learning Resources".
-    - Full doubt-clearing and oral voice admission features are instantly accessible.
+---
+
+## 11. Developer-Only Gemini Key Management & Multi-Role RBAC Isolation
+- **Strict Role-Gated Configuration**:
+  - The Gemini AI Key configuration button / wand icon (`🪄` / `Gemini Key`) and the inline subscription drawer (`#gemini-config-drawer`) are **strictly restricted to Developer mode** (`state.currentRole === 'developer' || state.isDeveloper`).
+  - For all other roles (Admin, Teacher, and Student), the configuration controls are completely hidden (`display: none` / `dev-only-link`).
+  - Programmatic attempts to invoke `toggleGeminiSettingsDrawer()` or `saveGeminiSettingsFromDrawer()` by non-developers are rejected with user-facing warnings:
+    `"Gemini AI configuration is restricted to Developer mode."`
+- **Tamper-Proof Keys**:
+  - Gemini API keys, mode selection, and model endpoints are guarded against inspection or override by institute staff, educators, and students.
+
+---
+
+## 12. Resilient Microphone Voice Engine & Browser Permission Diagnostics
+- **Native Web Speech Execution**:
+  - Voice recognition operates directly through the browser speech interface (`SpeechRecognition` / `webkitSpeechRecognition`) without artificial `getUserMedia` policy blockades in nested iframes.
+  - Interactive listening feedback includes a pulsating red recording badge (`animate-pulse ring-4 ring-rose-300`), live status banner (`#chatbot-voice-banner`), and dynamic placeholder prompt (*"🎙️ Listening... Speak now clearly..."*).
+- **Proactive Permission Guidance Modal**:
+  - When browser security blocks microphone access (`not-allowed`), the application displays an interactive diagnostic dialog (`showMicrophonePermissionHelpModal()`).
+  - Provides step-by-step guidance for Google Chrome address bar (Tune/Padlock icon > Microphone > Allow) and macOS System Settings (Privacy & Security > Microphone > Google Chrome > ON).
+  - Includes a direct "Reload Page" action and "Try Again" trigger.
+- **1-Click Oral Prompt Activation**:
+  - Tapping the `"🎙️ Speak: Add Student"` quick prompt pill actively powers on the microphone, eliminating extra clicks for oral student admissions.
 
 
 

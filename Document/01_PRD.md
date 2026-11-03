@@ -210,6 +210,13 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 - **FR-11.4: Oral Speech Student Admission**:
   - Web Speech API voice capture allowing oral student onboarding.
   - Entity extraction (Name, Parent, Phone, Batch, Fee) and 1-click confirmation card (`confirmVoiceStudentEnrollment`) strictly enforcing non-editable ₹0 initial Total Fees Paid.
+- **FR-11.5: Developer-Only Gemini Key Management & Multi-Role RBAC**:
+  - The Gemini Key configuration wand icon (`🪄`) and API drawer (`#gemini-config-drawer`) are strictly restricted to Developer mode (`isDev`).
+  - Completely hidden (`display: none` / `dev-only-link`) for Admin, Teacher, and Student roles, with server-side and client-side guards preventing unauthorized inspection or key alteration.
+- **FR-11.6: Browser Microphone Permission Diagnostics & Recovery**:
+  - Resilient Web Speech API activation that bypasses iframe policy restrictions.
+  - Interactive guidance modal (`showMicrophonePermissionHelpModal()`) offering step-by-step resolution for Chrome address bar (Tune/Padlock icon) and macOS System Settings.
+  - Quick action pill `"🎙️ Speak: Add Student"` directly activates voice recognition.
 
 ---
 

@@ -327,6 +327,9 @@ function mergeStudentsFromSheet_(dbData) {
 > - **Offline Marks Entry**: Teachers have full access to create tests and enter offline marks with auto-calculated class statistics.
 > - **Student/Parent Feedback**: Students and parents can access the `Faculty & Feedback` portal directly at the top to browse active mentors and submit 5-star ratings and reviews.
 > - **Universal Footers**: All views, login, and logout portals include streamlined developer attribution: `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition`.
+> - **Strict 4-Control Header**: Top header contains strictly 4 controls (Sync, Theme, Bell, Profile Badge); duplicate cloud icons are located exclusively in the sidebar under Developer Tools.
+> - **Developer-Only Gemini AI Configuration**: The Gemini API key drawer and setup wand icon (`🪄`) are strictly restricted to Developer mode (`isDev`) and hidden for all other roles.
+> - **Microphone Voice Engine & Recovery**: Direct Web Speech execution with an interactive permission guide modal (`showMicrophonePermissionHelpModal()`) for Chrome and macOS.
 
 ### 7.2 Google Apps Script Compiler Defense (Lexer Safety)
 When authoring client JavaScript embedded inside Google Apps Script `.html` templates, observe these critical rules to prevent silent code stripping by the Apps Script HTML compiler:

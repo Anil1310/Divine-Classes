@@ -300,3 +300,16 @@ const adminName = (state.settings && state.settings.adminName)
 - Appended synchronously across Login Screen (`renderLoginScreenView`), Logout Screen (`Routes/Logout/page.html`), and all active workspace views (`appendAppFooter`).
 - Layout specification:
   - Single streamlined line: `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition` (eliminating duplicate address/helpline lines already rendered in portal cards).
+
+### 7.3 Top Header 4-Control Strict Enforcement
+- The top header action container `#header-action-controls` strictly accommodates exactly 4 elements:
+  1. `btn-sync`: Cloud database sync button (`fa-cloud`).
+  2. `btn-theme-toggle`: Theme switch button (`fa-moon` / `fa-sun`).
+  3. Notification alerts dropdown (`fa-bell`).
+  4. Unified clickable profile badge (`#auth-header-container`).
+- Duplicate `#dev-quick-links` (Drive `fa-cloud` and Sheet `fa-cloud-arrow-up`) have been removed from the header; they are exclusively positioned in the sidebar Developer Tools drawer.
+
+### 7.4 Developer-Only Gemini Key RBAC & Speech Diagnostics
+- The inline drawer `#gemini-config-drawer` and configuration triggers (`#chatbot-gemini-config-btn`, `#dedicated-gemini-config-btn`) are strictly tagged with `.dev-only-link`.
+- `toggleGeminiSettingsDrawer()` and `saveGeminiSettingsFromDrawer()` reject any non-developer execution.
+- Web Speech API integration incorporates `showMicrophonePermissionHelpModal()` for instant visual diagnostics when browser security settings block microphone access.
