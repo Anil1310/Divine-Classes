@@ -1343,10 +1343,13 @@ function apiSaveDailyAttendance(payload) {
 
     if (role === 'teacher') {
       const teacher = (data.teachers || []).find(function (item) { return String(item.id) === String(payload.teacherId || ''); });
+      const cleanTName = teacher ? String(teacher.name || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim() : '';
+      const cleanBTeacher = String(batch.teacher || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
       const assigned = teacher && (
         String(batch.teacherId || '') === String(teacher.id) ||
         String(batch.teacher || '').trim().toLowerCase() === String(teacher.name || '').trim().toLowerCase() ||
-        String(batch.teacherEmail || '').trim().toLowerCase() === String(teacher.email || '').trim().toLowerCase()
+        String(batch.teacherEmail || '').trim().toLowerCase() === String(teacher.email || '').trim().toLowerCase() ||
+        (cleanTName && cleanBTeacher && cleanTName === cleanBTeacher)
       );
       if (!assigned) return { success: false, error: 'Teachers can record attendance only for batches assigned to their faculty profile.' };
     }

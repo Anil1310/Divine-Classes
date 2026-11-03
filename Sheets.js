@@ -219,7 +219,7 @@ function syncReadableSheets(ss, data) {
         batchSheet = ss.insertSheet('Batches_Roster');
       }
       batchSheet.clear();
-      const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Student Count'];
+      const bHeaders = ['Batch ID', 'Batch Name', 'Subjects', 'Schedule', 'Classroom / Hall', 'Lead Faculty', 'Teacher ID', 'Teacher Email', 'Student Count'];
       const bRows = [bHeaders];
       (data.batches || []).forEach(function(b) {
         bRows.push([
@@ -229,6 +229,8 @@ function syncReadableSheets(ss, data) {
           b.schedule || '',
           b.room || '',
           b.teacher || '',
+          b.teacherId || '',
+          b.teacherEmail || '',
           (b.studentIds || []).length
         ]);
       });

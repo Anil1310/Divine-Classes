@@ -49,7 +49,9 @@
                 'schedule': 'schedule',
                 'student_ids': 'studentIds',
                 'schedule_time': 'schedule',
-                'room_no': 'room'
+                'room_no': 'room',
+                'teacher_id': 'teacherId',
+                'teacher_email': 'teacherEmail'
             }
         },
         'students': {
@@ -233,6 +235,20 @@
             out.subject = out.subject || row.subjects || row.subject || 'All Subjects';
             out.teacher = out.teacher || row.lead_faculty || row.teacher || 'Faculty';
             out.schedule = out.schedule || row.schedule || 'Regular Schedule';
+            out.teacherId = out.teacherId || row.teacher_id || row.teacherId || null;
+            out.teacherEmail = out.teacherEmail || row.teacher_email || row.teacherEmail || null;
+            if (!out.teacherId) {
+                if (out.id === 'b1' || /rajesh/i.test(out.teacher)) {
+                    out.teacherId = 'tr1';
+                    out.teacherEmail = out.teacherEmail || 'rajesh.chahar@divineclasses.in';
+                } else if (out.id === 'b2' || /sunita/i.test(out.teacher)) {
+                    out.teacherId = 'tr2';
+                    out.teacherEmail = out.teacherEmail || 'dr.sunita@divineclasses.in';
+                } else if (out.id === 'b3' || /arvind/i.test(out.teacher)) {
+                    out.teacherId = 'tr3';
+                    out.teacherEmail = out.teacherEmail || 'arvind.verma@divineclasses.in';
+                }
+            }
             if (!Array.isArray(out.studentIds) || !out.studentIds.length) {
                 if (out.id === 'b1') out.studentIds = ['DC-101', 'DC-102', 'DC-103', 'DC-104', 'DC-105'];
                 else if (out.id === 'b2') out.studentIds = ['DC-106', 'DC-107', 'DC-108'];
