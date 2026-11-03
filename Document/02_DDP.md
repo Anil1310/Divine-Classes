@@ -286,11 +286,12 @@ const adminName = (state.settings && state.settings.adminName)
 ### 7.1 Top-Level Profile & Faculty Feedback Orchestration
 - **Sidebar Decoupling**: Teacher profiles have been removed from the `sidebarNavigationGroups.community` menu. Non-admin users cannot access faculty directory from the sidebar.
 - **Teacher Workspace**:
-  - Top header avatar and `renderAuthHeader()` render `[My Profile]` button bound to `openTeacherSelfProfileModal()`.
+  - Top header features exactly 4 primary actions: Sync, Theme Toggle, Notification Bell, and the clickable User Profile Badge bound to `openTeacherSelfProfileModal()`. Redundant `[My Profile]` buttons in the header have been removed.
   - Top role banner features `[My Faculty Profile & Reviews]` button.
   - Faculty modal presents teacher identity, photo upload, ID card download, and verified student/parent feedback entries.
 - **Student Workspace**:
-  - Top header and role banner render `[Faculty & Feedback]` and `[My Profile]`.
+  - Top header maintains the streamlined 4-icon layout (Sync, Theme, Bell, Profile Badge bound to `openStudentSelfProfileModal()`).
+  - Top role banner renders `[Faculty & Feedback]` and `[My Profile]`.
   - `openStudentFacultyFeedbackModal()` displays active faculty mentor cards alongside an interactive feedback form to submit star ratings and qualitative reviews.
 - **Legacy Stigma Elimination**:
   - The previous amber badge "Fees Hidden from Teacher" is eradicated and superseded by an affirmative emerald "Faculty Portal" indicator.

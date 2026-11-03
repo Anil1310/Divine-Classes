@@ -361,8 +361,9 @@ REQUIREMENTS:
    - Remove 'teachers' from sidebar navigation groups under 'community' for non-admin users.
    - Restrict full faculty roster administration strictly to 'admin' role.
 2. Top-Bar & Role Banner Placement:
-   - For Teachers: Render [My Profile] in header and [My Faculty Profile & Reviews] in role banner to open openTeacherSelfProfileModal().
-   - For Students: Render [Faculty & Feedback] and [My Profile] in header and role banner.
+   - Header: Standardized 4-icon layout (Sync, Theme, Bell, User Profile Badge). Redundant header action buttons removed.
+   - For Teachers: Click user badge or [My Faculty Profile & Reviews] in role banner to open openTeacherSelfProfileModal().
+   - For Students: Role banner renders [Faculty & Feedback] and [My Profile].
 3. Interactive Faculty Feedback Portal:
    - Enable students and parents to view faculty mentors, select a teacher, give a 1-5 star rating, choose feedback categories, and submit verified reviews.
    - Reviews automatically sync to local state and Supabase cloud.

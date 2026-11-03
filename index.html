@@ -3727,37 +3727,15 @@ window.DIVINE_PAGE_BACKENDS = {
                 roleText = 'Teacher';
             }
 
-            let roleActions = '';
-            if (u.role === 'teacher') {
-                roleActions = `
-                    <button type="button" onclick="openTeacherSelfProfileModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 transition cursor-pointer shadow-2xs" title="My Faculty Profile & Student Reviews">
-                        <i class="fa-solid fa-chalkboard-user"></i>
-                        <span class="hidden sm:inline">My Profile</span>
-                    </button>
-                `;
-            } else if (u.role === 'student') {
-                roleActions = `
-                    <button type="button" onclick="openStudentFacultyFeedbackModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shadow-2xs" title="Faculty Mentors & Feedback">
-                        <i class="fa-solid fa-star text-amber-500"></i>
-                        <span class="hidden sm:inline">Faculty & Feedback</span>
-                    </button>
-                    <button type="button" onclick="openStudentSelfProfileModal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800 transition cursor-pointer shadow-2xs" title="My Student Profile & ID Card">
-                        <i class="fa-solid fa-id-card"></i>
-                        <span class="hidden md:inline">My Profile</span>
-                    </button>
-                `;
-            }
-
             container.innerHTML = `
                 <div class="flex items-center gap-2">
-                    ${roleActions}
                     <div class="flex items-center gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                        <div class="flex items-center gap-1.5 sm:gap-2 text-xs">
-                            <button type="button" onclick="handleProfileIconClick(event)" title="View account details" aria-label="View account details" class="w-7 h-7 rounded-lg ${badgeBg} border flex items-center justify-center font-bold text-xs cursor-pointer hover:ring-2 hover:ring-indigo-400/50 transition">
+                        <div onclick="handleProfileIconClick(event)" class="flex items-center gap-1.5 sm:gap-2 text-xs cursor-pointer group" title="View profile & account details">
+                            <button type="button" onclick="handleProfileIconClick(event)" title="View profile & account details" aria-label="View profile & account details" class="w-7 h-7 rounded-lg ${badgeBg} border flex items-center justify-center font-bold text-xs cursor-pointer group-hover:ring-2 group-hover:ring-indigo-400/50 transition">
                                 <i class="fa-solid ${icon}"></i>
                             </button>
                             <div id="header-user-info" class="hidden sm:block leading-tight text-left">
-                                <p class="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[130px] sm:max-w-[120px]">${u.name}</p>
+                                <p class="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[130px] sm:max-w-[120px] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${u.name}</p>
                                 <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">${roleText}${u.identifier && u.role !== 'developer' ? ` • ${u.identifier}` : ''}</p>
                             </div>
                         </div>

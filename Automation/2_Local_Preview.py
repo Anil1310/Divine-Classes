@@ -76,7 +76,7 @@ def start_server_with_fallback(start_port: int = 8765, max_attempts: int = 10) -
             active_port = port
             break
         except OSError as e:
-            if e.errno == 48:  # Address already in use
+            if e.errno in (48, 98, 10048):  # Address already in use (macOS: 48, Linux: 98, Windows: 10048)
                 continue
             raise
 

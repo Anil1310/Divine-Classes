@@ -119,7 +119,7 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 
 ### 3.6 Accessing Your Faculty Profile & Identity Card
 1. Your profile is accessible right at the top of your workspace:
-   - Click **My Profile** in the top navigation header, or
+   - Click your **User Profile Badge** in the top navigation header (one of the 4 streamlined header controls: Sync, Theme, Bell, and Profile), or
    - Click **My Faculty Profile & Reviews** in your top role banner.
 2. **View & Edit Your Profile**:
    - View your credentials, qualifications, subjects, contact phone, and student/parent reviews received.
@@ -137,6 +137,7 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 2. Enter your **Roll Number** (e.g., `DC-102`).
 3. Enter your registered **Mobile Number** or password (default: `student123`).
 4. Click **Sign In to Student Portal**.
+5. The workspace features a streamlined top header with exactly 4 controls: Cloud Sync, Dark/Light Theme toggle, Notifications Bell, and your Student Profile Badge.
 
 ### 4.2 Checking Historical Attendance by Date
 1. Navigate to **Attendance**.
@@ -154,7 +155,7 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 3. Click **Print Report Card** to view and download your verified Academic Report Card.
 
 ### 4.5 Submitting Teacher & Faculty Feedback
-1. Click **Faculty & Feedback** in the top header or role banner.
+1. Click **Faculty & Feedback** in the role banner.
 2. Browse active faculty mentor profiles and their doubt-clearing timings.
 3. Select your teacher from the dropdown, give a **1 to 5 star rating**, choose a category (Teaching Quality, Doubt Resolution, Punctuality), and write your constructive comments.
 4. Click **Submit Feedback to Institute** to record your review.

@@ -124,10 +124,10 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 
 ### Module 6: Faculty Self-Profile & Mentor Directory Architecture
 - **FR-6.1**: **Top-Bar & Role Banner Profile Placement**:
-  - The teacher's own profile is accessible directly from the top header navigation and top role banner (`[My Faculty Profile & Reviews]`), completely removing teacher profiles from the non-admin "People & Community" sidebar navigation.
-  - Clicking this top-bar action opens `openTeacherSelfProfileModal()`, displaying Faculty Name, Subject, Experience, Qualifications, official Faculty ID Card generator, live photo updater, and real-time student/parent feedback and average star ratings received.
+  - The teacher's own profile is accessible directly from the top header user profile badge and top role banner (`[My Faculty Profile & Reviews]`), with duplicate buttons removed to maintain a clean 4-icon header (Sync, Theme, Notification Bell, and User Profile).
+  - Clicking this top-bar user badge opens `openTeacherSelfProfileModal()`, displaying Faculty Name, Subject, Experience, Qualifications, official Faculty ID Card generator, live photo updater, and real-time student/parent feedback and average star ratings received.
 - **FR-6.2**: **Student & Parent Faculty Feedback Portal**:
-  - For students, a prominent top header and role banner action (`[Faculty & Feedback]`) opens `openStudentFacultyFeedbackModal()`.
+  - For students, the role banner action (`[Faculty & Feedback]`) opens `openStudentFacultyFeedbackModal()`, keeping the top header streamlined to the 4 essential controls.
   - Displays active faculty mentor cards with qualifications, doubt-clearing timings, and an interactive feedback submission form allowing students and parents to submit 5-star ratings and constructive reviews.
 - **FR-6.3**: **Faculty Self-Management Controls**: Logged-in teachers have dedicated actions to maintain their profile:
   - *Edit My Profile*: Update academic qualifications, teaching experience, specialization, biography, and contact phone.
