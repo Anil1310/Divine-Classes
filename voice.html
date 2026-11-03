@@ -54,9 +54,9 @@
         </div>
 
         <div class="text-center space-y-0.5">
-            <div id="status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold animate-pulse">
-                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                <span>Listening... Speak clearly now!</span>
+            <div id="status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+                <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                <span>Tap the mic button to start speaking</span>
             </div>
             <p id="mic-hint" class="text-[11px] text-slate-400">Say your doubt or student details (e.g. "Add student Rahul, phone 9876543210")</p>
         </div>
@@ -169,12 +169,45 @@
 
         function startListening() {
             if (!recognition) recognition = initRecognition();
-            if (!recognition) return;
-            try {
-                recognition.start();
-            } catch(e) {
-                console.log('Start error:', e);
+            if (!recognition) {
+                statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold';
+                statusBadge.innerHTML = '❌ Speech engine unavailable here — use Chrome on desktop or Android.';
+                return;
             }
+            if (isListening) return;
+
+            statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold';
+            statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span><span>Requesting microphone…</span>';
+
+            // Explicitly ask for the mic so the browser/WebView shows its
+            // permission prompt before the speech engine starts.
+            const askMic = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+                ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) {}
+                  }).catch(function(err) { throw err; })
+                : Promise.resolve();
+
+            askMic.then(function() {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    // Usually "already started" — safe to ignore.
+                    console.log('Start error:', e);
+                }
+            }).catch(function(err) {
+                const name = (err && err.name) || '';
+                console.warn('Mic permission error:', name, err && err.message);
+                if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold';
+                    statusBadge.innerHTML = '❌ Microphone blocked. Tap the padlock/tune icon in the address bar → Microphone → Allow, then tap the mic again.';
+                } else if (name === 'NotFoundError') {
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold';
+                    statusBadge.innerHTML = '❌ No microphone found on this device.';
+                } else {
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold';
+                    statusBadge.innerHTML = '⚠️ Could not open the microphone. Tap the mic button to retry.';
+                }
+            });
         }
 
         function stopListening() {
@@ -237,10 +270,17 @@
             }, 100);
         }
 
-        // Start listening immediately when popup opens!
+        // Do not auto-start: browsers and Android WebViews only allow the speech
+        // engine after a direct tap inside this window. Show a clear prompt and
+        // start on the user's tap (the big mic button).
         window.addEventListener('DOMContentLoaded', function() {
-            startListening();
+            if (statusBadge) {
+                statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold';
+                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-indigo-400"></span><span>Tap the mic button to start speaking</span>';
+            }
+            if (micRing) micRing.classList.add('hidden');
         });
     </script>
 </body>
 </html>
+

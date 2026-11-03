@@ -3302,7 +3302,13 @@ window.DIVINE_PAGE_BACKENDS = {
                 showRequirementLabels: true,
                 allowAdminFeedbackDelete: true,
                 allowAdminLinkDelete: true,
-                showDummyData: true
+                showDummyData: true,
+                // Primary cloud database (Supabase). Pre-wired so a fresh browser
+                // connects automatically without opening Settings first.
+                supabaseEnabled: true,
+                supabaseUrl: 'https://srjqsofkjizwskqnzyfn.supabase.co',
+                supabaseKey: 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS',
+                leadDevEmail: 'anil.chahar170@gmail.com'
             },
 
             // Institute Notifications (Req: Real-time alerts, fees reminder, tests, DPPs)
@@ -5323,6 +5329,11 @@ window.DIVINE_PAGE_BACKENDS = {
             const target = new Date(parts[0], parts[1], 1);
             const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
             return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(Math.min(parts[2], lastDay)).padStart(2, '0')}`;
+        }
+
+        // Alias used by the voice enrollment flow.
+        function calculateNextMonthlyDueDate(isoDate) {
+            return nextMonthlyDueDate(isoDate) || localTodayIso();
         }
 
         function localTodayIso() {
@@ -11781,6 +11792,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             if (state.settings && state.settings.supabaseEnabled === true && state.settings.supabaseUrl && state.settings.supabaseKey) {
                 console.log('[Supabase] Early load from localStorage config');
                 loadDataFromSupabase().then(function() {
+                    window._supabaseBootLoaded = true;
                     saveStateLocally();
                     if (typeof savePersistentSettingsToLocal === 'function') {
                         savePersistentSettingsToLocal();
@@ -11891,6 +11903,29 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         }
                     })
                     .apiGetInitialData();
+            } else if (!window._supabaseBootLoaded && state.settings && state.settings.supabaseEnabled === true && state.settings.supabaseUrl && state.settings.supabaseKey) {
+                // Standalone web build (GitHub Pages / Vercel / APK WebView):
+                // pull the primary cloud snapshot so every device sees the same
+                // data. Without this branch the web app only pushed on changes
+                // and never loaded what was already stored in Supabase.
+                console.log('[Supabase] Standalone boot — loading primary cloud data');
+                loadDataFromSupabase().then(function () {
+                    saveStateLocally(true);
+                    if (typeof savePersistentSettingsToLocal === 'function') {
+                        savePersistentSettingsToLocal();
+                    }
+                    if (typeof startSupabaseLiveSync === 'function') {
+                        startSupabaseLiveSync();
+                    }
+                    updateRoleUI();
+                    renderSidebar();
+                    if (state.activeTab !== 'settings') renderMainContentPreservingScroll();
+                    updateNotificationBadge();
+                    updateSyncBadge('✓ Cloud DB Active', 'success');
+                }).catch(function (err) {
+                    console.error('[Supabase] Standalone load failed:', err);
+                    updateSyncBadge('Cloud Offline — using local data', 'warning');
+                });
             }
         }
         /********************************************************************
@@ -12155,20 +12190,87 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return window.SpeechRecognition || window.webkitSpeechRecognition || null;
         }
 
+        /**
+         * Resolve which chatbot surface is currently on screen so transcripts and
+         * mic state land on the visible input (dedicated page vs floating drawer).
+         */
+        function getChatbotVoiceUi() {
+            const dedicatedInput = document.getElementById('dedicated-chatbot-input');
+            const drawerInput = document.getElementById('chatbot-input');
+            const dedicatedVisible = !!(dedicatedInput && dedicatedInput.offsetParent !== null);
+            const drawerVisible = !!(drawerInput && drawerInput.offsetParent !== null);
+            const useDedicated = dedicatedVisible && !drawerVisible;
+            return {
+                mode: useDedicated ? 'dedicated' : 'drawer',
+                input: useDedicated ? dedicatedInput : (drawerInput || dedicatedInput),
+                banner: document.getElementById(useDedicated ? 'dedicated-voice-banner' : 'chatbot-voice-banner'),
+                micIcon: document.getElementById(useDedicated ? 'dedicated-mic-icon' : 'chatbot-mic-icon'),
+                micBtn: document.getElementById(useDedicated ? 'dedicated-chatbot-voice-btn' : 'chatbot-voice-btn')
+            };
+        }
+
+        function submitChatbotVoiceTranscript() {
+            try {
+                const dedicatedInput = document.getElementById('dedicated-chatbot-input');
+                const useDedicated = !!(dedicatedInput && dedicatedInput.offsetParent !== null) &&
+                    !(document.getElementById('chatbot-input') && document.getElementById('chatbot-input').offsetParent !== null);
+                if (useDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
+                    handleDedicatedChatbotSubmit(new Event('submit'));
+                } else if (typeof handleChatbotSubmit === 'function') {
+                    handleChatbotSubmit(new Event('submit'));
+                }
+            } catch (err) {
+                console.error('[Voice Submit Error]', err);
+            }
+        }
+
+        /**
+         * Ask the browser for microphone access explicitly. SpeechRecognition does
+         * not always trigger the permission prompt (and never inside sandboxed
+         * frames), so we request the mic ourselves on the user's click.
+         */
+        function requestMicrophonePermission() {
+            return new Promise(function(resolve, reject) {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    // Older browsers: let SpeechRecognition surface its own error.
+                    resolve(false);
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) {}
+                    resolve(true);
+                }).catch(function(err) {
+                    reject(err);
+                });
+            });
+        }
+
+        function isMicrophonePermissionError(err) {
+            const name = (err && err.name) || '';
+            return name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError';
+        }
+
         function openVoiceDictationWindow(target) {
             target = target || 'chatbot';
             const w = 440;
-            const h = 440;
+            const h = 480;
             const left = Math.max(0, Math.round((screen.width - w) / 2));
             const top = Math.max(0, Math.round((screen.height - h) / 2));
-            const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-            const voiceUrl = isLocal 
-                ? (window.location.origin + '/voice.html?target=' + encodeURIComponent(target))
-                : ('https://anil1310.github.io/Divine-Classes/voice.html?target=' + encodeURIComponent(target));
-            
+            const host = window.location.hostname || '';
+            const isAppsScriptFrame = window.self !== window.top ||
+                host.includes('googleusercontent.com') ||
+                host.includes('script.google.com') ||
+                host === 'docs.google.com';
+            // Same-origin voice.html works on GitHub Pages, Vercel, local preview and
+            // any custom domain. Apps Script iframes have no such file, so fall back
+            // to the public GitHub Pages copy.
+            const voiceUrl = isAppsScriptFrame
+                ? ('https://anil1310.github.io/Divine-Classes/voice.html?target=' + encodeURIComponent(target))
+                : new URL('voice.html?target=' + encodeURIComponent(target), window.location.href).href;
+
             const popup = window.open(voiceUrl, 'DivineVoicePopup', `width=${w},height=${h},top=${top},left=${left},status=0,toolbar=0,menubar=0,location=0`);
             if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-                showToast('Popup was blocked by your browser. Please allow popups or open via GitHub Pages.', 'warning');
+                showToast('Popup was blocked. Allow popups for this site, then tap the mic again.', 'warning');
             } else {
                 popup.focus();
                 showToast('🎙️ Dictation window opened! Speak now...', 'info');
@@ -12191,16 +12293,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
 
             // Target is chatbot
-            const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
-            if (input) {
-                input.value = text;
-                const floatingForm = document.getElementById('chatbot-form');
-                const isDedicated = !floatingForm || floatingForm.offsetParent === null;
-                if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
-                    handleDedicatedChatbotSubmit(new Event('submit'));
-                } else if (typeof handleChatbotSubmit === 'function') {
-                    handleChatbotSubmit(new Event('submit'));
-                }
+            const ui = getChatbotVoiceUi();
+            if (ui.input) {
+                ui.input.value = text;
+                ui.input.dispatchEvent(new Event('input', { bubbles: true }));
+                submitChatbotVoiceTranscript();
             }
         }
 
@@ -12224,6 +12321,23 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 }
             } catch(e){}
         });
+
+        function grantMicAndRetry(targetContext) {
+            requestMicrophonePermission().then(function() {
+                showToast('Microphone granted! Starting voice input...', 'success');
+                if (typeof closeModal === 'function') closeModal();
+                setTimeout(function() {
+                    if (targetContext === 'add_student') {
+                        startModalVoiceFill();
+                    } else {
+                        startChatbotVoiceRecognition();
+                    }
+                }, 250);
+            }).catch(function(err) {
+                console.warn('[Microphone Grant Failed]', err && err.name);
+                showToast('Still blocked. Open the padlock/tune icon in the address bar → Microphone → Allow, then reload the page.', 'error');
+            });
+        }
 
         function showMicrophonePermissionHelpModal(targetContext) {
             if (typeof openModal !== 'function') return;
@@ -12313,11 +12427,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">
                             Close
                         </button>
-                        <button type="button" onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
-                            <i class="fa-solid fa-rotate-right"></i> Reload Page
+                        <button type="button" onclick="grantMicAndRetry('${targetContext || 'chatbot'}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer">
+                            <i class="fa-solid fa-microphone"></i> Allow Microphone
                         </button>
-                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 200);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
-                            <i class="fa-solid fa-microphone"></i> Try Again
+                        <button type="button" onclick="closeModal(); setTimeout(function(){ if ('${targetContext || 'chatbot'}' === 'add_student') { startModalVoiceFill(); } else { toggleChatbotVoiceRecognition(); } }, 250);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-rotate-right"></i> Try Again
                         </button>
                     </div>
                 </div>
@@ -12325,10 +12439,71 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             openModal(html);
         }
 
+        /**
+         * Shown when the browser/WebView has no SpeechRecognition engine
+         * (common inside packaged Android .APK WebViews). Gives a working
+         * path instead of a dead button.
+         */
+        function showVoiceUnavailableModal(targetContext) {
+            if (typeof openModal !== 'function') {
+                showToast('Voice input is not supported here. Use Chrome or Safari, or tap the mic key on your keyboard.', 'warning');
+                return;
+            }
+            const html = `
+                <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100 max-w-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-microphone-slash"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold">Speak to Add a Student</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">This app view cannot access the speech engine directly. Pick any option below — all of them work.</p>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs leading-relaxed">
+                        <div class="font-bold text-indigo-600 dark:text-indigo-400">1️⃣ Keyboard voice typing (works in APK)</div>
+                        <p class="text-slate-600 dark:text-slate-300">Tap the field below, then tap the 🎤 microphone key on your Android keyboard and say:</p>
+                        <p class="p-2 bg-white dark:bg-slate-900 rounded-lg font-mono text-[10px] text-slate-700 dark:text-slate-300">Add student Rahul Sharma, father Ramesh Sharma, phone 9876543210, monthly fee 1000</p>
+                        <button type="button" onclick="focusVoiceTemplateInput()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-keyboard"></i> Open Field & Use Keyboard Mic
+                        </button>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs leading-relaxed">
+                        <div class="font-bold text-rose-600 dark:text-rose-400">2️⃣ Open in Chrome (full voice input)</div>
+                        <p class="text-slate-600 dark:text-slate-300">Chrome supports live speech recognition. Open this same app there and tap the mic.</p>
+                        <a href="https://anil1310.github.io/Divine-Classes/" target="_blank" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Divine Classes in Chrome
+                        </a>
+                    </div>
+
+                    <div class="flex justify-end pt-1">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">Close</button>
+                    </div>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function focusVoiceTemplateInput() {
+            if (typeof closeModal === 'function') closeModal();
+            const ui = getChatbotVoiceUi();
+            if (!ui.input) return;
+            if (!ui.input.value.trim()) {
+                ui.input.value = 'Add student ';
+            }
+            try {
+                ui.input.focus();
+                ui.input.setSelectionRange(ui.input.value.length, ui.input.value.length);
+            } catch (e) {}
+            showToast('Now tap the 🎤 key on your keyboard and speak the student details.', 'info');
+        }
+
         function toggleChatbotVoiceRecognition() {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) {
-                showToast('Voice recognition requires Google Chrome, Microsoft Edge, Safari, or an Android browser with microphone access.', 'warning');
+                showVoiceUnavailableModal('chatbot');
                 return;
             }
 
@@ -12342,12 +12517,44 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function startChatbotVoiceRecognition(langOverride) {
             const SpeechRec = getSpeechRecognition();
-            if (!SpeechRec) return;
+            if (!SpeechRec) {
+                showVoiceUnavailableModal('chatbot');
+                return;
+            }
 
             if (window.divineChatbotState && window.divineChatbotState.recognition) {
                 try { window.divineChatbotState.recognition.stop(); } catch(e){}
                 window.divineChatbotState.recognition = null;
             }
+
+            const ui = getChatbotVoiceUi();
+            if (ui.micIcon) ui.micIcon.className = 'fa-solid fa-spinner fa-spin text-xs';
+            if (ui.banner) ui.banner.classList.remove('hidden');
+
+            // Start the speech engine immediately inside the click handler so the
+            // browser keeps the user gesture (required by Safari/iOS). Then ask for
+            // the mic in parallel: some browsers only show the permission prompt
+            // through getUserMedia.
+            beginChatbotSpeechRecognition(langOverride);
+
+            requestMicrophonePermission().catch(function(err) {
+                console.warn('[Microphone Permission]', err && err.name, err && err.message);
+                const listening = !!(window.divineChatbotState && window.divineChatbotState.isListening);
+                if (listening) return; // recognition already has the mic
+                if (ui.micIcon) ui.micIcon.className = 'fa-solid fa-microphone text-xs';
+                if (ui.banner) ui.banner.classList.add('hidden');
+                if (isMicrophonePermissionError(err)) {
+                    showToast('Microphone access blocked. Tap "Allow Microphone" to grant it again.', 'error');
+                    showMicrophonePermissionHelpModal('chatbot');
+                } else if (err && err.name === 'NotFoundError') {
+                    showToast('No microphone detected. Connect a microphone and try again.', 'error');
+                }
+            });
+        }
+
+        function beginChatbotSpeechRecognition(langOverride) {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec) return;
 
             try {
                 const recognition = new SpeechRec();
@@ -12356,10 +12563,13 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 recognition.maxAlternatives = 1;
                 recognition.lang = langOverride || 'en-IN'; // Optimized for Indian English & Hindi terms
 
-                const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
-                const banner = document.getElementById('chatbot-voice-banner');
-                const micIcon = document.getElementById('chatbot-mic-icon') || document.getElementById('dedicated-mic-icon');
-                const micBtn = document.getElementById('chatbot-voice-btn') || document.getElementById('dedicated-chatbot-voice-btn');
+                const ui = getChatbotVoiceUi();
+                const input = ui.input;
+                const banner = ui.banner;
+                const micIcon = ui.micIcon;
+                const micBtn = ui.micBtn;
+                let finished = false;
+                let hadError = false;
 
                 recognition.onstart = function() {
                     if (window.divineChatbotState) {
@@ -12371,13 +12581,14 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     }
                     if (micBtn) {
                         micBtn.classList.add('bg-rose-600', 'text-white', 'ring-4', 'ring-rose-300', 'animate-pulse');
-                        micBtn.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300');
+                        micBtn.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300', 'bg-white');
                     }
                     if (input) {
                         input.placeholder = '🎙️ Listening... Speak now clearly...';
                         input.classList.add('ring-2', 'ring-rose-500', 'bg-rose-50/20');
+                        try { input.focus(); } catch (e) {}
                     }
-                    showToast('🎙️ Microphone active! Speak your doubt or student details...', 'info');
+                    showToast('🎙️ Microphone active! Say e.g. "Add student Rahul, phone 9876543210"', 'info');
                 };
 
                 recognition.onresult = function(event) {
@@ -12385,13 +12596,18 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     for (let i = event.resultIndex; i < event.results.length; i++) {
                         transcript += event.results[i][0].transcript;
                     }
-                    if (input && transcript) {
-                        input.value = transcript;
+                    if (transcript) {
+                        const liveUi = getChatbotVoiceUi();
+                        if (liveUi.input) {
+                            liveUi.input.value = transcript;
+                            liveUi.input.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
                     }
                 };
 
                 recognition.onerror = function(event) {
                     console.warn('[Voice Recognition Error]', event.error);
+                    hadError = true;
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                         showToast('Microphone access blocked. Please allow microphone in your browser settings.', 'error');
                         showMicrophonePermissionHelpModal('chatbot');
@@ -12402,27 +12618,26 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             startChatbotVoiceRecognition('en-US');
                         }, 200);
                         return;
+                    } else if (event.error === 'audio-capture') {
+                        showToast('No microphone was found. Connect a mic and try again.', 'error');
                     } else if (event.error === 'no-speech') {
                         showToast('No speech detected. Please speak closer to the microphone.', 'info');
                     } else if (event.error === 'network') {
                         showToast('Voice recognition network error. Please check your internet connection.', 'error');
-                    } else {
+                    } else if (event.error !== 'aborted') {
                         showToast('Voice error: ' + event.error, 'warning');
                     }
                     stopChatbotVoiceRecognition();
                 };
 
                 recognition.onend = function() {
+                    if (finished) return;
+                    finished = true;
+                    const spoken = getChatbotVoiceUi().input;
+                    const text = spoken ? String(spoken.value || '').trim() : '';
                     stopChatbotVoiceRecognition();
-                    const text = input ? String(input.value || '').trim() : '';
-                    if (text) {
-                        const floatingForm = document.getElementById('chatbot-form');
-                        const isDedicated = !floatingForm || floatingForm.offsetParent === null;
-                        if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
-                            handleDedicatedChatbotSubmit(new Event('submit'));
-                        } else if (typeof handleChatbotSubmit === 'function') {
-                            handleChatbotSubmit(new Event('submit'));
-                        }
+                    if (text && !hadError) {
+                        submitChatbotVoiceTranscript();
                     }
                 };
 
@@ -12441,10 +12656,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             if (window.divineChatbotState) {
                 window.divineChatbotState.isListening = false;
             }
-            const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
-            const banner = document.getElementById('chatbot-voice-banner');
-            const micIcon = document.getElementById('chatbot-mic-icon') || document.getElementById('dedicated-mic-icon');
-            const micBtn = document.getElementById('chatbot-voice-btn') || document.getElementById('dedicated-chatbot-voice-btn');
+            const ui = getChatbotVoiceUi();
+            const input = ui.input;
+            const banner = ui.banner;
+            const micIcon = ui.micIcon;
+            const micBtn = ui.micBtn;
 
             if (banner) banner.classList.add('hidden');
             if (micIcon) {
@@ -12455,15 +12671,18 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 micBtn.classList.add('bg-slate-100', 'text-slate-600', 'dark:bg-slate-800', 'dark:text-slate-300');
             }
             if (input) {
-                input.placeholder = "Ask anything or speak 'Add student Rahul...'";
+                input.placeholder = ui.mode === 'dedicated'
+                    ? "Ask any academic doubt or say 'Add student Rahul, phone 9876543210...'"
+                    : "Ask anything or speak 'Add student Rahul...'";
                 input.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-50/20');
             }
 
             if (window.divineChatbotState && window.divineChatbotState.recognition) {
-                try {
-                    window.divineChatbotState.recognition.stop();
-                } catch(e){}
+                const rec = window.divineChatbotState.recognition;
                 window.divineChatbotState.recognition = null;
+                try {
+                    rec.stop();
+                } catch(e){}
             }
         }
 
@@ -12473,7 +12692,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         function startModalVoiceFill() {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) {
-                showToast('Voice recognition not supported in this browser.', 'warning');
+                showVoiceUnavailableModal('add_student');
                 return;
             }
 
@@ -12481,11 +12700,32 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             const btnText = document.getElementById('modal-voice-btn-text');
             const hint = document.getElementById('modal-voice-hint');
 
+            function resetButton(label, messageHtml) {
+                if (btn) btn.className = 'px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0';
+                if (btnText) btnText.textContent = label || 'Speak';
+                if (hint && messageHtml) hint.innerHTML = messageHtml;
+            }
+
+            if (btn) btn.className = 'px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer animate-pulse shrink-0';
+            if (btnText) btnText.textContent = 'Starting...';
+
+            // Start inside the click gesture, then probe permission in parallel.
+            runRecognition();
+            requestMicrophonePermission().catch(function(err) {
+                if (!isMicrophonePermissionError(err)) return;
+                resetButton('Speak', 'Microphone blocked — tap "Allow Microphone" and try again.');
+                showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
+                showMicrophonePermissionHelpModal('add_student');
+            });
+
+            function runRecognition() {
             try {
                 const recognition = new SpeechRec();
                 recognition.continuous = false;
                 recognition.interimResults = true;
                 recognition.lang = 'en-IN';
+                let spokenText = '';
+                let hadError = false;
 
                 recognition.onstart = function() {
                     if (btn) btn.className = 'px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer animate-pulse shrink-0';
@@ -12498,35 +12738,40 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     for (let i = event.resultIndex; i < event.results.length; i++) {
                         transcript += event.results[i][0].transcript;
                     }
-                    if (hint) {
+                    if (transcript) spokenText = transcript;
+                    if (hint && transcript) {
                         hint.innerHTML = `<i>"${escapeHtml(transcript)}"</i>`;
                     }
                 };
 
                 recognition.onerror = function(event) {
+                    hadError = true;
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                         showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
                         showMicrophonePermissionHelpModal('add_student');
-                    } else {
+                    } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
                         showToast('Voice error: ' + event.error, 'error');
                     }
                 };
 
                 recognition.onend = function() {
-                    if (btn) btn.className = 'px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0';
-                    if (btnText) btnText.textContent = 'Speak';
-
-                    const rawSpoken = hint ? hint.textContent.replace(/^"|"$/g, '').trim() : '';
-                    if (rawSpoken && !rawSpoken.includes('Click mic')) {
+                    resetButton('Speak');
+                    if (hadError) return;
+                    const rawSpoken = spokenText.trim();
+                    if (rawSpoken) {
                         const parsed = extractStudentDetailsFromSpeech(rawSpoken);
-                        applyParsedDetailsToModal(parsed);
-                        showToast(`Student details extracted from speech!`, 'success');
+                        if (parsed) {
+                            applyParsedDetailsToModal(parsed);
+                            showToast('Student details extracted from speech!', 'success');
+                        }
                     }
                 };
 
                 recognition.start();
             } catch(e) {
+                resetButton('Speak');
                 showToast('Could not start microphone: ' + e.message, 'error');
+            }
             }
         }
 
@@ -12581,23 +12826,31 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 res.parent = parentMatch[1].trim();
             }
 
-            // 4. Student Name
-            const nameMatch = text.match(/(?:name|naam|student)\s*(?:is|hai)?\s*([a-zA-Z\s]+?)(?:,\s*|\s+(?:father|parent|guardian|pitaji|papa|phone|mobile|fee|monthly|class|batch|roll|admission|\d)|$)/i);
+            // 4. Student Name — prefer "add student <Name>" so a trailing word
+            // like "Student" inside the name is not truncated.
+            const stopWords = 'father|parent|guardian|pitaji|papa|phone|mobile|fee|fees|monthly|class|batch|roll|admission|date|address';
+            const nameCore = '([A-Za-z\\u0900-\\u097F][A-Za-z\\u0900-\\u097F\\s.\'-]+)';
+            const nameStop = new RegExp('\\s*(?:,|\\b(?:' + stopWords + ')\\b|\\d|$)', 'i');
+            let nameMatch = text.match(new RegExp('(?:add|enroll|enrol|register|admit|create)\\s+(?:a\\s+|an\\s+|the\\s+|new\\s+|naya\\s+|naye\\s+)?(?:student|admission)\\s+(?:named\\s+|name\\s+|naam\\s+)?' + nameCore, 'i'));
+            if (!nameMatch) {
+                nameMatch = text.match(new RegExp('(?:name|naam)\\s*(?:is|hai)?\\s*' + nameCore, 'i'));
+            }
+            if (!nameMatch) {
+                nameMatch = text.match(new RegExp('(?:student)\\s+(?:named\\s+|name\\s+|naam\\s+)?' + nameCore, 'i'));
+            }
             if (nameMatch) {
-                res.name = nameMatch[1].trim();
-            } else {
-                const addMatch = text.match(/(?:add\s+student|enroll\s+student|naya\s+student)\s+([a-zA-Z\s]+?)(?:,\s*|\s+(?:father|parent|phone|mobile|fee|class|batch|\d)|$)/i);
-                if (addMatch) {
-                    res.name = addMatch[1].trim();
-                }
+                // Trim trailing stop words captured by the lazy quantifier.
+                res.name = String(nameMatch[1] || '').split(nameStop)[0].trim();
             }
 
             if (res.name) {
-                res.name = res.name.replace(/\b(ko|ka|ki|add|enroll|student)\b/gi, '').trim();
+                res.name = res.name.replace(/^(?:add|enroll|enrol|register|admit|create|student|name|naam|is|hai)\s+/gi, '').trim();
+                res.name = res.name.replace(/[,\s]+$/g, '');
                 res.name = res.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
             }
             if (res.parent) {
-                res.parent = res.parent.replace(/\b(ko|ka|ki)\b/gi, '').trim();
+                res.parent = res.parent.replace(/^(?:father|parent|guardian|pitaji|papa|name|naam|is|hai)\s+/gi, '').trim();
+                res.parent = res.parent.replace(/[,\s]+$/g, '');
                 res.parent = res.parent.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
             }
 
@@ -12622,12 +12875,16 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         }
 
         function isVoiceEnrollmentCommand(text) {
-            const lower = String(text || '').toLowerCase();
-            return /(add\s+student|enroll\s+student|register\s+student|naya\s+student|naye\s+student|student\s+add\s+karo)/i.test(lower);
+            const lower = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (!lower) return false;
+            return /(add|enroll|enrol|register|admit|create|new|insert)\s+(a\s+|an\s+|the\s+|new\s+|naya\s+|naye\s+)?(student|admission|bachcha|bacche|vidyarthi)/i.test(lower) ||
+                /(student|admission|vidyarthi)\s+(ko\s+)?(add|enroll|enrol|register|admit|jodo|jod)/i.test(lower) ||
+                /(naya|naye|nayi)\s+(student|admission)/i.test(lower) ||
+                /^(add|enroll|enrol)\s+[a-z]/i.test(lower);
         }
 
         function renderVoiceEnrollmentCard(details) {
-            const encoded = encodeURIComponent(JSON.stringify(details));
+            const encoded = encodeURIComponent(JSON.stringify(details)).replace(/'/g, '%27');
             return `
                 <div class="space-y-2.5 p-3 rounded-2xl bg-indigo-50/80 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/80 text-xs">
                     <div class="flex items-center justify-between">
@@ -12677,24 +12934,37 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             });
             const nextRoll = `DC-${maxRollNum + 1}`;
             const studentId = 's_' + Date.now();
+            const admissionDate = details.admissionDate || localTodayIso();
+            const targetBatchId = details.batchId || (state.batches[0] ? state.batches[0].id : 'b1');
+            const targetBatch = (state.batches || []).find(b => b.id === targetBatchId);
 
+            // Keep the same field names the rest of the app reads
+            // (parentName, totalFee, batch.studentIds, etc.).
             const newStudent = {
                 id: studentId,
                 name: details.name,
-                parent: details.parent || 'Parent',
-                phone: details.phone || '9555-6787-53',
+                parentName: details.parent || 'Parent',
+                phone: details.phone || '9555678753',
                 roll: nextRoll,
-                batchId: details.batchId || (state.batches[0] ? state.batches[0].id : 'b1'),
+                batchId: targetBatchId,
+                totalFee: 0,
                 paidFee: 0, // strictly 0 on enrollment
                 monthlyFee: Number(details.monthlyFee) || 1000,
-                dueDate: calculateNextMonthlyDueDate(details.admissionDate || localTodayIso()),
-                admissionDate: details.admissionDate || localTodayIso(),
+                monthlyPaidThisCycle: 0,
+                dueDate: calculateNextMonthlyDueDate(admissionDate),
+                admissionDate: admissionDate,
+                lastReminder: 'Never',
                 status: 'Active',
+                password: 'password123',
                 photo: ''
             };
 
             if (!state.students) state.students = [];
             state.students.push(newStudent);
+            if (targetBatch) {
+                if (!Array.isArray(targetBatch.studentIds)) targetBatch.studentIds = [];
+                if (!targetBatch.studentIds.includes(studentId)) targetBatch.studentIds.push(studentId);
+            }
             saveStateLocally();
 
             if (typeof syncPendingDataToSupabase === 'function' && state.settings && state.settings.supabaseEnabled) {
@@ -12713,7 +12983,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             appendChatMessage('bot', `
                 <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200 space-y-1">
                     <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-600"></i> Student Successfully Enrolled!</p>
-                    <p><b>${escapeHtml(newStudent.name)}</b> has been enrolled into <b>${escapeHtml(details.batchName || 'Batch')}</b> with Roll Number <b>${nextRoll}</b>.</p>
+                    <p><b>${escapeHtml(newStudent.name)}</b> has been enrolled into <b>${escapeHtml(details.batchName || (targetBatch && targetBatch.name) || 'Batch')}</b> with Roll Number <b>${nextRoll}</b>.</p>
                     <p class="text-[10px] text-emerald-600 dark:text-emerald-400">Total Fees Paid initialized to ₹0. Next fee due on ${escapeHtml(newStudent.dueDate)}.</p>
                 </div>
             `);
@@ -13002,8 +13272,21 @@ Guidelines:
             }
         }
 
+        /**
+         * Returns the chat stream that is actually visible: the full-page
+         * chatbot on the AI Assistant tab, otherwise the floating drawer.
+         */
+        function getChatbotMessagesContainer() {
+            const dedicated = document.getElementById('dedicated-chatbot-messages');
+            const drawer = document.getElementById('chatbot-messages');
+            const dedicatedVisible = !!(dedicated && dedicated.offsetParent !== null);
+            const drawerVisible = !!(drawer && drawer.offsetParent !== null);
+            if (dedicatedVisible && !drawerVisible) return dedicated;
+            return drawer || dedicated;
+        }
+
         function appendChatMessage(role, htmlContent) {
-            const container = document.getElementById('chatbot-messages');
+            const container = getChatbotMessagesContainer();
             if (!container) return;
 
             const msgDiv = document.createElement('div');
@@ -13030,7 +13313,7 @@ Guidelines:
             }
 
             container.appendChild(msgDiv);
-            scrollChatbotToBottom();
+            container.scrollTop = container.scrollHeight;
 
             // Track in state
             if (!window.divineChatbotState.messages) window.divineChatbotState.messages = [];
@@ -13041,7 +13324,7 @@ Guidelines:
         }
 
         function showChatbotTypingIndicator() {
-            const container = document.getElementById('chatbot-messages');
+            const container = getChatbotMessagesContainer();
             if (!container) return;
             const existing = document.getElementById('chatbot-typing-indicator');
             if (existing) return;
@@ -13060,7 +13343,7 @@ Guidelines:
                 </div>
             `;
             container.appendChild(typingDiv);
-            scrollChatbotToBottom();
+            container.scrollTop = container.scrollHeight;
         }
 
         function removeChatbotTypingIndicator() {
@@ -13509,12 +13792,15 @@ Guidelines:
             const val = input.value.trim();
             if (!val) return;
             input.value = '';
-            appendDedicatedChatMessage('user', val);
 
+            // handleChatbotSubmit renders the user bubble into whichever chat
+            // stream is visible (dedicated page or floating drawer).
             const drawerInput = document.getElementById('chatbot-input');
             if (drawerInput) drawerInput.value = val;
             if (typeof handleChatbotSubmit === 'function') {
                 handleChatbotSubmit(e);
+            } else {
+                appendDedicatedChatMessage('user', val);
             }
         }
 
