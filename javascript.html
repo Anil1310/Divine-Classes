@@ -8850,6 +8850,24 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return null;
         }
 
+        /**
+         * Older browsers cached a settings object without Supabase fields, which
+         * silently overrode the defaults and left the app disconnected. Fill in
+         * the primary cloud config whenever it is missing.
+         */
+        function ensureSupabaseDefaults() {
+            if (!state.settings || typeof state.settings !== 'object') state.settings = {};
+            if (!state.settings.supabaseUrl) {
+                state.settings.supabaseUrl = 'https://srjqsofkjizwskqnzyfn.supabase.co';
+            }
+            if (!state.settings.supabaseKey) {
+                state.settings.supabaseKey = 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+            }
+            if (typeof state.settings.supabaseEnabled !== 'boolean') {
+                state.settings.supabaseEnabled = true;
+            }
+        }
+
         // Initialize Application
         function bootApp() {
             if (window._appBooted) return;
@@ -8870,6 +8888,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             try { initTheme(); } catch (e) { console.warn('Theme init warning:', e); }
             try { loadCachedData(); } catch (e) { console.warn('Cache load warning:', e); }
             try { applyPersistentSettingsOverrides(); } catch (e) { console.warn('Settings overrides warning:', e); }
+            try { ensureSupabaseDefaults(); } catch (e) { console.warn('Supabase defaults warning:', e); }
             try { updateChatbotVisibility(); } catch (e) { console.warn('Chatbot visibility update warning:', e); }
 
             // Restore Supabase config from dedicated localStorage key (survives cache clears)
