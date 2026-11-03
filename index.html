@@ -4163,9 +4163,8 @@ window.DIVINE_PAGE_BACKENDS = {
         function appendAppFooter(container) {
             if (!container || !state.isAuthenticated) return;
             const footerHtml = `
-                <footer class="mt-12 pt-6 pb-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
-                    <p>© 2026 Divine Classes • ${getShortAddress()} • Helpline: ${state.settings.contactDisplay || '9555-6787-53'}</p>
-                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Designed & Engineered with ❤️ by <span class="font-semibold text-slate-600 dark:text-slate-300">Er. Anil Kumar Chahar</span> • v2.5 Cloud Edition</p>
+                <footer class="mt-12 pt-6 pb-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">© 2026 Designed & Engineered by <span class="font-semibold text-slate-600 dark:text-slate-300">Dev. Anil Kumar Chahar</span> • 8126390611 • v2.5 Cloud Edition</p>
                 </footer>
             `;
             const footerWrapper = document.createElement('div');
@@ -10843,9 +10842,8 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return `
                 <div class="w-full min-h-[92vh] flex flex-col items-center justify-center py-6 sm:py-10 px-4">
                     ${renderLoginCardHtml(false)}
-                    <footer class="mt-8 text-center text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
-                        <p>© 2026 Divine Classes • ${getShortAddress()} • Helpline: ${state.settings.contactDisplay || '9555-6787-53'}</p>
-                        <p class="text-[10px] text-slate-400 dark:text-slate-500">Designed & Engineered with ❤️ by <span class="font-semibold text-slate-700 dark:text-slate-200">Er. Anil Kumar Chahar</span> • v2.5 Cloud Edition</p>
+                    <footer class="mt-8 text-center text-[11px] text-slate-500 dark:text-slate-400">
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500">© 2026 Designed & Engineered by <span class="font-semibold text-slate-700 dark:text-slate-200">Dev. Anil Kumar Chahar</span> • 8126390611 • v2.5 Cloud Edition</p>
                     </footer>
                 </div>
             `;

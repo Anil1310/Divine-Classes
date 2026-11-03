@@ -137,7 +137,7 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
   - Administrative faculty roster management is strictly isolated to Admin under Administration.
   - The legacy "Fees Hidden from Teacher" badge has been permanently eliminated and replaced by an elegant, positive "Faculty Portal" emerald badge.
 - **FR-6.5**: **Universal Developer Attribution & Footers**:
-  - All views (Login portal, Logout screen, and workspace footer) prominently feature official institute address and helpline alongside developer attribution: `Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition`.
+  - All views feature clean, streamlined developer attribution: `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition`, with institute address and contact housed directly in the relevant portal cards without redundancy.
 
 ### Module 7: Official Academic Report Card & Digital Verification
 - **FR-6.1**: Produce an official Academic Progress Report Card with:

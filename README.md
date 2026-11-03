@@ -326,7 +326,7 @@ function mergeStudentsFromSheet_(dbData) {
 > - **Universal Batch Enrollment**: Teachers can add students to any coaching batch via `+ Add Student to Any Batch`.
 > - **Offline Marks Entry**: Teachers have full access to create tests and enter offline marks with auto-calculated class statistics.
 > - **Student/Parent Feedback**: Students and parents can access the `Faculty & Feedback` portal directly at the top to browse active mentors and submit 5-star ratings and reviews.
-> - **Universal Footers**: All views, login, and logout portals include official institute contact info and developer attribution: `Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition`.
+> - **Universal Footers**: All views, login, and logout portals include streamlined developer attribution: `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition`.
 
 ### 7.2 Google Apps Script Compiler Defense (Lexer Safety)
 When authoring client JavaScript embedded inside Google Apps Script `.html` templates, observe these critical rules to prevent silent code stripping by the Apps Script HTML compiler:

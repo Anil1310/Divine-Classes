@@ -299,5 +299,4 @@ const adminName = (state.settings && state.settings.adminName)
 ### 7.2 Developer Attribution & Global Footers
 - Appended synchronously across Login Screen (`renderLoginScreenView`), Logout Screen (`Routes/Logout/page.html`), and all active workspace views (`appendAppFooter`).
 - Layout specification:
-  - Line 1: `© 2026 Divine Classes • 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063 • Contact: 9555-6787-53`
-  - Line 2: `Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition`
+  - Single streamlined line: `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition` (eliminating duplicate address/helpline lines already rendered in portal cards).

@@ -61,3 +61,11 @@ Every web application must provide ready-to-run automation scripts for both plat
 - **Auto-Formatting**: Google Sheets tabs must maintain Calibri 10pt font, bold frozen header rows, and column auto-sizing.
 - **Baseline Seed Data**: Keep complete demo seed files (`Seeds.js` and `Create_Database.sql`) with real-world credentials for instant testing.
 
+---
+
+## 6. Universal Developer Attribution & Footers
+- All views, login screens, and logout screens must feature clean single-line developer attribution:
+  `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition`
+- Do NOT repeat institute address or helpline in the footer when already visible inside portal/login cards.
+- Do NOT use heart emojis in the attribution; use official title `Dev. Anil Kumar Chahar`.
+

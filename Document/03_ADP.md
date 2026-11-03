@@ -370,9 +370,9 @@ REQUIREMENTS:
 4. Legacy Badge Eradication:
    - Ensure the negative "Fees Hidden from Teacher" badge is replaced with positive "Faculty Portal" styling.
 5. Developer Branding & Attribution:
-   - Display official institute address, helpline, and developer attribution:
-     "Designed & Engineered with ❤️ by Er. Anil Kumar Chahar • v2.5 Cloud Edition"
-   - Apply consistently across Login screen, Logout screen, and active workspace views.
+   - Display official developer attribution line:
+     "© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition"
+   - Apply consistently across Login screen, Logout screen, and active workspace views without redundant address duplication.
 ```
 
 ---
