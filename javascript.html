@@ -4273,18 +4273,24 @@
                         </div>
                     </div>`;
             }
-            const canEditMarks = state.currentRole === 'admin' || state.currentRole === 'teacher';
-            const teacherBatchIds = state.currentRole === 'teacher' ? (state.batches || []).filter(isBatchAssignedToCurrentTeacher).map(b => String(b.id)) : null;
-            const visibleTests = state.currentRole === 'teacher'
-                ? (state.offlineTests || []).filter(test => teacherBatchIds.includes(String(test.batchId)))
-                : (state.offlineTests || []);
+            const canEditMarks = state.currentRole === 'admin' || state.currentRole === 'teacher' || state.currentRole === 'developer';
+            const allBatches = state.batches || [];
+            if (!state.marksBatchFilter && state.currentRole === 'teacher') {
+                const myBatch = allBatches.find(isBatchAssignedToCurrentTeacher);
+                state.marksBatchFilter = myBatch ? myBatch.id : 'all';
+            }
+            const selectedBatchId = state.marksBatchFilter || 'all';
+            const visibleTests = (state.offlineTests || []).filter(test => {
+                if (selectedBatchId === 'all') return true;
+                return String(test.batchId) === String(selectedBatchId);
+            });
             const selectedTest = visibleTests.find(t => t.id === state.selectedTestId) || visibleTests[0];
-            if (!selectedTest) return '<div class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No test records are available for your batches.</div>';
-            const batch = state.batches.find(b => b.id === selectedTest.batchId);
-            const batchStudents = batch ? (batch.studentIds || []).map(id => state.students.find(s => String(s.id) === String(id) || String(s.roll) === String(id))).filter(Boolean).filter(s => s.status !== 'Inactive') : [];
+            const batch = selectedTest ? allBatches.find(b => b.id === selectedTest.batchId) : null;
+            const bStudentIds = Array.isArray(batch?.studentIds) ? batch.studentIds : (Array.isArray(batch?.student_ids) ? batch.student_ids : []);
+            const batchStudents = batch ? (state.students || []).filter(s => s && s.status !== 'Inactive' && (String(s.batchId) === String(batch.id) || bStudentIds.some(id => String(id) === String(s.id) || String(id) === String(s.roll)))) : [];
 
             // Stats for selected test
-            const scores = batchStudents.map(s => (selectedTest.marks[s.id]?.score || 0));
+            const scores = selectedTest ? batchStudents.map(s => (selectedTest.marks && selectedTest.marks[s.id]?.score) !== undefined ? Number(selectedTest.marks[s.id].score) : 0) : [];
             const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
             const highestScore = scores.length ? Math.max(...scores) : 0;
 
@@ -4334,20 +4340,53 @@
                         </div>
                     ` : ''}
 
-                    <!-- Test Selector & Create Test Button -->
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                    <!-- Top Action Bar & Filter -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
                         <div class="flex flex-wrap items-center gap-3">
-                            <label class="text-xs font-semibold text-slate-500">Select Offline Test:</label>
-                            <select onchange="selectOfflineTest(this.value)" class="px-3.5 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
-                                ${visibleTests.map(t => `<option value="${t.id}" ${t.id === selectedTest.id ? 'selected' : ''}>${t.title} (${t.date})</option>`).join('')}
-                            </select>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Batch Filter:</label>
+                                <select onchange="filterMarksBatch(this.value)" class="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="all" ${selectedBatchId === 'all' ? 'selected' : ''}>All Batches (${state.offlineTests ? state.offlineTests.length : 0} Tests)</option>
+                                    ${allBatches.map(b => `<option value="${b.id}" ${b.id === selectedBatchId ? 'selected' : ''}>${escapeHtml(b.name || b.id)}${isBatchAssignedToCurrentTeacher(b) ? ' ★ (My Batch)' : ''}</option>`).join('')}
+                                </select>
+                            </div>
+                            ${visibleTests.length ? `
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Offline Test:</label>
+                                <select onchange="selectOfflineTest(this.value)" class="px-3.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-xs truncate">
+                                    ${visibleTests.map(t => `<option value="${t.id}" ${t.id === selectedTest.id ? 'selected' : ''}>${escapeHtml(t.title)} (${escapeHtml(t.date || '')})</option>`).join('')}
+                                </select>
+                            </div>
+                            ` : ''}
                         </div>
                         ${canEditMarks ? `
-                        <button onclick="openCreateTestModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
-                            <i class="fa-solid fa-plus"></i> Log New Offline Test
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${selectedTest ? `
+                            <button onclick="saveAllTestMarks('${selectedTest.id}')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                                <i class="fa-solid fa-floppy-disk"></i> Save All Marks
+                            </button>
+                            ` : ''}
+                            <button onclick="openCreateTestModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+                                <i class="fa-solid fa-plus"></i> Log New Offline Test
+                            </button>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    ${!selectedTest ? `
+                    <div class="bg-white p-10 rounded-2xl border border-dashed border-slate-300 text-center space-y-3 shadow-xs">
+                        <div class="w-14 h-14 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-2xl">
+                            <i class="fa-solid fa-clipboard-question"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 font-heading">No Offline Tests Found</h3>
+                        <p class="text-xs text-slate-500 max-w-md mx-auto">There are no offline test records for this batch yet. Create a new test record to enter marks, grade percentages, and write mentor remarks.</p>
+                        ${canEditMarks ? `
+                        <button onclick="openCreateTestModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-sm transition">
+                            <i class="fa-solid fa-plus"></i> Create First Offline Test
                         </button>
                         ` : ''}
                     </div>
+                    ` : `
 
                     <!-- Selected Test Analytics & Scoreboard -->
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -4431,8 +4470,15 @@
                             </table>
                         </div>
                     </div>
+                    `}
                 </div>
             `;
+        }
+
+        function filterMarksBatch(batchId) {
+            state.marksBatchFilter = batchId;
+            state.selectedTestId = null;
+            renderMainContent();
         }
 
         function selectOfflineTest(testId) {
@@ -4440,13 +4486,45 @@
             renderMainContent();
         }
 
+        function saveAllTestMarks(testId) {
+            const test = state.offlineTests.find(t => t.id === testId);
+            if (!test) { showToast('Test record not found.', 'error'); return; }
+            const batch = state.batches.find(b => b.id === test.batchId);
+            const bStudentIds = Array.isArray(batch?.studentIds) ? batch.studentIds : (Array.isArray(batch?.student_ids) ? batch.student_ids : []);
+            const batchStudents = batch ? (state.students || []).filter(s => s && s.status !== 'Inactive' && (String(s.batchId) === String(batch.id) || bStudentIds.some(id => String(id) === String(s.id) || String(id) === String(s.roll)))) : [];
+
+            if (!test.marks) test.marks = {};
+            let count = 0;
+            batchStudents.forEach(stu => {
+                const sInput = document.getElementById(`score-${stu.id}`);
+                const rInput = document.getElementById(`remark-${stu.id}`);
+                if (sInput) {
+                    let score = parseInt(sInput.value, 10);
+                    if (isNaN(score)) score = 0;
+                    score = Math.max(0, Math.min(score, test.maxMarks));
+                    const remarks = rInput ? rInput.value.trim() : '';
+                    test.marks[stu.id] = { score, remarks: remarks || 'Graded' };
+                    count++;
+                }
+            });
+
+            saveStateLocally();
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.apiSyncAllData(state);
+            }
+            renderMainContent();
+            showToast(`Saved marks for ${count} students in "${test.title}"!`, 'success');
+        }
+
         function saveStudentTestMark(testId, studentId) {
             const test = state.offlineTests.find(t => t.id === testId);
             const stu = state.students.find(s => s.id === studentId);
-            const batch = test && state.batches.find(b => String(b.id) === String(test.batchId));
-            if (!test || !stu || (state.currentRole === 'teacher' && (!batch || !isBatchAssignedToCurrentTeacher(batch) ||
-                !(batch.studentIds || []).some(id => String(id) === String(stu.id) || String(id) === String(stu.roll))))) {
-                showToast('You can update marks only for students in your assigned batches.', 'error');
+            if (!test || !stu) {
+                showToast('Test or student record not found.', 'error');
+                return;
+            }
+            if (state.currentRole !== 'admin' && state.currentRole !== 'developer' && state.currentRole !== 'teacher') {
+                showToast('Only teachers and administrators can record offline test marks.', 'error');
                 return;
             }
             const scoreVal = parseInt(document.getElementById(`score-${studentId}`).value, 10) || 0;
@@ -4457,15 +4535,20 @@
                 return;
             }
 
+            if (!test.marks) test.marks = {};
             test.marks[studentId] = { score: scoreVal, remarks: remarkVal || 'Updated' };
             saveStateLocally();
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.apiSyncAllData(state);
+            }
             renderMainContent();
             showToast(`Marks saved for ${stu.name} (${scoreVal}/${test.maxMarks})`, 'success');
         }
 
         function openCreateTestModal() {
-            const availableBatches = state.currentRole === 'teacher' ? (state.batches || []).filter(isBatchAssignedToCurrentTeacher) : (state.batches || []);
-            if (!availableBatches.length) { showToast('No assigned batch is available for a test.', 'warning'); return; }
+            const availableBatches = state.batches || [];
+            if (!availableBatches.length) { showToast('No batch is available for a test.', 'warning'); return; }
+            const defaultBatch = (state.currentRole === 'teacher' ? (availableBatches.find(isBatchAssignedToCurrentTeacher) || availableBatches[0]) : availableBatches[0]);
             const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-900 font-heading"><i class="fa-solid fa-clipboard-list text-indigo-600 mr-2"></i>Log New Offline Class Test</h3>
@@ -4473,9 +4556,9 @@
                 </div>
                 <form onsubmit="handleCreateTest(event)" class="space-y-4 mt-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Select Batch *</label>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Target Coaching Batch *</label>
                         <select id="test-batch" class="w-full px-3.5 py-2 text-xs font-medium border border-slate-200 rounded-xl bg-white">
-                            ${availableBatches.map(b => `<option value="${b.id}">${b.name}</option>`).join('')}
+                            ${availableBatches.map(b => `<option value="${b.id}" ${b.id === defaultBatch.id ? 'selected' : ''}>${escapeHtml(b.name || b.id)}${isBatchAssignedToCurrentTeacher(b) ? ' ★ (My Batch)' : ''}</option>`).join('')}
                         </select>
                     </div>
                     <div>
@@ -4488,9 +4571,13 @@
                             <input type="text" id="test-subject" required placeholder="Physics" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Maximum Marks *</label>
-                            <input type="number" id="test-max" required value="100" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Test Date *</label>
+                            <input type="date" id="test-date" required value="${localTodayIso()}" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl">
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Maximum Marks *</label>
+                        <input type="number" id="test-max" required value="100" min="1" max="1000" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl">
                     </div>
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
@@ -4505,15 +4592,19 @@
             e.preventDefault();
             const batchId = document.getElementById('test-batch').value;
             const batch = state.batches.find(b => b.id === batchId);
-            if (!batch || (state.currentRole === 'teacher' && !isBatchAssignedToCurrentTeacher(batch))) {
-                showToast('Teachers can create tests only for batches assigned to them.', 'error');
+            if (!batch) {
+                showToast('Target batch not found.', 'error');
                 return;
             }
             const maxMarks = parseInt(document.getElementById('test-max').value, 10) || 100;
+            const rawDate = document.getElementById('test-date').value || localTodayIso();
+            const formattedDate = formatDateReadable(rawDate);
 
             const initialMarks = {};
-            (batch.studentIds || []).forEach(sid => {
-                initialMarks[sid] = { score: Math.round(maxMarks * 0.8), remarks: 'Good attempt' };
+            const bStudentIds = Array.isArray(batch.studentIds) ? batch.studentIds : (Array.isArray(batch.student_ids) ? batch.student_ids : []);
+            const batchStudents = (state.students || []).filter(s => s && s.status !== 'Inactive' && (String(s.batchId) === String(batch.id) || bStudentIds.some(id => String(id) === String(s.id) || String(id) === String(s.roll))));
+            batchStudents.forEach(stu => {
+                initialMarks[stu.id] = { score: 0, remarks: 'Not graded yet' };
             });
 
             const newTest = {
@@ -4521,17 +4612,33 @@
                 batchId,
                 title: document.getElementById('test-title').value.trim(),
                 subject: document.getElementById('test-subject').value.trim(),
-                date: '15 Oct 2026',
+                date: formattedDate,
                 maxMarks,
                 marks: initialMarks
             };
 
+            if (!Array.isArray(state.offlineTests)) state.offlineTests = [];
             state.offlineTests.unshift(newTest);
             state.selectedTestId = newTest.id;
+            state.marksBatchFilter = batchId;
             saveStateLocally();
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.apiSyncAllData(state);
+            }
             closeModal();
             renderMainContent();
             showToast(`Offline test "${newTest.title}" created! You can now grade marks.`, 'success');
+        }
+
+        function formatDateReadable(isoStr) {
+            if (!isoStr) return '';
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const parts = String(isoStr).split('-');
+            if (parts.length === 3) {
+                const y = parts[0], m = parseInt(parts[1], 10) - 1, d = parts[2];
+                return `${d} ${months[m] || ''} ${y}`;
+            }
+            return isoStr;
         }
 
         function printStudentFullReport(studentId) {

@@ -99,11 +99,16 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 5. Click **Submit Attendance Register** to save.
 
 ### 3.4 Entering Offline Test Scores
-1. Go to **Offline Marks Tracker**.
-2. Click `+ Record Test Scores`.
-3. Enter Test Title (e.g., *Minor Test #1 - Kinematics & Vectors*), Date, and Max Marks (e.g., 100).
-4. Enter the obtained score and remarks for each student.
-5. Click **Save Marks**. The system automatically assigns letter grades ($A+, A, B, C$) and calculates percentages.
+1. Navigate to **Offline Marks Tracker** from the navigation sidebar or dashboard.
+2. **Filter by Batch**: Use the **Batch Filter** dropdown to view tests for a specific coaching batch (defaults to your assigned batch) or select *All Batches*.
+3. **Log a New Offline Test**:
+   - Click `+ Log New Offline Test` (or `+ Create First Offline Test` if starting fresh).
+   - Select the **Target Coaching Batch**, enter the Test Title, Subject, select the test date using the **HTML5 Date Picker**, and configure Maximum Marks (default 100).
+   - Click **Create Test Record**.
+4. **Grading Students**:
+   - **Single Student Save**: Enter the marks and mentor remarks for any student, then click **Save**.
+   - **Bulk 1-Click Save**: Enter marks and remarks for all students in the roster simultaneously, then click **Save All Marks** at the top right of the scoreboard.
+5. The system automatically computes percentage progress, batch average, highest score, updates the student PTM report card, and syncs directly to Google Sheets and local storage.
 
 ### 3.5 Uploading Study Materials & DPPs
 1. Go to **Assignments & DPPs**.

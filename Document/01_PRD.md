@@ -114,12 +114,14 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 - **FR-4.5**: Faculty members can upload PDFs, assignments, and Daily Practice Problems (DPPs) with subject, topic, and batch tags.
 
 ### Module 5: Offline Academic Marks Tracker
-- **FR-5.1**: Record offline minor and grand test results including Test Title, Test Date, Student ID, Batch ID, Maximum Marks, Obtained Score, Topics Covered, and Teacher Remarks.
+- **FR-5.1**: Record offline minor, weekly, and grand test results including Test Title, Test Date (via HTML5 date picker), Target Batch ID, Maximum Marks, Obtained Score, and Mentor Remarks.
 - **FR-5.2**: The system must compute real-time analytics:
-  - Subject-wise score breakdown
-  - Cumulative score and percentage
+  - Subject-wise score breakdown and batch average vs. highest score.
+  - Cumulative score and percentage progress bar.
   - Automated grade assignment ($A+ \ge 85\%$, $A \ge 70\%$, $B \ge 50\%$, $C < 50\%$).
 - **FR-5.3**: Real-time validation preventing entered marks from exceeding maximum possible marks.
+- **FR-5.4**: Faculty bulk grading support allowing teachers to input scores for all students in a batch and commit in 1 click via **Save All Marks**, with immediate Google Sheets synchronization.
+- **FR-5.5**: Multi-batch filtering enabling faculty to seamlessly toggle between assigned batches or view all institute tests.
 
 ### Module 6: Official Academic Report Card & Digital Verification
 - **FR-6.1**: Produce an official Academic Progress Report Card with:
