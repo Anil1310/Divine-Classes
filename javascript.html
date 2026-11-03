@@ -7561,8 +7561,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return `
                 <div class="w-full min-h-[92vh] flex flex-col items-center justify-center py-6 sm:py-10 px-4">
                     ${renderLoginCardHtml(false)}
-                    <footer class="mt-8 text-center text-[11px] text-slate-500">
-                        <p>© 2026 Divine Classes • ${getShortAddress()} • Contact: ${state.settings.contactDisplay || '9555-6787-53'}</p>
+                    <footer class="mt-8 text-center text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+                        <p>© 2026 Divine Classes • ${getShortAddress()} • Helpline: ${state.settings.contactDisplay || '9555-6787-53'}</p>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500">Designed & Engineered with ❤️ by <span class="font-semibold text-slate-700 dark:text-slate-200">Er. Anil Kumar Chahar</span> • v2.5 Cloud Edition</p>
                     </footer>
                 </div>
             `;
@@ -8384,6 +8385,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     .apiGetInitialData();
             }
         }
+        window.bootApp = bootApp;
 
         // Multi-stage boot guarantee for Google Apps Script HtmlService iframe & standalone web app:
         // 1. If DOM is already interactive/complete, trigger immediately

@@ -264,7 +264,16 @@
 
             <!-- Scrollable Main Workspace -->
             <main id="main-content" class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-                <!-- Dynamic Views Injected Here -->
+                <!-- Initial Branded Loader (replaces blank canvas before bootApp paints) -->
+                <div id="initial-page-loader" class="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 fade-in">
+                    <div class="relative w-14 h-14">
+                        <div class="w-14 h-14 rounded-full border-4 border-indigo-200 dark:border-indigo-950 border-t-indigo-600 animate-spin"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Connecting to Divine Classes...</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Initializing cloud database & secure portal workspace</p>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
