@@ -20,9 +20,9 @@
 The **Divine Classes Web App** runs in any web browser on smartphones, tablets, laptops, and desktops.
 
 ### Web App Access URL
-Open the Google Apps Script Web App URL provided by your administrator:
+Open the active Google Apps Script Web App URL:
 ```text
-https://script.google.com/macros/s/.../exec
+https://script.google.com/macros/s/AKfycbySJOW4-AlwDHziPVoLCsz-X3LAf9CWurzGsJtyyxa4qIi7n9yh-A3lLatRUsOaN_sf/exec
 ```
 
 ### The Quick Persona Switcher (For Testing & Demo)
@@ -71,10 +71,24 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 
 ### 3.1 Logging In as Teacher
 1. Open the login modal and choose **Teacher Login**.
-2. Enter your registered Phone or Email (e.g. `+91 95556 78753`).
+2. Enter your registered Phone or Email (e.g. `rajesh.chahar@divineclasses.in` or `+91 95556 78753`).
 3. Enter your password (default: `teacher123`).
+4. Upon login, the top notification banner greets you with an emerald **Faculty Portal** badge:
+   > *"Teacher Mode Active: Welcome to your faculty workspace. You can manage your assigned batches, student attendance, assignments, and test marks."*
 
-### 3.2 Taking Daily Class Attendance
+### 3.2 Managing Assigned Batches & Adding Students
+1. Navigate to **Batches & Students** from the sidebar.
+2. Only batches assigned to your faculty profile will be displayed (with a badge indicating `Faculty Portal • Assigned Batches`). For example, *Er. Rajesh Chahar* automatically sees *JEE Advanced Target 2027 (Alpha Batch)*.
+3. To add a student to your batch, click the **+ Add Student** button on the batch card:
+   - **Option 1: Select from Existing Institute Directory**
+     - Use the dropdown to choose any registered student not yet in this batch.
+     - Click **Add Selected Student** to enroll them instantly.
+   - **Option 2: Enroll Brand New Student**
+     - Enter the student's **Full Name**, **Mobile Number**, and **Parent/Guardian Name**.
+     - Optionally upload a profile photo (`.jpg`, `.png`, `.webp`).
+     - Click **Enroll & Add to Batch**. The student is assigned a unique Roll Number, added to your batch roster, and synced across all cloud databases.
+
+### 3.3 Taking Daily Class Attendance
 1. Click **Attendance** from the navigation sidebar.
 2. Select your assigned batch from the batch dropdown.
 3. The student roster for that batch will load.
@@ -84,14 +98,14 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
    - 🟡 **L**: Late
 5. Click **Submit Attendance Register** to save.
 
-### 3.3 Entering Offline Test Scores
+### 3.4 Entering Offline Test Scores
 1. Go to **Offline Marks Tracker**.
 2. Click `+ Record Test Scores`.
 3. Enter Test Title (e.g., *Minor Test #1 - Kinematics & Vectors*), Date, and Max Marks (e.g., 100).
 4. Enter the obtained score and remarks for each student.
 5. Click **Save Marks**. The system automatically assigns letter grades ($A+, A, B, C$) and calculates percentages.
 
-### 3.4 Uploading Study Materials & DPPs
+### 3.5 Uploading Study Materials & DPPs
 1. Go to **Assignments & DPPs**.
 2. Click `Upload Study Material`.
 3. Choose the **Target Batch** (strictly scoped so other batches cannot access it).

@@ -78,16 +78,31 @@ Stores registered student demographic, enrollment, and fee status records.
 | `password` | `VARCHAR(64)` | YES | `'student123'`| Access credential for student portal. |
 
 ### 2.2 Table: `batches`
-Stores batch groupings, target competitive examination streams, and mentor assignments.
+Stores batch groupings, target competitive examination streams, mentor assignments, and enrolled student rosters.
 
 | Column Name | PostgreSQL Type | Nullable | Default | Description |
 | :--- | :--- | :---: | :---: | :--- |
-| `id` | `VARCHAR(64)` | NO | Primary Key | Unique batch identifier (e.g., `b1`, `b2`). |
-| `name` | `VARCHAR(128)` | NO | — | Name (e.g., `Alpha Batch (JEE Target 2026)`). |
-| `subject` | `VARCHAR(128)` | NO | — | Target curricula: `PCM`, `PCB`, `CBSE Boards`. |
-| `schedule` | `VARCHAR(128)` | YES | — | Class timings (e.g., `Mon-Fri 4:00 PM - 7:30 PM`). |
-| `teacherId` | `VARCHAR(64)` | YES | — | Foreign key mapping to `teachers.id`. |
+| `id` | `VARCHAR(64)` | NO | Primary Key | Unique batch identifier (e.g., `b1`, `b2`, `b3`). |
+| `name` | `VARCHAR(128)` | NO | — | Name (e.g., `JEE Advanced Target 2027 (Alpha Batch)`). |
+| `subject` | `VARCHAR(128)` | NO | — | Target curricula: `Physics, Chemistry & Mathematics`, etc. |
+| `schedule` | `VARCHAR(128)` | YES | — | Class timings (e.g., `Mon - Fri • 08:00 AM - 12:30 PM`). |
+| `room` | `VARCHAR(64)` | YES | — | Classroom or hall (e.g., `Lecture Hall 101 (Smart AC)`). |
+| `teacher` | `VARCHAR(128)` | YES | — | Lead faculty name (e.g., `Er. Rajesh Chahar (Ex-IITian)`). |
+| `teacherId` | `VARCHAR(64)` | YES | — | Foreign key mapping to `teachers.id` (e.g., `tr1`). |
+| `teacherEmail` | `VARCHAR(128)` | YES | — | Faculty email address for direct identity verification. |
+| `student_ids` | `JSONB` | NO | `'[]'::jsonb` | JSON Array of enrolled student IDs (`["s1", "s2", ...]`). |
 | `maxStudents` | `INTEGER` | NO | `40` | Maximum batch seating capacity. |
+
+#### 2.2.1 Faculty Batch Resolution & Student Enrollment Protocol
+1. **Multi-Factor Faculty Resolution**:
+   The function `isBatchAssignedToCurrentTeacher(batch)` links a batch to a teacher via:
+   - **Tier 1 (Explicit ID Match)**: `batch.teacherId === teacher.id`.
+   - **Tier 2 (Email Match)**: `batch.teacherEmail === teacher.email`.
+   - **Tier 3 (Normalized Name Match)**: Strips titles (`Er.`, `Dr.`, `Mr.`, `Mrs.`) and parenthetical notes (`(Ex-IITian)`) before comparing, ensuring `Er. Rajesh Chahar (Ex-IITian)` seamlessly matches `Er. Rajesh Chahar`.
+2. **Teacher Student Enrollment (`openAddStudentToBatchModal`)**:
+   - Allows assigned faculty to enroll students into their batch directly from the batch card.
+   - Option 1 adds existing unassigned/assigned students to `batch.studentIds`.
+   - Option 2 registers a brand-new student, auto-generates their ID, and immediately associates them with the batch in local state, Supabase, and Google Sheets.
 
 ### 2.3 Table: `attendance_records`
 Stores daily roll call attendance entries for batch rosters.

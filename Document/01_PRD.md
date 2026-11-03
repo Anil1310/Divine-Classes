@@ -6,8 +6,10 @@
 ## Document Control & Metadata
 - **Product Name**: Divine Classes Web ERP & Student-Parent LMS
 - **Target Audience**: Coaching Institutes, Students (JEE/NEET/CBSE), Parents, Faculty, Administrators
-- **Version**: 2.5.0 (Enterprise Release & Future Architecture)
+- **Version**: 2.6.0 (Enterprise Faculty & Batch Release)
 - **Deployment Platform**: Google Apps Script (GAS) Web App + Supabase (PostgreSQL 15) + Google Sheets + Android APK (Planned)
+- **Active Deployment ID**: `AKfycbySJOW4-AlwDHziPVoLCsz-X3LAf9CWurzGsJtyyxa4qIi7n9yh-A3lLatRUsOaN_sf` (@57)
+- **Live Web App URL**: `https://script.google.com/macros/s/AKfycbySJOW4-AlwDHziPVoLCsz-X3LAf9CWurzGsJtyyxa4qIi7n9yh-A3lLatRUsOaN_sf/exec`
 - **Author**: Antigravity AI Engineering Team on behalf of Divine Classes Leadership
 - **Status**: Production Ready / Approved
 
@@ -57,7 +59,8 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 | :--- | :---: | :---: | :---: |
 | **System Settings & Institute Profile** | Full Edit | Read-Only / Hidden | Hidden |
 | **Database Sync (Supabase / Sheets)** | Full Control | Hidden | Hidden |
-| **Batch Management & Student Roster** | Full CRUD | Assigned Batches | View Own Batch |
+| **Batch Management & Student Roster** | Full CRUD | **Assigned Batches + Add/Enroll Students** | View Own Batch |
+| **Faculty Portal Workspace Banner** | Admin Mode | **Faculty Portal Badge (Clean Workspace)** | Hidden |
 | **Attendance Register Taking** | Mark / Override | Mark for Assigned Batch | View Only (Own) |
 | **Historical Attendance by Date** | All Batches | Assigned Batches | Own Record Only |
 | **Offline Test Marks Entry** | Full CRUD | Enter for Assigned Batch | View Only (Own) |
@@ -95,12 +98,20 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
   - Classes Attended
   - Real-time Attendance Percentage with visual status badges (Green >= 85%, Amber 70-84%, Red < 70%).
 
-### Module 4: Batch Isolation & Material Access Control
-- **FR-4.1**: Students must only see information pertaining to their enrolled batch (e.g., *Alpha Batch (JEE Target 2026)*).
-- **FR-4.2**: The Study Materials repository must enforce strict batch gating:
+### Module 4: Batch Isolation, Faculty Assignment & Student Enrollment
+- **FR-4.1**: Students must only see information pertaining to their enrolled batch (e.g., *JEE Advanced Target 2027 (Alpha Batch)*).
+- **FR-4.2**: **Teacher Batch Scoping & Resolution Protocol**:
+  - Teachers logged in with their faculty profile automatically view only the coaching batches assigned to them.
+  - Identification matches via `teacherId`, registered `teacherEmail`, or title-normalized name matching (e.g. `Er. Rajesh Chahar (Ex-IITian)` dynamically links to `Er. Rajesh Chahar`).
+  - Active teacher batches feature an emerald badge: `Faculty Portal • Assigned Batches`.
+- **FR-4.3**: **Teacher Student Enrollment into Assigned Batches**:
+  - Teachers can click `+ Add Student` on their assigned batch cards to open the Enrollment Modal with two distinct workflows:
+    - *Option 1 (Existing Directory)*: Select any registered institute student not yet enrolled in this batch and add them in 1-click.
+    - *Option 2 (New Admission)*: Enroll a brand-new student directly into their batch with auto-generated Roll Number, student details, contact info, and profile image.
+- **FR-4.4**: The Study Materials repository must enforce strict batch gating:
   - Material cards tagged with `batchId` must only render for students enrolled in that specific `batchId`.
   - Material download links for other batches must be completely blocked and inaccessible.
-- **FR-4.3**: Faculty members can upload PDFs, assignments, and Daily Practice Problems (DPPs) with subject, topic, and batch tags.
+- **FR-4.5**: Faculty members can upload PDFs, assignments, and Daily Practice Problems (DPPs) with subject, topic, and batch tags.
 
 ### Module 5: Offline Academic Marks Tracker
 - **FR-5.1**: Record offline minor and grand test results including Test Title, Test Date, Student ID, Batch ID, Maximum Marks, Obtained Score, Topics Covered, and Teacher Remarks.

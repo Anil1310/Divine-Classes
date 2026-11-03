@@ -308,6 +308,52 @@ REQUIREMENTS:
 
 ---
 
+### PROMPT 13: Teacher Batch Resolution, Faculty Workspace & Direct Student Enrollment
+```text
+SYSTEM ROLE: Full-Stack RBAC & Educational Workflow Specialist
+GOAL: Empower coaching faculty with isolated batch management and seamless student enrollment.
+
+REQUIREMENTS:
+1. Faculty Batch Scoping:
+   - Teachers must only see coaching batches assigned to their faculty profile.
+   - Support multi-factor matching:
+     * Explicit batch.teacherId === teacher.id
+     * Registered batch.teacherEmail === teacher.email
+     * Normalized name comparison ignoring academic honorifics (Er., Dr., Mr.) and suffixes ((Ex-IITian)).
+2. Professional Faculty Workspace:
+   - Replace awkward "Fees Hidden from Teacher" banners with a clean, empowering 
+     "Faculty Portal • Assigned Batches" banner.
+3. Direct Student Enrollment (openAddStudentToBatchModal):
+   - Provide "+ Add Student" button on batch cards visible to assigned faculty.
+   - Option 1: Select existing registered institute students to enroll into the batch.
+   - Option 2: Register and enroll brand-new students with auto-generated Roll Number, 
+     contact details, and image uploads.
+   - Immediately synchronize newly enrolled students across local state, Supabase, 
+     and Google Sheets.
+```
+
+---
+
+### PROMPT 14: Google Apps Script HTML Pre-Processor & Lexer Defense
+```text
+SYSTEM ROLE: Google Apps Script Compiler & Syntax Hardening Specialist
+GOAL: Prevent silent code deletion caused by GAS HTML comment stripping lexer bugs.
+
+REQUIREMENTS:
+1. The Comment Stripper Collision:
+   - Google Apps Script's HTML compiler strips comments from <script> tags before evaluation.
+   - The compiler lexer does not treat ES6 template literals (backticks) as strings.
+   - Never place accept="image/*" inside backticks, as '/*' is misidentified as a block 
+     comment start, silently erasing subsequent code until the next '*/'.
+   - Use explicit MIME types: accept="image/jpeg,image/png,image/webp".
+2. Safe URL Template Literals:
+   - Never write `https://wa.me/...` inside backticks, as '//' is misidentified as a line 
+     comment, truncating the rest of the line and causing SyntaxError.
+   - Use standard quoted string concatenation: 'https://wa.me/' + phone + '?text=' + msg.
+```
+
+---
+
 ## 4. Operational Playbook & Best Practices
 
 ### 4.1 Deployment Workflow

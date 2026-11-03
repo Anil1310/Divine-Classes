@@ -311,14 +311,22 @@ function mergeStudentsFromSheet_(dbData) {
 
 ### 7.1 Role Hierarchy Matrix
 
-| Privilege / View                                | Developer |   Admin   |      Teacher / Faculty      |       Student / Parent       |
-| ----------------------------------------------- | :--------: | :--------: | :--------------------------: | :--------------------------: |
-| **Institute Settings Console**            |  ✅ Full  | ❌ Blocked |          ❌ Blocked          |          ❌ Blocked          |
-| **Google Drive / Sheet Direct Links**     | ✅ Visible | ❌ Hidden |          ❌ Hidden          |          ❌ Hidden          |
-| **Student Fee Ledger & Payment Dues**     |  ✅ Full  |  ✅ Full  | 🚫 **Strictly Hidden** | 🚫 **Strictly Hidden** |
-| **Batch Management & Student Assignment** |  ✅ Full  |  ✅ Full  |       ✅ View / Assign       |        ❌ Restricted        |
-| **Test Marks Entry & Report Cards**       |  ✅ Full  |  ✅ Full  |       ✅ Create & Edit       |     👁️ View Own Marks     |
-| **Study Materials & Assignments**         |  ✅ Full  |  ✅ Full  |       ✅ Upload Files       |      👁️ Download Only      |
+| Privilege / View                                | Developer |   Admin   |             Teacher / Faculty             |       Student / Parent       |
+| ----------------------------------------------- | :--------: | :--------: | :---------------------------------------: | :--------------------------: |
+| **Institute Settings Console**            |  ✅ Full  | ❌ Blocked |                ❌ Blocked                 |          ❌ Blocked          |
+| **Google Drive / Sheet Direct Links**     | ✅ Visible | ❌ Hidden |                ❌ Hidden                 |          ❌ Hidden          |
+| **Student Fee Ledger & Payment Dues**     |  ✅ Full  |  ✅ Full  | 🚫 **Strictly Hidden (Faculty Portal)** | 🚫 **Strictly Hidden** |
+| **Batch Management & Student Enrollment** |  ✅ Full  |  ✅ Full  | **✅ Assigned Batches + Add Students**  |        ❌ Restricted        |
+| **Test Marks Entry & Report Cards**       |  ✅ Full  |  ✅ Full  |             ✅ Create & Edit              |     👁️ View Own Marks     |
+| **Study Materials & Assignments**         |  ✅ Full  |  ✅ Full  |              ✅ Upload Files              |      👁️ Download Only      |
+
+> **Note on Faculty Experience:**
+> Teachers logged in to Divine Classes see a dedicated **Faculty Portal** with an emerald status badge. Batch cards for assigned batches allow teachers to directly add existing institute students or enroll brand-new students via `openAddStudentToBatchModal()`.
+
+### 7.2 Google Apps Script Compiler Defense (Lexer Safety)
+When authoring client JavaScript embedded inside Google Apps Script `.html` templates, observe these critical rules to prevent silent code stripping by the Apps Script HTML compiler:
+1. **Explicit Image MIME Types**: Never write `accept="image/*"` inside backtick template literals (`...`); the lexer misinterprets `/*` as the start of a block comment and strips subsequent code until the next `*/`. Use `accept="image/jpeg,image/png,image/webp"`.
+2. **Quoted URL Concatenation**: Avoid writing raw `https://` inside template literals (`...`); the lexer can misinterpret `//` as a line comment, truncating the rest of the line. Use string concatenation: `'https://wa.me/' + phone + '?text=' + msg`.
 
 ---
 
