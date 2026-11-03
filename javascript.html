@@ -914,6 +914,9 @@
             renderAuthHeader();
             updateRoleUI();
             renderSidebar();
+            if (typeof updateChatbotVisibility === 'function') {
+                updateChatbotVisibility();
+            }
             renderMainContent();
             showToast('You have been logged out successfully.', 'info');
         }
@@ -1097,6 +1100,9 @@
 
             updateRoleUI();
             renderSidebar();
+            if (typeof updateChatbotVisibility === 'function') {
+                updateChatbotVisibility();
+            }
             renderMainContent();
         }
 
@@ -7632,6 +7638,20 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-circle-info mr-1 text-violet-500"></i> Current state: <strong>${canAdminDeleteLinks() ? 'ON — Admin can delete study links' : 'OFF — Admin cannot delete study links'}</strong>. Developer always retains full control from this console.</p>
                             `)}
 
+                            ${sectionCard('AI Assistant & Chatbot Control', 'fa-robot', 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300', `
+                                <label class="relative flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Enable Floating Chatbot & Voice Assistant</p>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = Chatbot launcher button & voice helpdesk are active for all users. <strong>Turn OFF to completely hide and disable the chatbot</strong> across the web app.</p>
+                                    </div>
+                                    <div class="relative shrink-0 w-11 h-6">
+                                        <input type="checkbox" id="set-chatbotEnabled" ${isChatbotEnabled() ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" aria-label="Enable Floating Chatbot">
+                                        <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                    </div>
+                                </label>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-circle-info mr-1 text-indigo-500"></i> Current state: <strong>${isChatbotEnabled() ? 'ON — Chatbot visible and active' : 'OFF — Chatbot hidden and disabled'}</strong>. Change takes effect immediately after Save.</p>
+                            `)}
+
                             ${sectionCard("Coaching Owner's Google Drive Folder", 'fa-folder-tree', 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300', `
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div class="rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 p-4 space-y-3 min-w-0">
@@ -7831,17 +7851,21 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     showDummyData: shouldShowDummyData(),
                     allowAdminFeedbackDelete: canAdminDeleteFeedback(),
                     allowAdminLinkDelete: canAdminDeleteLinks(),
+                    chatbotEnabled: isChatbotEnabled(),
                     dummyDataWiped: !!(state.settings && (state.settings.dummyDataWiped === true || state.settings.dummyDataWiped === 'true'))
                 };
                 localStorage.setItem(PERSISTENT_SETTINGS_KEY, JSON.stringify(overrides));
+                localStorage.setItem('DIVINE_CHATBOT_ENABLED', String(isChatbotEnabled()));
             } catch (e) {}
         }
 
         function applyPersistentSettingsOverrides() {
             try {
                 const raw = localStorage.getItem(PERSISTENT_SETTINGS_KEY);
-                if (!raw) return;
-                const saved = JSON.parse(raw);
+                let saved = {};
+                if (raw) {
+                    try { saved = JSON.parse(raw) || {}; } catch(e) {}
+                }
                 if (!state.settings) state.settings = {};
                 if (saved && typeof saved === 'object') {
                     if (saved.showRequirementLabels !== undefined) state.settings.showRequirementLabels = saved.showRequirementLabels;
@@ -7849,6 +7873,14 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     if (saved.allowAdminFeedbackDelete !== undefined) state.settings.allowAdminFeedbackDelete = saved.allowAdminFeedbackDelete;
                     if (saved.allowAdminLinkDelete !== undefined) state.settings.allowAdminLinkDelete = saved.allowAdminLinkDelete;
                     if (saved.dummyDataWiped !== undefined) state.settings.dummyDataWiped = saved.dummyDataWiped;
+                    if (saved.chatbotEnabled !== undefined) state.settings.chatbotEnabled = saved.chatbotEnabled;
+                }
+                const localChatbot = localStorage.getItem('DIVINE_CHATBOT_ENABLED');
+                if (localChatbot !== null && localChatbot !== undefined && localChatbot !== '') {
+                    state.settings.chatbotEnabled = (localChatbot === 'true' || localChatbot === true);
+                }
+                if (typeof updateChatbotVisibility === 'function') {
+                    updateChatbotVisibility();
                 }
             } catch (e) {}
         }
@@ -7998,7 +8030,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
             if (!state.settings) state.settings = {};
-            const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'sheetsMirrorEnabled', 'supabaseEnabled', 'supabaseUrl', 'supabaseKey', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
+            const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'chatbotEnabled', 'sheetsMirrorEnabled', 'supabaseEnabled', 'supabaseUrl', 'supabaseKey', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
             keys.forEach(function (k) {
                 const el = document.getElementById('set-' + k);
                 if (el) {
@@ -8019,6 +8051,12 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     if (v) state.settings[k] = v;
                 }
             });
+
+            if (state.settings.chatbotEnabled !== undefined) {
+                try {
+                    localStorage.setItem('DIVINE_CHATBOT_ENABLED', String(state.settings.chatbotEnabled));
+                } catch(e) {}
+            }
 
             const form = e.currentTarget;
             if (form && form.dataset.saving === 'true') return;
@@ -8056,6 +8094,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase();
             updateRoleUI();
             renderSidebar();
+            if (typeof updateChatbotVisibility === 'function') {
+                updateChatbotVisibility();
+            }
             const restoreSaveButton = function() {
                 if (form) delete form.dataset.saving;
                 if (saveButton) {
@@ -8815,6 +8856,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             try { initTheme(); } catch (e) { console.warn('Theme init warning:', e); }
             try { loadCachedData(); } catch (e) { console.warn('Cache load warning:', e); }
             try { applyPersistentSettingsOverrides(); } catch (e) { console.warn('Settings overrides warning:', e); }
+            try { updateChatbotVisibility(); } catch (e) { console.warn('Chatbot visibility update warning:', e); }
 
             // Restore Supabase config from dedicated localStorage key (survives cache clears)
             try {
@@ -8955,6 +8997,52 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         /********************************************************************
          * DIVINE AI ASSISTANT, GEMINI AUTO-CONNECT & ORAL VOICE ADMISSION
          ********************************************************************/
+        function isChatbotEnabled() {
+            try {
+                const localVal = localStorage.getItem('DIVINE_CHATBOT_ENABLED');
+                if (localVal !== null && localVal !== undefined && localVal !== '') {
+                    return localVal === 'true' || localVal === true;
+                }
+            } catch(e) {}
+            if (state && state.settings && state.settings.chatbotEnabled !== undefined) {
+                return state.settings.chatbotEnabled === true || state.settings.chatbotEnabled === 'true';
+            }
+            return true; // Default ON
+        }
+
+        function updateChatbotVisibility() {
+            const enabled = isChatbotEnabled();
+            const btn = document.getElementById('divine-chatbot-btn');
+            const win = document.getElementById('divine-chatbot-window');
+            if (btn) {
+                if (enabled) {
+                    btn.style.display = '';
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.style.display = 'none';
+                    btn.classList.add('hidden');
+                }
+            }
+            if (win) {
+                if (!enabled) {
+                    win.style.display = 'none';
+                    win.classList.add('hidden');
+                    if (window.divineChatbotState) {
+                        window.divineChatbotState.isOpen = false;
+                        if (window.divineChatbotState.isListening && typeof stopChatbotVoiceRecognition === 'function') {
+                            stopChatbotVoiceRecognition();
+                        }
+                    }
+                    const iconClosed = document.getElementById('chatbot-icon-closed');
+                    const iconOpened = document.getElementById('chatbot-icon-opened');
+                    if (iconClosed) iconClosed.classList.remove('hidden');
+                    if (iconOpened) iconOpened.classList.add('hidden');
+                } else {
+                    win.style.display = '';
+                }
+            }
+        }
+
         window.divineChatbotState = {
             isOpen: false,
             initialized: false,
@@ -9638,6 +9726,13 @@ Guidelines:
         }
 
         function toggleDivineChatbot(forceState) {
+            if (!isChatbotEnabled()) {
+                const btn = document.getElementById('divine-chatbot-btn');
+                const win = document.getElementById('divine-chatbot-window');
+                if (btn) { btn.style.display = 'none'; btn.classList.add('hidden'); }
+                if (win) { win.style.display = 'none'; win.classList.add('hidden'); }
+                return;
+            }
             const win = document.getElementById('divine-chatbot-window');
             const iconClosed = document.getElementById('chatbot-icon-closed');
             const iconOpened = document.getElementById('chatbot-icon-opened');
