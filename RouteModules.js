@@ -10,5 +10,9 @@ const ROUTE_MODULES = {
   "logout": {
     "template": "Routes/Logout/page",
     "title": "Signed Out - Divine Classes Portal"
+  },
+  "loading": {
+    "template": "Routes/Loading/page",
+    "title": "Connecting to Divine Classes..."
   }
 };

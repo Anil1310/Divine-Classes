@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connecting to Divine Classes...</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: {
+                            50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+                            400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+                            800: '#3730a3', 900: '#312e81', 950: '#1e1b4b'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <?!= include('css'); ?>
+    <?!= include('Routes/Loading/page-css'); ?>
+</head>
+<body class="text-slate-800 antialiased bg-slate-50 dark:bg-slate-950 min-h-screen flex flex-col justify-between p-4 sm:p-6 transition-colors duration-200">
+    <div class="max-w-md mx-auto my-auto w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 p-8 sm:p-10 text-center space-y-6 fade-in">
+        <!-- Logo Header -->
+        <div class="flex items-center justify-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center overflow-hidden shadow-xs">
+                <img id="loading-logo-img" src="" alt="Divine Classes" class="w-9 h-9 object-contain" onerror="this.style.display='none'; document.getElementById('loading-cap-icon').style.display='inline-block';">
+                <i id="loading-cap-icon" class="fa-solid fa-graduation-cap text-indigo-600 text-xl hidden"></i>
+            </div>
+            <div class="text-left">
+                <h2 class="text-base font-extrabold font-heading text-slate-900 dark:text-slate-100 leading-tight">Divine Classes</h2>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Excellence in Board & Competitive Prep</p>
+            </div>
+        </div>
+
+        <!-- Center Loader -->
+        <div class="py-4 flex flex-col items-center justify-center space-y-5">
+            <div class="relative w-16 h-16">
+                <div class="w-16 h-16 rounded-full border-4 border-indigo-100 dark:border-indigo-950 border-t-indigo-600 animate-spin"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <i class="fa-solid fa-bolt text-indigo-600 text-base animate-pulse"></i>
+                </div>
+            </div>
+
+            <div class="space-y-1.5">
+                <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">Connecting to Divine Classes...</h3>
+                <p id="loading-status-text" class="text-xs text-slate-500 dark:text-slate-400">Initializing cloud database & secure portal workspace</p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full max-w-xs bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden p-0.5 border border-slate-200 dark:border-slate-700">
+                <div id="loading-bar-fill" class="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-300 ease-out" style="width: 20%"></div>
+            </div>
+        </div>
+
+        <!-- Quick Action / Status Badges -->
+        <div class="pt-2 flex items-center justify-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>Cloud Sync Active</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                <i class="fa-solid fa-shield-halved text-indigo-500"></i>
+                <span>SSL Encrypted</span>
+            </span>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <a href="?page=index" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition">
+                Skip to Workspace <i class="fa-solid fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Developer Footer -->
+    <footer class="text-center py-4 text-xs text-slate-400">
+        <p class="text-[10px] text-slate-500">&copy; 2026 Designed & Engineered by <span class="font-semibold text-slate-400">Dev. Anil Kumar Chahar</span> • 8126390611 • v2.5 Cloud Edition</p>
+    </footer>
+
+    <?!= include('javascript'); ?>
+    <?!= include('Routes/Loading/page-js'); ?>
+</body>
+</html>

@@ -686,6 +686,7 @@
 #main-content[data-page-module="links"] .dc-page-root { display: contents; }
 #main-content[data-page-module="feedback"] .dc-page-root { display: contents; }
 #main-content[data-page-module="settings"] .dc-page-root { display: contents; }
+#main-content[data-page-module="loading"] .dc-page-root { display: contents; }
 </style>
 <div hidden aria-hidden="true">
 <!-- The legacy renderer supplies this page's content. -->
@@ -708,6 +709,8 @@
 <template id="dc-page-feedback" data-app-section="feedback" data-sheet-tab="Feedback_Responses"><section class="dc-page-root" data-page-root="feedback"></section></template>
 <!-- The legacy renderer supplies this page's content. -->
 <template id="dc-page-settings" data-app-section="settings" data-sheet-tab="Settings_Config"><section class="dc-page-root" data-page-root="settings"></section></template>
+<!-- The dedicated loading page module -->
+<template id="dc-page-loading" data-app-section="loading" data-sheet-tab="System_Config"><section class="dc-page-root" data-page-root="loading"></section></template>
 </div>
 <script>
 window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
@@ -800,6 +803,14 @@ window.DIVINE_PAGE_MODULES["settings"] = {
     "developer"
   ]
 };
+window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
+window.DIVINE_PAGE_MODULES["loading"] = {
+  "id": "loading",
+  "sheet": "System_Config",
+  "templateId": "dc-page-loading",
+  "renderer": "renderLoadingView",
+  "access": []
+};
 window.DIVINE_PAGE_BACKENDS = {
   "attendance": {
     "source": "Code.js",
@@ -877,6 +888,13 @@ window.DIVINE_PAGE_BACKENDS = {
     "methods": [
       "apiDatabaseSave",
       "apiUpdateAdminPassword"
+    ]
+  },
+  "loading": {
+    "source": "Code.js",
+    "sheetHelpers": "Sheets.js",
+    "methods": [
+      "apiGetInitialData"
     ]
   }
 };
@@ -10956,6 +10974,20 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     <footer class="mt-8 text-center text-[11px] text-slate-500 dark:text-slate-400">
                         <p class="text-[10px] text-slate-400 dark:text-slate-500">© 2026 Designed & Engineered by <span class="font-semibold text-slate-700 dark:text-slate-200">Dev. Anil Kumar Chahar</span> • 8126390611 • v2.5 Cloud Edition</p>
                     </footer>
+                </div>
+            `;
+        }
+
+        function renderLoadingView() {
+            return `
+                <div id="initial-page-loader" class="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 fade-in py-12">
+                    <div class="relative w-14 h-14">
+                        <div class="w-14 h-14 rounded-full border-4 border-indigo-200 dark:border-indigo-950 border-t-indigo-600 animate-spin"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Connecting to Divine Classes...</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Initializing cloud database & secure portal workspace</p>
+                    </div>
                 </div>
             `;
         }

@@ -1,0 +1,40 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let progress = 15;
+    const bar = document.getElementById('loading-bar-fill');
+    const statusText = document.getElementById('loading-status-text');
+    const steps = [
+        "Connecting to cloud database...",
+        "Validating workspace security...",
+        "Syncing student & batch registers...",
+        "Finishing workspace preparation...",
+        "Ready! Launching Divine Classes..."
+    ];
+    let stepIdx = 0;
+    const interval = setInterval(function() {
+        progress = Math.min(progress + 20, 95);
+        if (bar) bar.style.width = progress + '%';
+        if (stepIdx < steps.length && statusText) {
+            statusText.textContent = steps[stepIdx];
+            stepIdx++;
+        }
+        if (progress >= 95) {
+            clearInterval(interval);
+            setTimeout(function() {
+                if (bar) bar.style.width = '100%';
+                if (statusText) statusText.textContent = "Launching Divine Classes...";
+                setTimeout(function() {
+                    window.location.href = '?page=index';
+                }, 400);
+            }, 400);
+        }
+    }, 400);
+
+    if (typeof COACHING_LOGO_BASE64 !== 'undefined') {
+        const logoImg = document.getElementById('loading-logo-img');
+        if (logoImg) {
+            logoImg.src = COACHING_LOGO_BASE64;
+        }
+    }
+});
+</script>
