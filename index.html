@@ -12274,6 +12274,29 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError';
         }
 
+        /**
+         * Google Apps Script serves web apps inside an iframe whose Permissions
+         * Policy disables the microphone entirely. No prompt can ever appear
+         * there, so detect it and offer a path that actually works instead of
+         * showing "allow the microphone" steps that cannot succeed.
+         */
+        function isMicrophonePolicyBlocked() {
+            try {
+                const policy = document.featurePolicy || document.permissionsPolicy;
+                if (policy && typeof policy.allowsFeature === 'function') {
+                    return policy.allowsFeature('microphone') === false;
+                }
+            } catch (e) {}
+            return false;
+        }
+
+        function isAppsScriptHost() {
+            const host = window.location.hostname || '';
+            return window.self !== window.top ||
+                host.indexOf('googleusercontent.com') !== -1 ||
+                host.indexOf('script.google.com') !== -1;
+        }
+
         function openVoiceDictationWindow(target) {
             target = target || 'chatbot';
             const w = 440;
@@ -12473,6 +12496,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 showToast('Voice input is not supported here. Use Chrome or Safari, or tap the mic key on your keyboard.', 'warning');
                 return;
             }
+            const policyBlocked = isMicrophonePolicyBlocked();
             const html = `
                 <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100 max-w-lg">
                     <div class="flex items-center gap-3">
@@ -12481,7 +12505,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         </div>
                         <div>
                             <h3 class="text-base font-bold">Speak to Add a Student</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">This app view cannot access the speech engine directly. Pick any option below — all of them work.</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">${policyBlocked ? 'This page is served by Google Apps Script, which blocks microphone access for every app it hosts. Pick an option below to speak anyway.' : 'This app view cannot access the speech engine directly. Pick any option below — all of them work.'}</p>
                         </div>
                     </div>
 
@@ -12526,7 +12550,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function toggleChatbotVoiceRecognition() {
             const SpeechRec = getSpeechRecognition();
-            if (!SpeechRec) {
+            if (!SpeechRec || isMicrophonePolicyBlocked()) {
                 showVoiceUnavailableModal('chatbot');
                 return;
             }
@@ -12541,7 +12565,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function startChatbotVoiceRecognition(langOverride) {
             const SpeechRec = getSpeechRecognition();
-            if (!SpeechRec) {
+            if (!SpeechRec || isMicrophonePolicyBlocked()) {
                 showVoiceUnavailableModal('chatbot');
                 return;
             }
@@ -12715,7 +12739,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
          ********************************************************************/
         function startModalVoiceFill() {
             const SpeechRec = getSpeechRecognition();
-            if (!SpeechRec) {
+            if (!SpeechRec || isMicrophonePolicyBlocked()) {
                 showVoiceUnavailableModal('add_student');
                 return;
             }
