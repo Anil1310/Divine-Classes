@@ -57,14 +57,14 @@ function doGet(e) {
     return template.evaluate()
       .setTitle(title)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
   } catch (err) {
     try {
       const fallback = HtmlService.createTemplateFromFile('index');
       return fallback.evaluate()
         .setTitle('Divine Classes - Institute Management System')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
     } catch (innerErr) {
       return HtmlService.createHtmlOutput('<h3>Error loading application: ' + err.toString() + '</h3>');
     }
