@@ -316,12 +316,13 @@ function mergeStudentsFromSheet_(dbData) {
 | **Institute Settings Console**            |  ✅ Full  | ❌ Blocked |                ❌ Blocked                 |          ❌ Blocked          |
 | **Google Drive / Sheet Direct Links**     | ✅ Visible | ❌ Hidden |                ❌ Hidden                 |          ❌ Hidden          |
 | **Student Fee Ledger & Payment Dues**     |  ✅ Full  |  ✅ Full  | 🚫 **Strictly Hidden (Faculty Portal)** | 🚫 **Strictly Hidden** |
-| **Batch Management & Student Enrollment** |  ✅ Full  |  ✅ Full  | **✅ Assigned Batches + Add Students**  |        ❌ Restricted        |
+| **Batch Management & Student Enrollment** |  ✅ Full  |  ✅ Full  | **✅ All Batches + Add Students to Any Batch**  |        ❌ Restricted        |
 | **Test Marks Entry & Report Cards**       |  ✅ Full  |  ✅ Full  |             ✅ Create & Edit              |     👁️ View Own Marks     |
+| **Faculty Profile & ID Card**             |  ✅ Full  |  ✅ Full  |   **✅ Self-Edit Profile & Print ID Card**   |    👁️ Read-Only Faculty    |
 | **Study Materials & Assignments**         |  ✅ Full  |  ✅ Full  |              ✅ Upload Files              |      👁️ Download Only      |
 
 > **Note on Faculty Experience:**
-> Teachers logged in to Divine Classes see a dedicated **Faculty Portal** with an emerald status badge. Batch cards for assigned batches allow teachers to directly add existing institute students or enroll brand-new students via `openAddStudentToBatchModal()`.
+> Teachers logged in to Divine Classes see a dedicated **Faculty Portal** with an emerald status badge. All coaching batches are visible with direct student enrollment options, while assigned batches are prominently highlighted (`My Assigned Batch`). Teachers can also self-edit their faculty profile (qualifications, experience, specialization, bio, photo) and print their official Faculty Identity Card directly from the portal. Fellow mentors are presented in a clean, read-only grid.
 
 ### 7.2 Google Apps Script Compiler Defense (Lexer Safety)
 When authoring client JavaScript embedded inside Google Apps Script `.html` templates, observe these critical rules to prevent silent code stripping by the Apps Script HTML compiler:

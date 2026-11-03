@@ -14,7 +14,7 @@ The application is deployed as a Single-Page Application (SPA) on **Google Apps 
 | Role | Portal Scope | Permissions & Restrictions |
 | :--- | :--- | :--- |
 | **Administrator / Director** | Master Institute Operations | Unrestricted CRUD access across batches, students, teachers, fee records, settings, and database configurations. |
-| **Faculty / Teacher** | Academic & Classroom Management | Scoped to assigned batches: take daily attendance, input offline test marks, upload batch-specific study materials. |
+| **Faculty / Teacher** | Academic & Classroom Management | Full coaching batch visibility with universal student enrollment into any batch; assigned batch highlighted; offline test marks grading; self-service profile & ID card management; fellow mentors displayed in read-only view. |
 | **Student / Parent** | Personal Academic Portal | **Strict Batch Isolation**: Can only access their designated batch, review personal attendance history by date, view offline marks, download authorized batch materials, and export digitally signed report cards. |
 
 ---
@@ -308,28 +308,25 @@ REQUIREMENTS:
 
 ---
 
-### PROMPT 13: Teacher Batch Resolution, Faculty Workspace & Direct Student Enrollment
+### PROMPT 13: Universal Teacher Batch Enrollment, Offline Marks & Faculty Profile Architecture
 ```text
 SYSTEM ROLE: Full-Stack RBAC & Educational Workflow Specialist
-GOAL: Empower coaching faculty with isolated batch management and seamless student enrollment.
+GOAL: Empower coaching faculty with institute-wide batch access, offline marks tracking, and self-service profile management.
 
 REQUIREMENTS:
-1. Faculty Batch Scoping:
-   - Teachers must only see coaching batches assigned to their faculty profile.
-   - Support multi-factor matching:
-     * Explicit batch.teacherId === teacher.id
-     * Registered batch.teacherEmail === teacher.email
-     * Normalized name comparison ignoring academic honorifics (Er., Dr., Mr.) and suffixes ((Ex-IITian)).
-2. Professional Faculty Workspace:
-   - Replace awkward "Fees Hidden from Teacher" banners with a clean, empowering 
-     "Faculty Portal • Assigned Batches" banner.
-3. Direct Student Enrollment (openAddStudentToBatchModal):
-   - Provide "+ Add Student" button on batch cards visible to assigned faculty.
-   - Option 1: Select existing registered institute students to enroll into the batch.
-   - Option 2: Register and enroll brand-new students with auto-generated Roll Number, 
-     contact details, and image uploads.
-   - Immediately synchronize newly enrolled students across local state, Supabase, 
-     and Google Sheets.
+1. Universal Batch Visibility & Student Enrollment:
+   - All institute coaching batches are visible to teachers, with assigned batches highlighted with an emerald badge (★ My Assigned Batch).
+   - Any teacher can enroll students into any coaching batch via "+ Add Student" on batch cards or "+ Add Student to Any Batch" header button.
+   - Support both existing student directory selection and brand-new student registration with auto-generated Roll Number and batch association.
+2. Offline Test Marks & Grading:
+   - Teachers can log new offline tests, select target batches, enter student marks and remarks, and trigger "Save All Marks" bulk synchronization.
+   - Batch performance statistics (average score, highest mark, progress bar) calculate in real time.
+3. Faculty Profile Privacy & Mentor Grid:
+   - Logged-in teacher sees their personal profile card at the top with self-service bio/qualifications/experience/photo edit tools and Faculty ID Card generation.
+   - Administrative modification buttons on fellow faculty are hidden.
+   - Other institute mentors are displayed in read-only format with doubt booking buttons hidden.
+4. Clean White-Label Faculty Workspace:
+   - Maintain a clean, professional "Faculty Portal" banner without negative or intrusive restrictions.
 ```
 
 ---

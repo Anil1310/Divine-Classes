@@ -96,12 +96,22 @@
             altTable: 'offline_test_marks',
             columns: {
                 'test_id': 'id',
+                'id': 'id',
                 'test_title': 'title',
+                'title': 'title',
+                'name': 'title',
                 'test_date': 'date',
+                'date': 'date',
                 'max_marks': 'maxMarks',
+                'maxMarks': 'maxMarks',
                 'marks_obtained': 'marksObtained',
                 'student_name': 'studentName',
                 'teacher_remarks': 'remarks',
+                'subject': 'subject',
+                'batch_id': 'batchId',
+                'batchId': 'batchId',
+                'marks': 'marks',
+                'results': 'results',
                 'is_dummy': 'isDummy'
             }
         },
@@ -110,12 +120,32 @@
             altTable: 'teachers_roster',
             columns: {
                 'teacher_id': 'id',
+                'id': 'id',
                 'teacher_name': 'name',
+                'name': 'name',
                 'login_email': 'email',
+                'email': 'email',
                 'login_password': 'password',
+                'password': 'password',
                 'access_status': 'status',
+                'status': 'status',
                 'contact_phone': 'phone',
-                'avatar_color': 'avatarColor'
+                'phone': 'phone',
+                'avatar_color': 'avatarColor',
+                'avatarColor': 'avatarColor',
+                'primary_subject': 'subject',
+                'subject': 'subject',
+                'academic_qualifications': 'qualification',
+                'qualification': 'qualification',
+                'teaching_experience': 'experience',
+                'experience': 'experience',
+                'specialization_focus': 'specialization',
+                'specialization': 'specialization',
+                'faculty_biography': 'bio',
+                'bio': 'bio',
+                'profile_photo': 'photo',
+                'photo': 'photo',
+                'initials': 'initials'
             }
         },
         'gallery': {
@@ -279,6 +309,23 @@
             out.password = out.password || row.login_password || row.password || 'teacher123';
             out.status = out.status || row.access_status || row.status || 'Active';
             out.phone = out.phone || row.contact_phone || row.phone || '';
+            out.subject = out.subject || row.primary_subject || row.subject || 'Faculty Mentor';
+            out.qualification = out.qualification || row.academic_qualifications || row.qualification || 'M.Sc., B.Ed.';
+            out.experience = out.experience || row.teaching_experience || row.experience || '5+ Years';
+            out.specialization = out.specialization || row.specialization_focus || row.specialization || 'IIT-JEE / NEET Specialist';
+            out.bio = out.bio || row.faculty_biography || row.bio || 'Dedicated faculty mentor at Divine Classes.';
+            out.photo = out.photo || row.profile_photo || row.photo || '';
+            out.avatarColor = out.avatarColor || row.avatar_color || row.avatarColor || 'from-indigo-600 to-blue-600';
+            out.initials = out.initials || (out.name ? out.name.split(' ').map(function(n) { return n[0]; }).join('').slice(0, 2).toUpperCase() : 'FC');
+        }
+        if (tableConfig.stateKey === 'offlineTests') {
+            out.id = out.id || row.test_id || row.id || '';
+            out.title = out.title || row.test_title || row.name || row.title || 'Offline Test';
+            out.batchId = out.batchId || row.batch_id || row.batchId || 'b1';
+            out.date = out.date || row.test_date || row.date || '';
+            out.subject = out.subject || row.subject || 'Physics';
+            out.maxMarks = Number(out.maxMarks !== undefined ? out.maxMarks : (row.max_marks || 100));
+            out.marks = (out.marks && typeof out.marks === 'object') ? out.marks : (row.marks || {});
         }
         if (tableConfig.stateKey === 'feedbacks') {
             out.id = out.id || row.id || ('f' + Math.random().toString(36).substr(2, 6));
@@ -429,7 +476,9 @@
                     bio: t.bio || '',
                     initials: t.initials || '',
                     password: t.password || 'teacher123',
-                    status: t.status || 'Active'
+                    status: t.status || 'Active',
+                    photo: t.photo || '',
+                    avatar_color: t.avatarColor || 'from-indigo-600 to-blue-600'
                 };
             });
             try {
@@ -471,10 +520,12 @@
                     id: ot.id,
                     batch_id: ot.batchId || '',
                     name: ot.name || ot.title || '',
+                    title: ot.title || ot.name || '',
                     date: ot.date || '',
                     max_marks: Number(ot.maxMarks || 100),
                     subject: ot.subject || '',
-                    results: ot.results || []
+                    results: ot.results || [],
+                    marks: ot.marks || {}
                 };
             });
             try {

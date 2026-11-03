@@ -93,16 +93,25 @@ Stores batch groupings, target competitive examination streams, mentor assignmen
 | `student_ids` | `JSONB` | NO | `'[]'::jsonb` | JSON Array of enrolled student IDs (`["s1", "s2", ...]`). |
 | `maxStudents` | `INTEGER` | NO | `40` | Maximum batch seating capacity. |
 
-#### 2.2.1 Faculty Batch Resolution & Student Enrollment Protocol
+#### 2.2.1 Faculty Batch Resolution & Universal Student Enrollment Protocol
 1. **Multi-Factor Faculty Resolution**:
    The function `isBatchAssignedToCurrentTeacher(batch)` links a batch to a teacher via:
    - **Tier 1 (Explicit ID Match)**: `batch.teacherId === teacher.id`.
    - **Tier 2 (Email Match)**: `batch.teacherEmail === teacher.email`.
    - **Tier 3 (Normalized Name Match)**: Strips titles (`Er.`, `Dr.`, `Mr.`, `Mrs.`) and parenthetical notes (`(Ex-IITian)`) before comparing, ensuring `Er. Rajesh Chahar (Ex-IITian)` seamlessly matches `Er. Rajesh Chahar`.
-2. **Teacher Student Enrollment (`openAddStudentToBatchModal`)**:
-   - Allows assigned faculty to enroll students into their batch directly from the batch card.
-   - Option 1 adds existing unassigned/assigned students to `batch.studentIds`.
-   - Option 2 registers a brand-new student, auto-generates their ID, and immediately associates them with the batch in local state, Supabase, and Google Sheets.
+2. **Universal Teacher Student Enrollment (`openAddStudentToBatchModal`)**:
+   - All institute coaching batches are visible in the Faculty Portal with dedicated `+ Add Student` triggers on each batch card and a global `+ Add Student to Any Batch` header action.
+   - Assigned batches feature a distinct emerald accent ring and `★ My Assigned Batch` indicator.
+   - Any teacher can enroll students into any coaching batch:
+     - Option 1 adds existing institute students to the target batch roster and sets `student.batchId = batch.id`.
+     - Option 2 registers a brand-new student, auto-generates their ID, and immediately associates them with the chosen batch across local state, Supabase, and Google Sheets.
+3. **Faculty Self-Profile & Mentor Grid Visibility**:
+   - Upon teacher login, their personal profile card is prominently featured at the top with self-service profile editing (`openEditTeacherModal`), photo upload (`openTeacherPhotoModal`), and print-ready Faculty Identity Card generation (`openTeacherIdCard`).
+   - Administrative modification buttons on fellow teachers are strictly hidden.
+   - The remaining active faculty roster is displayed in read-only mentor view (similar to student view, but with student-only doubt booking buttons suppressed).
+4. **Offline Test Marks Logging & Grading**:
+   - Teachers can create new offline tests (`openCreateTestModal`), filter tests by batch, and enter student test scores and remarks.
+   - Real-time batch performance analytics (Batch Average, Highest Score, Percentage Progress) are automatically calculated and synchronized to the cloud.
 
 ### 2.3 Table: `attendance_records`
 Stores daily roll call attendance entries for batch rosters.

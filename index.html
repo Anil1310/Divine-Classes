@@ -971,12 +971,22 @@ window.DIVINE_PAGE_BACKENDS = {
             altTable: 'offline_test_marks',
             columns: {
                 'test_id': 'id',
+                'id': 'id',
                 'test_title': 'title',
+                'title': 'title',
+                'name': 'title',
                 'test_date': 'date',
+                'date': 'date',
                 'max_marks': 'maxMarks',
+                'maxMarks': 'maxMarks',
                 'marks_obtained': 'marksObtained',
                 'student_name': 'studentName',
                 'teacher_remarks': 'remarks',
+                'subject': 'subject',
+                'batch_id': 'batchId',
+                'batchId': 'batchId',
+                'marks': 'marks',
+                'results': 'results',
                 'is_dummy': 'isDummy'
             }
         },
@@ -985,12 +995,32 @@ window.DIVINE_PAGE_BACKENDS = {
             altTable: 'teachers_roster',
             columns: {
                 'teacher_id': 'id',
+                'id': 'id',
                 'teacher_name': 'name',
+                'name': 'name',
                 'login_email': 'email',
+                'email': 'email',
                 'login_password': 'password',
+                'password': 'password',
                 'access_status': 'status',
+                'status': 'status',
                 'contact_phone': 'phone',
-                'avatar_color': 'avatarColor'
+                'phone': 'phone',
+                'avatar_color': 'avatarColor',
+                'avatarColor': 'avatarColor',
+                'primary_subject': 'subject',
+                'subject': 'subject',
+                'academic_qualifications': 'qualification',
+                'qualification': 'qualification',
+                'teaching_experience': 'experience',
+                'experience': 'experience',
+                'specialization_focus': 'specialization',
+                'specialization': 'specialization',
+                'faculty_biography': 'bio',
+                'bio': 'bio',
+                'profile_photo': 'photo',
+                'photo': 'photo',
+                'initials': 'initials'
             }
         },
         'gallery': {
@@ -1154,6 +1184,23 @@ window.DIVINE_PAGE_BACKENDS = {
             out.password = out.password || row.login_password || row.password || 'teacher123';
             out.status = out.status || row.access_status || row.status || 'Active';
             out.phone = out.phone || row.contact_phone || row.phone || '';
+            out.subject = out.subject || row.primary_subject || row.subject || 'Faculty Mentor';
+            out.qualification = out.qualification || row.academic_qualifications || row.qualification || 'M.Sc., B.Ed.';
+            out.experience = out.experience || row.teaching_experience || row.experience || '5+ Years';
+            out.specialization = out.specialization || row.specialization_focus || row.specialization || 'IIT-JEE / NEET Specialist';
+            out.bio = out.bio || row.faculty_biography || row.bio || 'Dedicated faculty mentor at Divine Classes.';
+            out.photo = out.photo || row.profile_photo || row.photo || '';
+            out.avatarColor = out.avatarColor || row.avatar_color || row.avatarColor || 'from-indigo-600 to-blue-600';
+            out.initials = out.initials || (out.name ? out.name.split(' ').map(function(n) { return n[0]; }).join('').slice(0, 2).toUpperCase() : 'FC');
+        }
+        if (tableConfig.stateKey === 'offlineTests') {
+            out.id = out.id || row.test_id || row.id || '';
+            out.title = out.title || row.test_title || row.name || row.title || 'Offline Test';
+            out.batchId = out.batchId || row.batch_id || row.batchId || 'b1';
+            out.date = out.date || row.test_date || row.date || '';
+            out.subject = out.subject || row.subject || 'Physics';
+            out.maxMarks = Number(out.maxMarks !== undefined ? out.maxMarks : (row.max_marks || 100));
+            out.marks = (out.marks && typeof out.marks === 'object') ? out.marks : (row.marks || {});
         }
         if (tableConfig.stateKey === 'feedbacks') {
             out.id = out.id || row.id || ('f' + Math.random().toString(36).substr(2, 6));
@@ -1304,7 +1351,9 @@ window.DIVINE_PAGE_BACKENDS = {
                     bio: t.bio || '',
                     initials: t.initials || '',
                     password: t.password || 'teacher123',
-                    status: t.status || 'Active'
+                    status: t.status || 'Active',
+                    photo: t.photo || '',
+                    avatar_color: t.avatarColor || 'from-indigo-600 to-blue-600'
                 };
             });
             try {
@@ -1346,10 +1395,12 @@ window.DIVINE_PAGE_BACKENDS = {
                     id: ot.id,
                     batch_id: ot.batchId || '',
                     name: ot.name || ot.title || '',
+                    title: ot.title || ot.name || '',
                     date: ot.date || '',
                     max_marks: Number(ot.maxMarks || 100),
                     subject: ot.subject || '',
-                    results: ot.results || []
+                    results: ot.results || [],
+                    marks: ot.marks || {}
                 };
             });
             try {
@@ -3349,71 +3400,75 @@ window.DIVINE_PAGE_BACKENDS = {
         }
 
         function normalizeAppCollections() {
-            if (!state.settings || typeof state.settings !== 'object') {
-                state.settings = {};
-            }
-            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'notifications'].forEach(function (key) {
-                if (!Array.isArray(state[key])) state[key] = [];
-            });
-
-            // Auto-heal batches if any fields are missing or undefined
-            state.batches = state.batches.map(function (b, idx) {
-                if (!b || typeof b !== 'object') return b;
-                const bId = b.id || b.batch_id || 'b' + (idx + 1);
-                const teacherName = (b.teacher && b.teacher !== 'undefined') ? b.teacher : (b.lead_faculty || 'Faculty Mentor');
-                let teacherId = b.teacherId || b.teacher_id || null;
-                let teacherEmail = b.teacherEmail || b.teacher_email || null;
-                if ((!teacherId || !teacherEmail) && Array.isArray(state.teachers)) {
-                    const cleanB = String(teacherName).toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
-                    const matched = state.teachers.find(function(t) {
-                        if (!t) return false;
-                        if (teacherId && String(t.id) === String(teacherId)) return true;
-                        const cleanT = String(t.name || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
-                        return cleanT && cleanB && (cleanT === cleanB || cleanB.includes(cleanT) || cleanT.includes(cleanB));
-                    });
-                    if (matched) {
-                        if (!teacherId) teacherId = matched.id;
-                        if (!teacherEmail) teacherEmail = matched.email;
-                    }
+            try {
+                if (!state.settings || typeof state.settings !== 'object') {
+                    state.settings = {};
                 }
-                return Object.assign({}, b, {
-                    id: bId,
-                    name: (b.name && b.name !== 'undefined') ? b.name : (b.batch_name || ('Batch ' + bId.toUpperCase())),
-                    subject: (b.subject && b.subject !== 'undefined') ? b.subject : (b.subjects || 'Physics, Chemistry & Mathematics'),
-                    room: (b.room && b.room !== 'undefined') ? b.room : (b.classroom_hall || b.room_no || 'Lecture Hall 101'),
-                    teacher: teacherName,
-                    teacherId: teacherId,
-                    teacherEmail: teacherEmail,
-                    schedule: (b.schedule && b.schedule !== 'undefined') ? b.schedule : (b.schedule_time || 'Mon - Fri • 08:00 AM - 12:30 PM'),
-                    studentIds: Array.isArray(b.studentIds) ? b.studentIds : (Array.isArray(b.student_ids) ? b.student_ids : [])
+                ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'notifications'].forEach(function (key) {
+                    if (!Array.isArray(state[key])) state[key] = [];
                 });
-            });
 
-            // Auto-heal students if any fields are missing or undefined
-            state.students = state.students.map(function (s, idx) {
-                if (!s || typeof s !== 'object') return s;
-                const sId = s.id || s.roll_no || s.roll || 's' + (idx + 1);
-                const sRoll = s.roll || s.roll_no || ('DC-' + (100 + idx + 1));
-                return {
-                    id: sId,
-                    roll: sRoll,
-                    name: (s.name && s.name !== 'undefined') ? s.name : (s.student_name || ('Student ' + sRoll)),
-                    password: s.password || s.login_password || 'password123',
-                    status: s.status || s.access_status || 'Active',
-                    phone: s.phone || s.contact_phone || '',
-                    parentName: s.parentName || s.parent_name || '—',
-                    totalFee: Number(s.totalFee !== undefined ? s.totalFee : (s.total_fee_inr || 48000)),
-                    paidFee: Number(s.paidFee !== undefined ? s.paidFee : (s.paid_fee_inr || 0)),
-                    monthlyFee: Number(s.monthlyFee !== undefined ? s.monthlyFee : (s.monthly_fee_inr || 4000)),
-                    dueDate: s.dueDate || s.fee_due_date || 'Fully Paid',
-                    lastReminder: s.lastReminder || s.last_reminder_sent || '-',
-                    admissionDate: s.admissionDate || s.admission_date || '',
-                    batchId: s.batchId || s.batch_id || (state.batches[0] ? state.batches[0].id : 'b1')
-                };
-            });
+                // Auto-heal batches if any fields are missing or undefined
+                state.batches = state.batches.map(function (b, idx) {
+                    if (!b || typeof b !== 'object') return b;
+                    const bId = b.id || b.batch_id || 'b' + (idx + 1);
+                    const teacherName = (b.teacher && b.teacher !== 'undefined') ? b.teacher : (b.lead_faculty || 'Faculty Mentor');
+                    let teacherId = b.teacherId || b.teacher_id || null;
+                    let teacherEmail = b.teacherEmail || b.teacher_email || null;
+                    if ((!teacherId || !teacherEmail) && Array.isArray(state.teachers)) {
+                        const cleanB = String(teacherName).toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
+                        const matched = state.teachers.find(function(t) {
+                            if (!t) return false;
+                            if (teacherId && String(t.id) === String(teacherId)) return true;
+                            const cleanT = String(t.name || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
+                            return cleanT && cleanB && (cleanT === cleanB || cleanB.includes(cleanT) || cleanT.includes(cleanB));
+                        });
+                        if (matched) {
+                            if (!teacherId) teacherId = matched.id;
+                            if (!teacherEmail) teacherEmail = matched.email;
+                        }
+                    }
+                    return Object.assign({}, b, {
+                        id: bId,
+                        name: (b.name && b.name !== 'undefined') ? b.name : (b.batch_name || ('Batch ' + bId.toUpperCase())),
+                        subject: (b.subject && b.subject !== 'undefined') ? b.subject : (b.subjects || 'Physics, Chemistry & Mathematics'),
+                        room: (b.room && b.room !== 'undefined') ? b.room : (b.classroom_hall || b.room_no || 'Lecture Hall 101'),
+                        teacher: teacherName,
+                        teacherId: teacherId,
+                        teacherEmail: teacherEmail,
+                        schedule: (b.schedule && b.schedule !== 'undefined') ? b.schedule : (b.schedule_time || 'Mon - Fri • 08:00 AM - 12:30 PM'),
+                        studentIds: Array.isArray(b.studentIds) ? b.studentIds : (Array.isArray(b.student_ids) ? b.student_ids : [])
+                    });
+                });
 
-            if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) state.settings = {};
-            if (!state.activeTab) state.activeTab = 'dashboard';
+                // Auto-heal students if any fields are missing or undefined
+                state.students = state.students.map(function (s, idx) {
+                    if (!s || typeof s !== 'object') return s;
+                    const sId = s.id || s.roll_no || s.roll || 's' + (idx + 1);
+                    const sRoll = s.roll || s.roll_no || ('DC-' + (100 + idx + 1));
+                    return Object.assign({}, s, {
+                        id: sId,
+                        roll: sRoll,
+                        name: (s.name && s.name !== 'undefined') ? s.name : (s.student_name || ('Student ' + sRoll)),
+                        password: s.password || s.login_password || 'password123',
+                        status: s.status || s.access_status || 'Active',
+                        phone: s.phone || s.contact_phone || '',
+                        parentName: s.parentName || s.parent_name || '—',
+                        totalFee: Number(s.totalFee !== undefined ? s.totalFee : (s.total_fee_inr || 48000)),
+                        paidFee: Number(s.paidFee !== undefined ? s.paidFee : (s.paid_fee_inr || 0)),
+                        monthlyFee: Number(s.monthlyFee !== undefined ? s.monthlyFee : (s.monthly_fee_inr || 4000)),
+                        dueDate: s.dueDate || s.fee_due_date || 'Fully Paid',
+                        lastReminder: s.lastReminder || s.last_reminder_sent || '-',
+                        admissionDate: s.admissionDate || s.admission_date || '',
+                        batchId: s.batchId || s.batch_id || (state.batches[0] ? state.batches[0].id : 'b1')
+                    });
+                });
+
+                if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) state.settings = {};
+                if (!state.activeTab) state.activeTab = 'dashboard';
+            } catch (err) {
+                console.warn('normalizeAppCollections exception caught safely:', err);
+            }
         }
 
         /********************************************************************
@@ -4090,7 +4145,7 @@ window.DIVINE_PAGE_BACKENDS = {
             const titleEl = document.getElementById('page-title');
             const subtitleEl = document.getElementById('page-subtitle');
             if (!container) return;
-            normalizeAppCollections();
+            try { normalizeAppCollections(); } catch (e) { console.warn('normalizeAppCollections error:', e); }
             try {
 
             if (!state.isAuthenticated) {

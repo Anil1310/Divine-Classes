@@ -549,71 +549,75 @@
         }
 
         function normalizeAppCollections() {
-            if (!state.settings || typeof state.settings !== 'object') {
-                state.settings = {};
-            }
-            ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'notifications'].forEach(function (key) {
-                if (!Array.isArray(state[key])) state[key] = [];
-            });
-
-            // Auto-heal batches if any fields are missing or undefined
-            state.batches = state.batches.map(function (b, idx) {
-                if (!b || typeof b !== 'object') return b;
-                const bId = b.id || b.batch_id || 'b' + (idx + 1);
-                const teacherName = (b.teacher && b.teacher !== 'undefined') ? b.teacher : (b.lead_faculty || 'Faculty Mentor');
-                let teacherId = b.teacherId || b.teacher_id || null;
-                let teacherEmail = b.teacherEmail || b.teacher_email || null;
-                if ((!teacherId || !teacherEmail) && Array.isArray(state.teachers)) {
-                    const cleanB = String(teacherName).toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
-                    const matched = state.teachers.find(function(t) {
-                        if (!t) return false;
-                        if (teacherId && String(t.id) === String(teacherId)) return true;
-                        const cleanT = String(t.name || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
-                        return cleanT && cleanB && (cleanT === cleanB || cleanB.includes(cleanT) || cleanT.includes(cleanB));
-                    });
-                    if (matched) {
-                        if (!teacherId) teacherId = matched.id;
-                        if (!teacherEmail) teacherEmail = matched.email;
-                    }
+            try {
+                if (!state.settings || typeof state.settings !== 'object') {
+                    state.settings = {};
                 }
-                return Object.assign({}, b, {
-                    id: bId,
-                    name: (b.name && b.name !== 'undefined') ? b.name : (b.batch_name || ('Batch ' + bId.toUpperCase())),
-                    subject: (b.subject && b.subject !== 'undefined') ? b.subject : (b.subjects || 'Physics, Chemistry & Mathematics'),
-                    room: (b.room && b.room !== 'undefined') ? b.room : (b.classroom_hall || b.room_no || 'Lecture Hall 101'),
-                    teacher: teacherName,
-                    teacherId: teacherId,
-                    teacherEmail: teacherEmail,
-                    schedule: (b.schedule && b.schedule !== 'undefined') ? b.schedule : (b.schedule_time || 'Mon - Fri • 08:00 AM - 12:30 PM'),
-                    studentIds: Array.isArray(b.studentIds) ? b.studentIds : (Array.isArray(b.student_ids) ? b.student_ids : [])
+                ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'externalLinks', 'feedbacks', 'notifications'].forEach(function (key) {
+                    if (!Array.isArray(state[key])) state[key] = [];
                 });
-            });
 
-            // Auto-heal students if any fields are missing or undefined
-            state.students = state.students.map(function (s, idx) {
-                if (!s || typeof s !== 'object') return s;
-                const sId = s.id || s.roll_no || s.roll || 's' + (idx + 1);
-                const sRoll = s.roll || s.roll_no || ('DC-' + (100 + idx + 1));
-                return {
-                    id: sId,
-                    roll: sRoll,
-                    name: (s.name && s.name !== 'undefined') ? s.name : (s.student_name || ('Student ' + sRoll)),
-                    password: s.password || s.login_password || 'password123',
-                    status: s.status || s.access_status || 'Active',
-                    phone: s.phone || s.contact_phone || '',
-                    parentName: s.parentName || s.parent_name || '—',
-                    totalFee: Number(s.totalFee !== undefined ? s.totalFee : (s.total_fee_inr || 48000)),
-                    paidFee: Number(s.paidFee !== undefined ? s.paidFee : (s.paid_fee_inr || 0)),
-                    monthlyFee: Number(s.monthlyFee !== undefined ? s.monthlyFee : (s.monthly_fee_inr || 4000)),
-                    dueDate: s.dueDate || s.fee_due_date || 'Fully Paid',
-                    lastReminder: s.lastReminder || s.last_reminder_sent || '-',
-                    admissionDate: s.admissionDate || s.admission_date || '',
-                    batchId: s.batchId || s.batch_id || (state.batches[0] ? state.batches[0].id : 'b1')
-                };
-            });
+                // Auto-heal batches if any fields are missing or undefined
+                state.batches = state.batches.map(function (b, idx) {
+                    if (!b || typeof b !== 'object') return b;
+                    const bId = b.id || b.batch_id || 'b' + (idx + 1);
+                    const teacherName = (b.teacher && b.teacher !== 'undefined') ? b.teacher : (b.lead_faculty || 'Faculty Mentor');
+                    let teacherId = b.teacherId || b.teacher_id || null;
+                    let teacherEmail = b.teacherEmail || b.teacher_email || null;
+                    if ((!teacherId || !teacherEmail) && Array.isArray(state.teachers)) {
+                        const cleanB = String(teacherName).toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
+                        const matched = state.teachers.find(function(t) {
+                            if (!t) return false;
+                            if (teacherId && String(t.id) === String(teacherId)) return true;
+                            const cleanT = String(t.name || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(er\.|dr\.|mr\.|mrs\.|ms\.)\s*/i, '').trim();
+                            return cleanT && cleanB && (cleanT === cleanB || cleanB.includes(cleanT) || cleanT.includes(cleanB));
+                        });
+                        if (matched) {
+                            if (!teacherId) teacherId = matched.id;
+                            if (!teacherEmail) teacherEmail = matched.email;
+                        }
+                    }
+                    return Object.assign({}, b, {
+                        id: bId,
+                        name: (b.name && b.name !== 'undefined') ? b.name : (b.batch_name || ('Batch ' + bId.toUpperCase())),
+                        subject: (b.subject && b.subject !== 'undefined') ? b.subject : (b.subjects || 'Physics, Chemistry & Mathematics'),
+                        room: (b.room && b.room !== 'undefined') ? b.room : (b.classroom_hall || b.room_no || 'Lecture Hall 101'),
+                        teacher: teacherName,
+                        teacherId: teacherId,
+                        teacherEmail: teacherEmail,
+                        schedule: (b.schedule && b.schedule !== 'undefined') ? b.schedule : (b.schedule_time || 'Mon - Fri • 08:00 AM - 12:30 PM'),
+                        studentIds: Array.isArray(b.studentIds) ? b.studentIds : (Array.isArray(b.student_ids) ? b.student_ids : [])
+                    });
+                });
 
-            if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) state.settings = {};
-            if (!state.activeTab) state.activeTab = 'dashboard';
+                // Auto-heal students if any fields are missing or undefined
+                state.students = state.students.map(function (s, idx) {
+                    if (!s || typeof s !== 'object') return s;
+                    const sId = s.id || s.roll_no || s.roll || 's' + (idx + 1);
+                    const sRoll = s.roll || s.roll_no || ('DC-' + (100 + idx + 1));
+                    return Object.assign({}, s, {
+                        id: sId,
+                        roll: sRoll,
+                        name: (s.name && s.name !== 'undefined') ? s.name : (s.student_name || ('Student ' + sRoll)),
+                        password: s.password || s.login_password || 'password123',
+                        status: s.status || s.access_status || 'Active',
+                        phone: s.phone || s.contact_phone || '',
+                        parentName: s.parentName || s.parent_name || '—',
+                        totalFee: Number(s.totalFee !== undefined ? s.totalFee : (s.total_fee_inr || 48000)),
+                        paidFee: Number(s.paidFee !== undefined ? s.paidFee : (s.paid_fee_inr || 0)),
+                        monthlyFee: Number(s.monthlyFee !== undefined ? s.monthlyFee : (s.monthly_fee_inr || 4000)),
+                        dueDate: s.dueDate || s.fee_due_date || 'Fully Paid',
+                        lastReminder: s.lastReminder || s.last_reminder_sent || '-',
+                        admissionDate: s.admissionDate || s.admission_date || '',
+                        batchId: s.batchId || s.batch_id || (state.batches[0] ? state.batches[0].id : 'b1')
+                    });
+                });
+
+                if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) state.settings = {};
+                if (!state.activeTab) state.activeTab = 'dashboard';
+            } catch (err) {
+                console.warn('normalizeAppCollections exception caught safely:', err);
+            }
         }
 
         /********************************************************************
@@ -1290,7 +1294,7 @@
             const titleEl = document.getElementById('page-title');
             const subtitleEl = document.getElementById('page-subtitle');
             if (!container) return;
-            normalizeAppCollections();
+            try { normalizeAppCollections(); } catch (e) { console.warn('normalizeAppCollections error:', e); }
             try {
 
             if (!state.isAuthenticated) {

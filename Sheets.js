@@ -182,7 +182,7 @@ function syncReadableSheets(ss, data) {
         teachSheet = ss.insertSheet('Teachers_Roster');
       }
       teachSheet.clear();
-      const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience'];
+      const trHeaders = ['Teacher ID', 'Teacher Name', 'Subject', 'Login Email', 'Login Password', 'Access Status', 'Contact Phone', 'Qualification', 'Experience', 'Specialization', 'Biography'];
       const trRows = [trHeaders];
       (data.teachers || []).forEach(function(tr) {
         trRows.push([
@@ -194,7 +194,9 @@ function syncReadableSheets(ss, data) {
           tr.status || 'Active',
           tr.phone || '',
           tr.qualification || '',
-          tr.experience || ''
+          tr.experience || '',
+          tr.specialization || '',
+          tr.bio || ''
         ]);
       });
       teachSheet.getRange(1, 1, trRows.length, trHeaders.length).setValues(trRows);
