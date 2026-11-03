@@ -46,7 +46,8 @@ function doGet(e) {
       index: { template: 'index', title: 'Divine Classes - Institute Management System' },
       login: { template: 'login', title: 'Sign In - Divine Classes Portal' },
       logout: { template: 'logout', title: 'Signed Out - Divine Classes Portal' },
-      loading: { template: 'Routes/Loading/page', title: 'Connecting to Divine Classes...' }
+      loading: { template: 'Routes/Loading/page', title: 'Connecting to Divine Classes...' },
+      chatbot: { template: 'Routes/Chatbot/page', title: 'Divine AI Assistant - Divine Classes' }
     };
     const route = routeConfig[page] || routeConfig.index;
     const templateName = route.template;

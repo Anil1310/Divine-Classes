@@ -74,3 +74,53 @@ Applies identically across Web Browsers and Mobile APK (WebView):
 - **Independence of Credentials vs. Session**:
   - Auto-logout or manual logout closes the active session (`DIVINE_AUTH_SESSION`), but keeps the 10-day remembered credentials intact. This allows the user to immediately log back in with their remembered credentials until the 10-day limit expires.
 
+---
+
+## 8. Dynamic Monthly Tuition Fees & Non-Editable Total Paid Field
+- **Non-Editable Total Fees Paid**:
+  - In student enrollment ("Add New Student" modal), the obsolete "Total Course Fee" input is completely removed.
+  - Replaced with **"Total Fees Paid (₹)"**, permanently initialized to **`0`** and strictly **non-editable by anyone, even for admin** (`readonly disabled cursor-not-allowed`).
+  - In student edit modals, "Total Fees Paid (₹)" remains strictly read-only and displays the student's cumulative payments till date.
+- **Dynamic Payment Accumulation & Due Date Advancement**:
+  - Tuition is paid on a monthly basis (default ₹1,000 / month, or any student-configured monthly rate).
+  - Recording fee payments (e.g. ₹1,000 for 1 month, or ₹12,000 for 12 months) automatically accumulates into `paidFee` (Total Fees Paid).
+  - Every recorded monthly payment advances the student's next fee due date forward by the exact number of months paid (`months = Math.floor(payment / monthlyFee)`).
+- **Fees Ledger & Receipts**:
+  - Ledger table header, mobile summary drawers, printed fee receipts, and CSV exports prominently highlight **"Total Paid (₹)"**, **"Monthly Fee (₹)"**, and real-time **"Fee Due Date"** status.
+
+---
+
+## 9. Divine AI Assistant, Gemini Auto-Connect & Oral Voice Recognition Architecture
+- **Interactive Multi-Mode Chatbot**:
+  - Available as both a persistent floating launcher (`#divine-chatbot-btn` + `#divine-chatbot-window`) and a full dedicated page module (`Pages/Chatbot/` and `Routes/Chatbot/page.html` with route `?page=chatbot`).
+  - Provides instant state-aware queries for students (live fee dues, total fees paid till date, enrolled batch, attendance, test marks) and institute knowledge (Paschimpuri campus address, helpline, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar).
+  - Academic doubt solver covering Physics (Ohm's law, Newton's laws), Chemistry, Mathematics, and Biology with pedagogical Markdown formatting.
+- **Auto-Connected Gemini AI Integration**:
+  - Direct integration with Google Gemini AI (`apiAskGeminiAi` in `Code.js` and direct client-side fallback `https://generativelanguage.googleapis.com/v1beta/models/`).
+  - Auto-connects to `gemini-2.5-flash` or `gemini-2.5-pro` with inline developer key management drawer (`#gemini-config-drawer`).
+  - Text-to-speech audio feedback (`speakChatbotResponse`) and Markdown-to-HTML parser (`formatGeminiMarkdown`).
+- **Oral Speech & Voice-Powered Student Admission**:
+  - Voice recognition via Web Speech API (`toggleChatbotVoiceRecognition` and `#modal-voice-fill-btn`).
+  - Natural speech parser (`extractStudentDetailsFromSpeech`) extracting Student Name, Father's Name, Phone, Batch, and Monthly Fee.
+  - Interactive Voice Admission Confirmation Card with 1-click enroll (`confirmVoiceStudentEnrollment`) strictly maintaining ₹0 initial Total Fees Paid.
+
+---
+
+## 10. Developer Settings Feature Governance & Master Chatbot Toggle
+- **Chatbot ON/OFF Control**:
+  - Managed via Developer Settings card (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
+  - State stored in `state.settings.chatbotEnabled` (default: `true`) and `localStorage ('DIVINE_CHATBOT_ENABLED')`.
+  - Synchronized across reloads and cloud database saves via `savePersistentSettingsToLocal()`, `applyPersistentSettingsOverrides()`, and `handleSaveSettings()`.
+- **Complete Disablement & Hiding**:
+  - When **switched OFF**:
+    - Floating launcher button (`#divine-chatbot-btn`) is completely hidden (`display: none` / `hidden`).
+    - Chat drawer (`#divine-chatbot-window`) is immediately closed, hidden, and active microphone recognition is stopped.
+    - Dedicated nav item is excluded from sidebar navigation (`renderSidebar`).
+    - Dedicated view renders an administrative notice with a shortcut button to Settings.
+  - When **switched ON**:
+    - Launcher button is visible and active across all views.
+    - Nav item appears in the sidebar under "Learning Resources".
+    - Full doubt-clearing and oral voice admission features are instantly accessible.
+
+
+

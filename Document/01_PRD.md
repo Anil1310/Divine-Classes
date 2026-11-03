@@ -196,6 +196,33 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 
 ---
 
+### Module 11: Divine AI Assistant, Gemini Auto-Connect & Oral Voice Recognition
+- **FR-11.1: Multi-Interface Chatbot**:
+  - Floating action launcher (`#divine-chatbot-btn`) and responsive chat drawer (`#divine-chatbot-window`) accessible across all views.
+  - Dedicated full-page route (`?page=chatbot`) and page module (`Pages/Chatbot/`).
+- **FR-11.2: Instant State-Aware Academic & Institute Answers**:
+  - Live student queries: fee dues, total payments, enrolled batch, attendance rate, test marks.
+  - Institute knowledge base: address (235 Paschimpuri Pocket 2), helpline, visiting hours, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar.
+  - Academic doubt solving: formulas, Ohm's law, Newton's laws, quadratic equations with pedagogical formatting.
+- **FR-11.3: Google Gemini AI Auto-Connection**:
+  - Direct connection to Gemini API (`gemini-2.5-flash` and `gemini-2.5-pro`) with inline API key drawer.
+  - Oral text-to-speech feedback (`speakChatbotResponse`) and Markdown rendering.
+- **FR-11.4: Oral Speech Student Admission**:
+  - Web Speech API voice capture allowing oral student onboarding.
+  - Entity extraction (Name, Parent, Phone, Batch, Fee) and 1-click confirmation card (`confirmVoiceStudentEnrollment`) strictly enforcing non-editable ₹0 initial Total Fees Paid.
+
+---
+
+### Module 12: Developer Feature Governance & Chatbot Master Toggle
+- **FR-12.1: Developer Settings Chatbot Control**:
+  - Master toggle switch (`set-chatbotEnabled`) in Developer Settings.
+  - Saved to `state.settings.chatbotEnabled` and browser `localStorage ('DIVINE_CHATBOT_ENABLED')`.
+- **FR-12.2: Universal Suppression When Switched OFF**:
+  - Hides launcher button and drawer, stops active microphone listening, removes sidebar navigation entry, and suppresses shortcuts.
+  - Seamlessly re-enables when switched ON without page reload.
+
+---
+
 ## 4. Non-Functional Requirements (NFR)
 
 1. **Performance & Latency**: Initial SPA load time $< 1.5$ seconds; optimistic UI mutations respond in $< 100\text{ ms}$.
@@ -218,6 +245,7 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 | **Phase 3** | **Mobile UI & Batch Privacy** | Mobile hamburger navigation, responsive sidebar, 2-sec auto-collapsing profile chip, strict batch-level study material isolation. | ✅ **Completed** |
 | **Phase 4** | **Official Verifiable Report Card** | Circular Divine Classes emblem logo, dynamic Director signature (`state.settings.adminName`), emerald academic seal, verification hash, PDF/JPEG export, WhatsApp dispatch. | ✅ **Completed** |
 | **Phase 5** | **Cloud White-Label & Real-Time Sync** | 4-second live bi-directional sync (Laptop $\leftrightarrow$ Mobile APK), 9-table cloud sync, notification purge on dummy wipe, Admin master password cloud tracking, unified "Cloud" branding. | ✅ **Completed** |
-| **Phase 6** | **Android APK & Store Readiness** | TWA / Capacitor packaging, Play Store developer setup (\$25 one-time), splash screen, APK compilation (Planned). | ⏳ **Planned** |
-| **Phase 7** | **Multi-Subject Sectional Analytics** | Granular PCM/PCB score breakdown, comparative batch percentiles, batch topper recognition (Planned). | ⏳ **Planned** |
-| **Phase 8** | **Online CBT Mock Test Engine** | Timed examination portal with negative marking, question palettes, and automated answer explanations (Planned). | ⏳ **Planned** |
+| **Phase 6** | **AI Assistant, Voice Admission & Governance** | Divine AI Assistant chatbot, auto-connected Gemini Pro/Flash API, Web Speech oral student enrollment, Developer Settings master toggle governance. | ✅ **Completed** |
+| **Phase 7** | **Android APK & Store Readiness** | TWA / Capacitor packaging, Play Store developer setup (\$25 one-time), splash screen, APK compilation (Planned). | ⏳ **Planned** |
+| **Phase 8** | **Multi-Subject Sectional Analytics** | Granular PCM/PCB score breakdown, comparative batch percentiles, batch topper recognition (Planned). | ⏳ **Planned** |
+| **Phase 9** | **Online CBT Mock Test Engine** | Timed examination portal with negative marking, question palettes, and automated answer explanations (Planned). | ⏳ **Planned** |

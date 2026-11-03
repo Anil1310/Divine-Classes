@@ -646,3 +646,31 @@ Python is required on both systems. Node.js is required for the “Seed All Init
 Use a Supabase secret/service-role key, not a publishable key. Windows stores a supplied key encrypted for the current Windows user with DPAPI. macOS stores it in the current user's login Keychain. The key is never written into the project files. Each computer needs its own local key setup.
 
 The script locates `DummyData.js` and runs Git/Clasp from the directory containing the script, so those operations do not depend on the terminal's current directory.
+
+---
+
+## 14. Divine AI Assistant, Gemini Auto-Connect & Oral Voice Recognition
+
+The portal integrates an interactive AI Assistant & Doubts Helpdesk:
+- **Multi-Mode Interface**:
+  - Persistent floating launcher (`#divine-chatbot-btn`) and responsive chat drawer (`#divine-chatbot-window`).
+  - Standalone dedicated route (`?page=chatbot`) and page module (`Pages/Chatbot/`).
+- **Real-Time State & Institute Intelligence**:
+  - Live student queries: fee dues, total payments, enrolled batch, attendance, test marks.
+  - Institute knowledge base: Paschimpuri address, contact numbers, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar.
+  - Academic doubt solving: Physics, Chemistry, Maths & Biology with pedagogical Markdown formatting.
+- **Auto-Connected Google Gemini Engine**:
+  - Direct connection to Gemini API (`gemini-2.5-flash` and `gemini-2.5-pro`) with inline developer API key drawer (`#gemini-config-drawer`).
+  - Text-to-speech audio feedback (`speakChatbotResponse`) and Markdown-to-HTML parser.
+- **Oral Speech & Voice-Powered Student Admission**:
+  - Web Speech API microphone input allowing oral speech queries and enrollment.
+  - Natural speech parser extracting Name, Parent, Phone, Batch, and Fee with 1-click enrollment card strictly enforcing non-editable ₹0 initial Total Fees Paid.
+
+---
+
+## 15. Developer Settings Feature Governance & Master Chatbot Toggle
+
+- **Master Chatbot Toggle**: Located in Developer Settings (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
+- **State Storage & Persistence**: Saved to `state.settings.chatbotEnabled` (default: `true`) and `localStorage ('DIVINE_CHATBOT_ENABLED')`, surviving browser reloads and syncing to the cloud database.
+- **Complete Disablement**: When toggled OFF, the floating button and drawer are completely hidden, active voice recognition is cancelled, and the navigation link is removed from the sidebar.
+

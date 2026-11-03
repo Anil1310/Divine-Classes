@@ -88,4 +88,39 @@ Applies identically across Web Browsers and Mobile APK (WebView):
 - **Fees Ledger & Receipts**:
   - Ledger table header, mobile summary drawers, printed fee receipts, and CSV exports prominently highlight **"Total Paid (₹)"**, **"Monthly Fee (₹)"**, and real-time **"Fee Due Date"** status.
 
+---
+
+## 9. Divine AI Assistant, Gemini Auto-Connect & Oral Voice Recognition Architecture
+- **Interactive Multi-Mode Chatbot**:
+  - Available as both a persistent floating launcher (`#divine-chatbot-btn` + `#divine-chatbot-window`) and a full dedicated page module (`Pages/Chatbot/` and `Routes/Chatbot/page.html` with route `?page=chatbot`).
+  - Provides instant state-aware queries for students (live fee dues, total fees paid till date, enrolled batch, attendance, test marks) and institute knowledge (Paschimpuri campus address, helpline, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar).
+  - Academic doubt solver covering Physics (Ohm's law, Newton's laws), Chemistry, Mathematics, and Biology with pedagogical Markdown formatting.
+- **Auto-Connected Gemini AI Integration**:
+  - Direct integration with Google Gemini AI (`apiAskGeminiAi` in `Code.js` and direct client-side fallback `https://generativelanguage.googleapis.com/v1beta/models/`).
+  - Auto-connects to `gemini-2.5-flash` or `gemini-2.5-pro` with inline developer key management drawer (`#gemini-config-drawer`).
+  - Text-to-speech audio feedback (`speakChatbotResponse`) and Markdown-to-HTML parser (`formatGeminiMarkdown`).
+- **Oral Speech & Voice-Powered Student Admission**:
+  - Voice recognition via Web Speech API (`toggleChatbotVoiceRecognition` and `#modal-voice-fill-btn`).
+  - Natural speech parser (`extractStudentDetailsFromSpeech`) extracting Student Name, Father's Name, Phone, Batch, and Monthly Fee.
+  - Interactive Voice Admission Confirmation Card with 1-click enroll (`confirmVoiceStudentEnrollment`) strictly maintaining ₹0 initial Total Fees Paid.
+
+---
+
+## 10. Developer Settings Feature Governance & Master Chatbot Toggle
+- **Chatbot ON/OFF Control**:
+  - Managed via Developer Settings card (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
+  - State stored in `state.settings.chatbotEnabled` (default: `true`) and `localStorage ('DIVINE_CHATBOT_ENABLED')`.
+  - Synchronized across reloads and cloud database saves via `savePersistentSettingsToLocal()`, `applyPersistentSettingsOverrides()`, and `handleSaveSettings()`.
+- **Complete Disablement & Hiding**:
+  - When **switched OFF**:
+    - Floating launcher button (`#divine-chatbot-btn`) is completely hidden (`display: none` / `hidden`).
+    - Chat drawer (`#divine-chatbot-window`) is immediately closed, hidden, and active microphone recognition is stopped.
+    - Dedicated nav item is excluded from sidebar navigation (`renderSidebar`).
+    - Dedicated view renders an administrative notice with a shortcut button to Settings.
+  - When **switched ON**:
+    - Launcher button is visible and active across all views.
+    - Nav item appears in the sidebar under "Learning Resources".
+    - Full doubt-clearing and oral voice admission features are instantly accessible.
+
+
 

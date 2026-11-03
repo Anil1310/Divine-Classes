@@ -416,6 +416,7 @@ INSERT INTO public.settings_config (setting_parameter, configured_value, descrip
 ('Show Requirement Labels', 'Off', 'Page header Requirement #N tags (toggle in Settings)'),
 ('Admin Feedback Delete', 'Off', 'Admin delete button on Feedback Wall (toggle in Settings)'),
 ('Study Link Delete', 'Off', 'Admin delete button on Study Links cards (toggle in Settings)'),
+('Enable Floating Chatbot', 'On', 'Chatbot launcher & AI assistant visibility (toggle in Settings)'),
 ('Show Dummy / Demo Data', 'Off', 'Seed demo students/batches/tests visibility'),
 ('Dummy Data Wiped', 'No', 'Permanent clearance status before client handover'),
 ('Last Auto-Sync Timestamp', '31 Oct 2026, 23:20:00', 'Time of last auto-sync from Web App'),

@@ -420,3 +420,20 @@ clasp open --webapp
    - Permanent dummy clearance wipes demo students, batches, materials, tests, teachers, gallery, and feedbacks.
    - Clears all dummy notifications from memory and Cloud database, resetting the notification counter to zero.
    - External study links, settings configuration, and genuine client entries are protected permanently.
+
+### 4.4 Divine AI Assistant, Auto-Connected Gemini Pro/Flash & Oral Voice Admission Architecture
+1. **Multi-Surface AI Presence**:
+   - Floating drawer `#divine-chatbot-window` and button `#divine-chatbot-btn` accessible on every view.
+   - Dedicated full-page route (`?page=chatbot`) and modular page container (`Pages/Chatbot/`).
+2. **Auto-Connected Gemini Engine**:
+   - Backend `apiAskGeminiAi` in `Code.js` with direct client-side fallback to Gemini REST API endpoints.
+   - Auto-connection to `gemini-2.5-flash` or `gemini-2.5-pro` with inline developer API key drawer `#gemini-config-drawer`.
+3. **Oral Voice Recognition & Voice Admission**:
+   - Web Speech API integration (`SpeechRecognition` / `webkitSpeechRecognition`) for oral microphone inputs.
+   - Speech parser `extractStudentDetailsFromSpeech` extracting Name, Parent, Phone, Batch, and Fee.
+   - 1-click admission confirmation card `confirmVoiceStudentEnrollment` strictly enforcing ₹0 non-editable initial Total Fees Paid.
+4. **Developer Feature Governance**:
+   - Master toggle `set-chatbotEnabled` in Developer Settings.
+   - Stored in `state.settings.chatbotEnabled` and `localStorage ('DIVINE_CHATBOT_ENABLED')`.
+   - When OFF: completely hides floating button and drawer, stops active microphone recording, and removes the sidebar navigation link.
+   - When ON: fully active and responsive across desktop and mobile.

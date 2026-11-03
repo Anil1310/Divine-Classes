@@ -269,3 +269,33 @@ At the bottom of the report card modal, click any of the action buttons:
 ### Q6: If I change a setting on my computer, will it update on my phone?
 **A**: Yes. The system runs an automated bi-directional live sync loop every 4 seconds. Any update made on a computer browser is instantly pushed to the mobile APK as soon as the app is opened or focused.
 
+---
+
+## 9. Divine AI Assistant & Oral Voice Student Enrollment Guide
+
+### 9.1 Using the Floating AI Assistant
+1. Tap the floating **robot icon button** in the bottom-right corner of your screen (or open **AI Assistant** from the navigation sidebar).
+2. Ask any academic doubt in Physics, Chemistry, Maths, or Biology.
+3. Tap on quick prompt pills to check:
+   - 💰 **Live Fee Status**: Your pending fee dues and next due date.
+   - ⏰ **Class Timetable**: Schedule for your enrolled batch.
+   - 📍 **Coaching Helpline**: Address and contact details for the Paschimpuri center.
+4. Listen to responses orally by tapping the speaker button.
+
+### 9.2 Oral Voice Student Admission (For Faculty & Admin)
+1. Open the Chatbot or the **"Add Student to Batch"** modal.
+2. Tap the **Microphone** icon.
+3. Speak clearly:
+   > *"Add student Rahul Sharma, father Mukesh Sharma, phone 9876543210, batch Class 11 Physics, fee 12000"*
+4. The system transcribes your speech and presents a **Voice Admission Confirmation Card**.
+5. Tap **Confirm & Enroll** to add the student instantly to the batch with initial Total Fees Paid strictly set to ₹0.
+
+### 9.3 Toggling Chatbot ON / OFF (Developer Settings)
+1. Sign in as Lead Developer (`anil.chahar170@gmail.com`).
+2. Go to **Settings** $\rightarrow$ **AI Assistant & Chatbot Control**.
+3. Flip the toggle **Enable Floating Chatbot & Voice Assistant**:
+   - **ON**: Chatbot button, drawer, and sidebar link are visible to everyone.
+   - **OFF**: Chatbot is completely hidden, disabled, and voice listeners are shut down.
+4. Click **Save Settings** to apply immediately.
+
+

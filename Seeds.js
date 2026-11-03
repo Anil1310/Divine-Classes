@@ -374,6 +374,7 @@ function getDefaultSeedData() {
       allowAdminLinkDelete: false,
       showDummyData: true,
       dummyDataWiped: false,
+      chatbotEnabled: true,
       supabaseEnabled: true,
       supabaseUrl: 'https://srjqsofkjizwskqnzyfn.supabase.co',
       supabaseKey: 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS'
@@ -527,6 +528,7 @@ function getDefaultSettingsConfigRows_(settings, syncedAt) {
     ['Show Requirement Labels', (s.showRequirementLabels === false || s.showRequirementLabels === 'Off' || s.showRequirementLabels === 'off' || s.showRequirementLabels === 'false' || s.showRequirementLabels === 0 || s.showRequirementLabels === '0') ? 'Off' : 'On', 'Page header Requirement #N tags (toggle in Settings)'],
     ['Admin Feedback Delete', (s.allowAdminFeedbackDelete === false || s.allowAdminFeedbackDelete === 'Off' || s.allowAdminFeedbackDelete === 'off' || s.allowAdminFeedbackDelete === 'false') ? 'Off' : 'On', 'Admin delete button on Feedback Wall (toggle in Settings)'],
     ['Study Link Delete', (s.allowAdminLinkDelete === false || s.allowAdminLinkDelete === 'Off' || s.allowAdminLinkDelete === 'off' || s.allowAdminLinkDelete === 'false') ? 'Off' : 'On', 'Admin delete button on Study Links cards (toggle in Settings)'],
+    ['Enable Floating Chatbot', (s.chatbotEnabled === false || s.chatbotEnabled === 'Off' || s.chatbotEnabled === 'off' || s.chatbotEnabled === 'false') ? 'Off' : 'On', 'Chatbot launcher & AI assistant visibility (toggle in Settings)'],
     ['Show Dummy / Demo Data', (s.showDummyData === false || s.showDummyData === 'Off' || s.showDummyData === 'off' || s.showDummyData === 'false' || s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Off' : 'On', 'Seed demo students/batches/tests visibility'],
     ['Dummy Data Wiped', (s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Yes' : 'No', 'Permanent clearance status before client handover'],
     ['Supabase Enabled', (s.supabaseEnabled === false || s.supabaseEnabled === 'Off' || s.supabaseEnabled === 'off' || s.supabaseEnabled === 'false') ? 'Off' : 'On', 'Supabase primary database toggle'],

@@ -14,5 +14,9 @@ const ROUTE_MODULES = {
   "loading": {
     "template": "Routes/Loading/page",
     "title": "Connecting to Divine Classes..."
+  },
+  "chatbot": {
+    "template": "Routes/Chatbot/page",
+    "title": "Divine AI Assistant - Divine Classes"
   }
 };
