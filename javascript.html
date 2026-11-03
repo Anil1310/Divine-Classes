@@ -9259,7 +9259,77 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return window.SpeechRecognition || window.webkitSpeechRecognition || null;
         }
 
-        function showMicrophonePermissionHelpModal() {
+        function openVoiceDictationWindow(target) {
+            target = target || 'chatbot';
+            const w = 440;
+            const h = 440;
+            const left = Math.max(0, Math.round((screen.width - w) / 2));
+            const top = Math.max(0, Math.round((screen.height - h) / 2));
+            const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+            const voiceUrl = isLocal 
+                ? (window.location.origin + '/voice.html?target=' + encodeURIComponent(target))
+                : ('https://anil1310.github.io/Divine-Classes/voice.html?target=' + encodeURIComponent(target));
+            
+            const popup = window.open(voiceUrl, 'DivineVoicePopup', `width=${w},height=${h},top=${top},left=${left},status=0,toolbar=0,menubar=0,location=0`);
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+                showToast('Popup was blocked by your browser. Please allow popups or open via GitHub Pages.', 'warning');
+            } else {
+                popup.focus();
+                showToast('🎙️ Dictation window opened! Speak now...', 'info');
+            }
+        }
+
+        function handleIncomingVoiceDictation(text, target) {
+            text = String(text || '').trim();
+            if (!text) return;
+
+            if (target === 'add_student') {
+                const parsed = typeof extractStudentDetailsFromSpeech === 'function' ? extractStudentDetailsFromSpeech(text) : null;
+                if (parsed && typeof applyParsedDetailsToModal === 'function') {
+                    applyParsedDetailsToModal(parsed);
+                    showToast('Student details populated from speech dictation!', 'success');
+                } else {
+                    showToast('Captured: ' + text, 'info');
+                }
+                return;
+            }
+
+            // Target is chatbot
+            const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
+            if (input) {
+                input.value = text;
+                const floatingForm = document.getElementById('chatbot-form');
+                const isDedicated = !floatingForm || floatingForm.offsetParent === null;
+                if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
+                    handleDedicatedChatbotSubmit(new Event('submit'));
+                } else if (typeof handleChatbotSubmit === 'function') {
+                    handleChatbotSubmit(new Event('submit'));
+                }
+            }
+        }
+
+        // Cross-window message listener for voice dictation popup
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'DIVINE_CHATBOT_VOICE') {
+                handleIncomingVoiceDictation(event.data.text, event.data.target || 'chatbot');
+            }
+        });
+
+        // Also check localStorage on focus as a resilient fallback
+        window.addEventListener('focus', function() {
+            try {
+                const raw = localStorage.getItem('DIVINE_LAST_VOICE_DICTATION');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (data && data.text && (Date.now() - data.timestamp < 15000)) {
+                        localStorage.removeItem('DIVINE_LAST_VOICE_DICTATION');
+                        handleIncomingVoiceDictation(data.text, data.target || 'chatbot');
+                    }
+                }
+            } catch(e){}
+        });
+
+        function showMicrophonePermissionHelpModal(targetContext) {
             if (typeof openModal !== 'function') return;
             const ua = navigator.userAgent || '';
             const isEdge = /Edg\//i.test(ua);
@@ -9276,7 +9346,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             <i class="fa-solid fa-microphone-slash"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold">Microphone Status & Guidance</h3>
+                            <h3 class="text-base font-bold">Microphone Voice Input Solution</h3>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
                                 Platform: <span class="font-semibold text-indigo-600 dark:text-indigo-400">${isAndroid ? '📱 Android Mobile APK' : (isMac ? '🍎 macOS (' + browserName + ')' : browserName)}</span>
                             </p>
@@ -9284,24 +9354,24 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     </div>
 
                     ${isGoogleAppsScriptIframe ? `
-                    <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2.5 text-xs leading-relaxed">
-                        <div class="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-circle-info"></i>
-                            <span>Google Apps Script Iframe Security Note</span>
+                    <div class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-3 text-xs leading-relaxed">
+                        <div class="font-bold text-indigo-800 dark:text-indigo-300 flex items-center gap-1.5 text-sm">
+                            <i class="fa-solid fa-microphone text-rose-500"></i>
+                            <span>Google Apps Script Microphone Solution</span>
                         </div>
                         <p class="text-slate-700 dark:text-slate-300">
-                            You have already correctly enabled the microphone in <strong>Mac System Settings</strong> and <strong>${browserName}</strong>!
+                            Your microphone is correctly toggled <strong>ON</strong> in macOS and <strong>${browserName}</strong>! Because Google's iframe container restricts direct audio hardware, you can speak orally using either option below:
                         </p>
-                        <p class="text-slate-600 dark:text-slate-400">
-                            However, the Google Apps Script test URL (<code>script.google.com</code>) renders web apps inside a nested sandbox iframe without <code>allow="microphone"</code>. Google's cloud policy blocks audio hardware inside this container.
-                        </p>
-                        <div class="pt-2 border-t border-amber-200 dark:border-amber-800 space-y-1.5 font-semibold text-slate-800 dark:text-slate-200">
-                            <div class="text-indigo-600 dark:text-indigo-400">✨ Where Your Voice Input Works 100%:</div>
-                            <ul class="list-disc list-inside space-y-1 font-normal text-slate-600 dark:text-slate-300 ml-1">
-                                <li><strong>📱 Mobile APK:</strong> Your Android APK WebView runs outside Google's iframe container.</li>
-                                <li><strong>💻 Local Preview:</strong> Run <code>2_Local_Preview.bat</code> (or <code>python3 Automation/2_Local_Preview.py</code>) to test live speech in ${browserName} at <code>http://127.0.0.1:8765</code>.</li>
-                                <li><strong>🌐 Vercel / Web Domain:</strong> Runs as a top-level web app with full native microphone support.</li>
-                            </ul>
+                        <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                            <button type="button" onclick="closeModal(); openVoiceDictationWindow('${targetContext || 'chatbot'}');" class="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer transition">
+                                <i class="fa-solid fa-microphone"></i> 🎙️ Launch Dictation Popup
+                            </button>
+                            <a href="https://anil1310.github.io/Divine-Classes/" target="_blank" class="flex-1 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 text-center cursor-pointer transition">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open App with Mic (GitHub)
+                            </a>
+                        </div>
+                        <div class="pt-2 border-t border-indigo-200 dark:border-indigo-800/60 text-[11px] text-slate-500 dark:text-slate-400">
+                            💡 <strong>Tip:</strong> The Launch Dictation Popup lets you speak into your microphone and automatically types and submits your query into this exact window!
                         </div>
                     </div>
                     ` : isAndroid ? `
@@ -9428,7 +9498,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     console.warn('[Voice Recognition Error]', event.error);
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                         showToast('Microphone access blocked. Please allow microphone in your browser settings.', 'error');
-                        showMicrophonePermissionHelpModal();
+                        showMicrophonePermissionHelpModal('chatbot');
                     } else if (event.error === 'language-not-supported' && (!langOverride || langOverride !== 'en-US')) {
                         console.log('Language en-IN not supported in this browser, falling back to en-US');
                         stopChatbotVoiceRecognition();
@@ -9540,7 +9610,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 recognition.onerror = function(event) {
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                         showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
-                        showMicrophonePermissionHelpModal();
+                        showMicrophonePermissionHelpModal('add_student');
                     } else {
                         showToast('Voice error: ' + event.error, 'error');
                     }
@@ -9975,8 +10045,12 @@ Guidelines:
             if (!container) return;
             const isStudent = state.currentRole === 'student';
             const isTeacherOrAdmin = state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher';
+            const isGoogleAppsScriptIframe = window.self !== window.top || window.location.hostname.includes('googleusercontent.com') || window.location.hostname.includes('script.google.com');
 
             const pills = [];
+            if (isGoogleAppsScriptIframe) {
+                pills.push({ label: '🎙️ Dictation Window', query: '__VOICE_POPUP__' });
+            }
             if (isTeacherOrAdmin) {
                 pills.push({ label: '🎙️ Speak: Add Student', query: 'Add student Rahul Sharma phone 9876543210 batch Class 10' });
             }
@@ -10004,6 +10078,10 @@ Guidelines:
         }
 
         function askChatbotQuickQuestion(query) {
+            if (query === '__VOICE_POPUP__') {
+                openVoiceDictationWindow('chatbot');
+                return;
+            }
             if (query && query.includes('Rahul Sharma') && query.includes('Add student')) {
                 toggleChatbotVoiceRecognition();
                 return;

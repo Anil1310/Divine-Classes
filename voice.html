@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎙️ Divine Voice Dictation - Divine Classes</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.15); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .animate-ring {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col p-4 font-sans select-none overflow-hidden">
+    <!-- Header -->
+    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-rose-600/20 text-rose-500 border border-rose-500/30 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-microphone"></i>
+            </div>
+            <div>
+                <h1 class="text-xs font-bold tracking-wide uppercase text-indigo-400">Divine AI Voice Dictation</h1>
+                <p id="target-label" class="text-[10px] text-slate-400">Oral Speech Input Gateway</p>
+            </div>
+        </div>
+        <!-- Language Selector -->
+        <select id="voice-lang" onchange="restartRecognition()" class="bg-slate-800 border border-slate-700 text-[11px] rounded-lg px-2 py-1 text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="en-IN" selected>🇮🇳 English (India)</option>
+            <option value="en-US">🇺🇸 English (US)</option>
+            <option value="hi-IN">🇮🇳 Hindi (हिन्दी)</option>
+        </select>
+    </div>
+
+    <!-- Center Mic & Visualizer -->
+    <div class="flex-1 flex flex-col items-center justify-center py-4 space-y-3">
+        <div class="relative flex items-center justify-center">
+            <div id="mic-ring" class="absolute w-24 h-24 rounded-full bg-rose-500/20 animate-ring"></div>
+            <button id="toggle-mic-btn" type="button" onclick="toggleListening()" class="relative z-10 w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center text-2xl shadow-lg shadow-rose-600/50 transition cursor-pointer">
+                <i id="mic-icon" class="fa-solid fa-microphone"></i>
+            </button>
+        </div>
+
+        <div class="text-center space-y-0.5">
+            <div id="status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold animate-pulse">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span>Listening... Speak clearly now!</span>
+            </div>
+            <p id="mic-hint" class="text-[11px] text-slate-400">Say your doubt or student details (e.g. "Add student Rahul, phone 9876543210")</p>
+        </div>
+
+        <!-- Live Transcript Display Box -->
+        <div class="w-full">
+            <textarea id="transcript" rows="3" placeholder="Spoken words will appear here in real-time..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none shadow-inner leading-relaxed"></textarea>
+        </div>
+    </div>
+
+    <!-- Actions Footer -->
+    <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+        <button type="button" onclick="clearTranscript()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition">
+            <i class="fa-solid fa-rotate-left text-[10px]"></i> Clear
+        </button>
+
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="window.close()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-medium cursor-pointer transition">
+                Cancel
+            </button>
+            <button id="send-btn" type="button" onclick="sendAndClose()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer transition active:scale-95">
+                <i class="fa-solid fa-paper-plane text-[10px]"></i> Send to App
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetMode = urlParams.get('target') || 'chatbot';
+
+        const targetLabel = document.getElementById('target-label');
+        if (targetLabel) {
+            targetLabel.textContent = targetMode === 'add_student' ? 'Target: Quick Student Admission Form' : 'Target: Divine AI Assistant Chatbot';
+        }
+
+        const transcriptArea = document.getElementById('transcript');
+        const statusBadge = document.getElementById('status-badge');
+        const micIcon = document.getElementById('mic-icon');
+        const micRing = document.getElementById('mic-ring');
+        const toggleBtn = document.getElementById('toggle-mic-btn');
+        const langSelect = document.getElementById('voice-lang');
+
+        let recognition = null;
+        let isListening = false;
+        let finalTranscript = '';
+
+        function getSpeechRecognition() {
+            return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+        }
+
+        function initRecognition() {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec) {
+                statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold';
+                statusBadge.innerHTML = '⚠️ Web Speech API not supported in this browser';
+                return null;
+            }
+
+            const rec = new SpeechRec();
+            rec.continuous = true;
+            rec.interimResults = true;
+            rec.lang = langSelect ? langSelect.value : 'en-IN';
+
+            rec.onstart = function() {
+                isListening = true;
+                micIcon.className = 'fa-solid fa-stop';
+                toggleBtn.className = 'relative z-10 w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center text-2xl shadow-lg shadow-rose-600/50 transition cursor-pointer';
+                if (micRing) micRing.classList.remove('hidden');
+                statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold animate-pulse';
+                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Listening... Speak clearly now!</span>';
+            };
+
+            rec.onresult = function(event) {
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const part = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += (finalTranscript ? ' ' : '') + part;
+                    } else {
+                        interim += part;
+                    }
+                }
+                const display = (finalTranscript + (interim ? ' ' + interim : '')).trim();
+                transcriptArea.value = display;
+            };
+
+            rec.onerror = function(event) {
+                console.warn('[Voice Dictation Error]', event.error);
+                if (event.error === 'not-allowed') {
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold';
+                    statusBadge.innerHTML = '❌ Microphone blocked. Please allow mic in address bar.';
+                } else if (event.error === 'no-speech') {
+                    // Ignored on continuous
+                } else {
+                    statusBadge.innerHTML = `⚠️ Error: ${event.error}`;
+                }
+            };
+
+            rec.onend = function() {
+                isListening = false;
+                micIcon.className = 'fa-solid fa-microphone';
+                toggleBtn.className = 'relative z-10 w-16 h-16 rounded-full bg-slate-700 hover:bg-indigo-600 text-white flex items-center justify-center text-2xl transition cursor-pointer';
+                if (micRing) micRing.classList.add('hidden');
+                statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold';
+                statusBadge.innerHTML = '<span>Tap mic to speak again, or click "Send to App"</span>';
+            };
+
+            return rec;
+        }
+
+        function startListening() {
+            if (!recognition) recognition = initRecognition();
+            if (!recognition) return;
+            try {
+                recognition.start();
+            } catch(e) {
+                console.log('Start error:', e);
+            }
+        }
+
+        function stopListening() {
+            if (recognition) {
+                try { recognition.stop(); } catch(e){}
+            }
+        }
+
+        function toggleListening() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function restartRecognition() {
+            stopListening();
+            recognition = null;
+            setTimeout(startListening, 200);
+        }
+
+        function clearTranscript() {
+            finalTranscript = '';
+            transcriptArea.value = '';
+        }
+
+        function sendAndClose() {
+            stopListening();
+            const text = String(transcriptArea.value || '').trim();
+            if (!text) {
+                window.close();
+                return;
+            }
+
+            // Post back to parent opener window
+            try {
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'DIVINE_CHATBOT_VOICE',
+                        text: text,
+                        target: targetMode
+                    }, '*');
+                }
+            } catch(err) {
+                console.error('postMessage error:', err);
+            }
+
+            // Also persist in localStorage for backup
+            try {
+                localStorage.setItem('DIVINE_LAST_VOICE_DICTATION', JSON.stringify({
+                    text: text,
+                    target: targetMode,
+                    timestamp: Date.now()
+                }));
+            } catch(e){}
+
+            setTimeout(function() {
+                window.close();
+            }, 100);
+        }
+
+        // Start listening immediately when popup opens!
+        window.addEventListener('DOMContentLoaded', function() {
+            startListening();
+        });
+    </script>
+</body>
+</html>
