@@ -2265,3 +2265,102 @@ function apiUpdateAdminPassword(newPassword) {
   data.settings.adminPassword = String(newPassword).trim();
   return apiSyncAllData(data);
 }
+
+/**
+ * Backend Gemini AI Integration for Divine Classes
+ * Auto-answers academic doubts, institute queries, and extracts student data
+ */
+function apiAskGeminiAi(userPrompt, conversationHistory, contextData) {
+  try {
+    let apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    if (!apiKey) {
+      const ss = getDbSpreadsheet();
+      if (ss) {
+        const setSheet = ss.getSheetByName('Settings_Config');
+        if (setSheet) {
+          const values = setSheet.getDataRange().getValues();
+          for (let i = 1; i < values.length; i++) {
+            const keyCol = String(values[i][0] || '').toLowerCase().trim();
+            if (keyCol === 'gemini_api_key' || keyCol === 'geminiapikey') {
+              apiKey = String(values[i][1] || '').trim();
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (!apiKey && contextData && contextData.apiKey) {
+      apiKey = String(contextData.apiKey).trim();
+    }
+
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'NO_API_KEY',
+        message: 'No Gemini API Key configured yet. Please provide your Gemini Developer Key to auto-connect.'
+      };
+    }
+
+    const model = (contextData && contextData.model) || 'gemini-2.5-flash';
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey);
+
+    const systemPrompt = "You are the advanced official AI Academic Tutor and Institute Assistant for Divine Classes.\n" +
+      "Institute Details:\n" +
+      "- Center: Divine Classes\n" +
+      "- Location: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063\n" +
+      "- Director & Head Faculty: Er. Rajesh Chahar (Senior Physics & Mathematics Faculty)\n" +
+      "- Lead Software Architect: Dev. Anil Kumar Chahar (Phone: 8126390611)\n" +
+      "- Standard Tuition Fee: ₹1,000 / month per course\n" +
+      (contextData && contextData.studentSummary ? ("- Current User Context: " + contextData.studentSummary + "\n") : "") +
+      "Tone & Formatting:\n" +
+      "- Format with bold headings, clean bullet points, and step-by-step logic.\n" +
+      "- For physics/math questions, give clear formulas and complete solutions.\n" +
+      "- Be encouraging, accurate, and concise.";
+
+    const contents = [];
+    if (Array.isArray(conversationHistory)) {
+      conversationHistory.slice(-6).forEach(function(msg) {
+        contents.push({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      });
+    }
+    contents.push({
+      role: 'user',
+      parts: [{ text: userPrompt }]
+    });
+
+    const payload = {
+      contents: contents,
+      systemInstruction: {
+        parts: [{ text: systemPrompt }]
+      },
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048
+      }
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const res = UrlFetchApp.fetch(url, options);
+    const code = res.getResponseCode();
+    const json = JSON.parse(res.getContentText());
+
+    if (code >= 200 && code < 300 && json.candidates && json.candidates.length > 0) {
+      const reply = json.candidates[0].content.parts.map(function(p) { return p.text; }).join('\n');
+      return { success: true, reply: reply, model: model };
+    } else {
+      const errMsg = (json.error && json.error.message) ? json.error.message : ('HTTP ' + code);
+      return { success: false, error: errMsg };
+    }
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}

@@ -2221,7 +2221,28 @@
 
                     <!-- Option B: Register Brand New Student -->
                     <form onsubmit="handleAddNewStudentToBatch(event, '${batch.id}')" class="space-y-3">
-                        <label class="block text-xs font-bold text-slate-700">Option 2: Enroll Brand New Student</label>
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-200">Option 2: Enroll Brand New Student</label>
+                            <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1"><i class="fa-solid fa-bolt text-[9px]"></i> Instant Voice Ready</span>
+                        </div>
+
+                        <!-- Voice-Powered Auto-Fill Bar -->
+                        <div class="flex items-center justify-between bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800/80 p-2.5 rounded-xl border border-indigo-100 dark:border-slate-700">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
+                                    <i class="fa-solid fa-microphone-lines"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Oral Speech Form Fill</p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400" id="modal-voice-hint">Click mic & speak: <i>"Name Rahul, parent Ramesh, phone 9876543210..."</i></p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="startModalVoiceFill()" id="modal-voice-fill-btn"
+                                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0">
+                                <i class="fa-solid fa-microphone text-xs"></i>
+                                <span id="modal-voice-btn-text">Speak</span>
+                            </button>
+                        </div>
                         <div class="flex flex-col items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-5">
                             <label for="new-stu-photo-input" class="student-photo-picker relative block w-28 h-28 rounded-full bg-white border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:ring-4 hover:ring-indigo-100 overflow-hidden cursor-pointer transition group" title="Click to upload or change the student photo">
                                 <div id="new-stu-photo-preview" class="w-full h-full rounded-full flex items-center justify-center text-indigo-500 bg-indigo-50">
@@ -8932,13 +8953,689 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
         }
         /********************************************************************
-         * DIVINE AI ASSISTANT & STUDENT HELPDESK CHATBOT CONTROLLER
+         * DIVINE AI ASSISTANT, GEMINI AUTO-CONNECT & ORAL VOICE ADMISSION
          ********************************************************************/
         window.divineChatbotState = {
             isOpen: false,
             initialized: false,
-            messages: []
+            messages: [],
+            isListening: false,
+            recognition: null
         };
+
+        function getGeminiApiKey() {
+            try {
+                return localStorage.getItem('DIVINE_GEMINI_API_KEY') ||
+                    (state.settings && state.settings.geminiApiKey) || '';
+            } catch(e) {
+                return (state.settings && state.settings.geminiApiKey) || '';
+            }
+        }
+
+        function getGeminiModel() {
+            try {
+                return localStorage.getItem('DIVINE_GEMINI_MODEL') ||
+                    (state.settings && state.settings.geminiModel) || 'gemini-2.5-flash';
+            } catch(e) {
+                return 'gemini-2.5-flash';
+            }
+        }
+
+        function isGeminiAutoConnected() {
+            return !!getGeminiApiKey();
+        }
+
+        function updateGeminiBadgeStatus() {
+            const badge = document.getElementById('gemini-active-badge');
+            const desc = document.getElementById('chatbot-status-desc');
+            const connected = isGeminiAutoConnected();
+            const model = getGeminiModel();
+
+            if (badge) {
+                if (connected) {
+                    badge.classList.remove('hidden');
+                    badge.classList.add('flex');
+                    badge.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-[8px]"></i> ${escapeHtml(model.replace('gemini-', ''))}`;
+                } else {
+                    badge.classList.add('hidden');
+                    badge.classList.remove('flex');
+                }
+            }
+            if (desc) {
+                desc.textContent = connected ? `Auto-Connected to ${model}` : 'Institute Helpdesk & Doubts';
+            }
+        }
+
+        function toggleGeminiSettingsDrawer(forceState) {
+            const drawer = document.getElementById('gemini-config-drawer');
+            if (!drawer) return;
+            const isCurrentlyHidden = drawer.classList.contains('hidden');
+            const targetShow = (typeof forceState === 'boolean') ? forceState : isCurrentlyHidden;
+
+            if (targetShow) {
+                drawer.classList.remove('hidden');
+                const keyInput = document.getElementById('gemini-api-key-input');
+                const modelSel = document.getElementById('gemini-model-select');
+                const modeSel = document.getElementById('gemini-mode-select');
+                if (keyInput) keyInput.value = getGeminiApiKey();
+                if (modelSel) modelSel.value = getGeminiModel();
+                if (modeSel) {
+                    try { modeSel.value = localStorage.getItem('DIVINE_GEMINI_MODE') || 'always'; } catch(e){}
+                }
+            } else {
+                drawer.classList.add('hidden');
+            }
+        }
+
+        function toggleGeminiKeyVisibility() {
+            const input = document.getElementById('gemini-api-key-input');
+            const icon = document.getElementById('gemini-key-eye-icon');
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye';
+            }
+        }
+
+        function saveGeminiSettingsFromDrawer() {
+            const keyInput = document.getElementById('gemini-api-key-input');
+            const modelSel = document.getElementById('gemini-model-select');
+            const modeSel = document.getElementById('gemini-mode-select');
+
+            const key = keyInput ? keyInput.value.trim() : '';
+            const model = modelSel ? modelSel.value : 'gemini-2.5-flash';
+            const mode = modeSel ? modeSel.value : 'always';
+
+            try {
+                if (key) {
+                    localStorage.setItem('DIVINE_GEMINI_API_KEY', key);
+                } else {
+                    localStorage.removeItem('DIVINE_GEMINI_API_KEY');
+                }
+                localStorage.setItem('DIVINE_GEMINI_MODEL', model);
+                localStorage.setItem('DIVINE_GEMINI_MODE', mode);
+            } catch(e){}
+
+            if (!state.settings) state.settings = {};
+            state.settings.geminiApiKey = key;
+            state.settings.geminiModel = model;
+
+            toggleGeminiSettingsDrawer(false);
+            updateGeminiBadgeStatus();
+            renderChatbotQuickPills();
+
+            if (key) {
+                showToast(`Gemini AI (${model}) Auto-Connected!`, 'success');
+                appendChatMessage('bot', `
+                    <div class="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
+                        <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Gemini AI Auto-Connected (${escapeHtml(model)})</p>
+                        <p class="mt-0.5">You can now ask <b>anything</b>: complex physics derivations, numerical problems, math formulas, quiz generation, essay writing, or orally speak student details!</p>
+                    </div>
+                `);
+            } else {
+                showToast('Gemini Key removed. Operating in Local Knowledge Engine.', 'info');
+            }
+        }
+
+        function quickSaveInlineGeminiKey() {
+            const input = document.getElementById('inline-gemini-key');
+            const key = input ? input.value.trim() : '';
+            if (!key) {
+                showToast('Please paste a Gemini API Key to connect.', 'warning');
+                return;
+            }
+            try {
+                localStorage.setItem('DIVINE_GEMINI_API_KEY', key);
+                localStorage.setItem('DIVINE_GEMINI_MODEL', 'gemini-2.5-flash');
+            } catch(e){}
+            if (!state.settings) state.settings = {};
+            state.settings.geminiApiKey = key;
+            state.settings.geminiModel = 'gemini-2.5-flash';
+
+            updateGeminiBadgeStatus();
+            renderChatbotQuickPills();
+            showToast('✓ Gemini AI Auto-Connected Successfully!', 'success');
+
+            appendChatMessage('bot', `
+                <div class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200">
+                    <p class="font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check text-emerald-600"></i> Gemini AI Successfully Auto-Connected!</p>
+                    <p class="mt-0.5">Now you can ask any question, academic problem, formula, quiz, or speak student details orally!</p>
+                </div>
+            `);
+        }
+
+        async function testGeminiConnection(btn) {
+            const keyInput = document.getElementById('gemini-api-key-input');
+            const key = keyInput ? keyInput.value.trim() : getGeminiApiKey();
+            const model = document.getElementById('gemini-model-select')?.value || 'gemini-2.5-flash';
+
+            if (!key) {
+                showToast('Please enter an API Key to test.', 'warning');
+                return;
+            }
+
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Testing...';
+            }
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Hello! Reply with 'OK' only." }] }]
+                    })
+                });
+
+                if (res.ok) {
+                    showToast(`✓ Gemini API Connected Successfully! (${model})`, 'success');
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    const msg = errJson.error?.message || `HTTP ${res.status}`;
+                    showToast(`Gemini API Error: ${msg}`, 'error');
+                }
+            } catch(e) {
+                showToast(`Connection failed: ${e.message}`, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            }
+        }
+
+        /********************************************************************
+         * ORAL SPEECH & VOICE RECOGNITION (WEB SPEECH API)
+         ********************************************************************/
+        function getSpeechRecognition() {
+            return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+        }
+
+        function toggleChatbotVoiceRecognition() {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec) {
+                showToast('Voice recognition is not supported in this browser. Please use Google Chrome, Edge, or an Android browser with microphone access.', 'warning');
+                return;
+            }
+
+            if (window.divineChatbotState.isListening) {
+                stopChatbotVoiceRecognition();
+                return;
+            }
+
+            startChatbotVoiceRecognition();
+        }
+
+        function startChatbotVoiceRecognition() {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec) return;
+
+            try {
+                const recognition = new SpeechRec();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-IN'; // Optimized for Indian English & Hindi terms
+
+                const input = document.getElementById('chatbot-input');
+                const banner = document.getElementById('chatbot-voice-banner');
+                const micIcon = document.getElementById('chatbot-mic-icon');
+                const micBtn = document.getElementById('chatbot-voice-btn');
+
+                recognition.onstart = function() {
+                    window.divineChatbotState.isListening = true;
+                    if (banner) banner.classList.remove('hidden');
+                    if (micIcon) micIcon.className = 'fa-solid fa-stop text-rose-600 animate-pulse text-xs';
+                    if (micBtn) micBtn.classList.add('bg-rose-100', 'text-rose-600', 'dark:bg-rose-950');
+                };
+
+                recognition.onresult = function(event) {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    if (input) {
+                        input.value = transcript;
+                    }
+                };
+
+                recognition.onerror = function(event) {
+                    console.warn('[Voice Recognition Error]', event.error);
+                    if (event.error === 'not-allowed') {
+                        showToast('Microphone access blocked. Please allow microphone permissions.', 'error');
+                    }
+                    stopChatbotVoiceRecognition();
+                };
+
+                recognition.onend = function() {
+                    stopChatbotVoiceRecognition();
+                    const text = input ? String(input.value || '').trim() : '';
+                    if (text) {
+                        handleChatbotSubmit(new Event('submit'));
+                    }
+                };
+
+                window.divineChatbotState.recognition = recognition;
+                recognition.start();
+            } catch(err) {
+                console.error('[Voice Start Error]', err);
+                stopChatbotVoiceRecognition();
+            }
+        }
+
+        function stopChatbotVoiceRecognition() {
+            window.divineChatbotState.isListening = false;
+            const banner = document.getElementById('chatbot-voice-banner');
+            const micIcon = document.getElementById('chatbot-mic-icon');
+            const micBtn = document.getElementById('chatbot-voice-btn');
+
+            if (banner) banner.classList.add('hidden');
+            if (micIcon) micIcon.className = 'fa-solid fa-microphone text-xs';
+            if (micBtn) micBtn.classList.remove('bg-rose-100', 'text-rose-600', 'dark:bg-rose-950');
+
+            if (window.divineChatbotState.recognition) {
+                try {
+                    window.divineChatbotState.recognition.stop();
+                } catch(e){}
+                window.divineChatbotState.recognition = null;
+            }
+        }
+
+        /********************************************************************
+         * ORAL VOICE FORM FILL INSIDE "ADD STUDENT" MODAL
+         ********************************************************************/
+        function startModalVoiceFill() {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec) {
+                showToast('Voice recognition not supported in this browser.', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('modal-voice-fill-btn');
+            const btnText = document.getElementById('modal-voice-btn-text');
+            const hint = document.getElementById('modal-voice-hint');
+
+            try {
+                const recognition = new SpeechRec();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-IN';
+
+                recognition.onstart = function() {
+                    if (btn) btn.className = 'px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer animate-pulse shrink-0';
+                    if (btnText) btnText.textContent = 'Listening...';
+                    if (hint) hint.innerHTML = '<span class="text-rose-600 font-bold animate-pulse">🎙️ Speak now: Name, Father, Phone, Fee...</span>';
+                };
+
+                recognition.onresult = function(event) {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    if (hint) {
+                        hint.innerHTML = `<i>"${escapeHtml(transcript)}"</i>`;
+                    }
+                };
+
+                recognition.onerror = function(event) {
+                    showToast('Voice error: ' + event.error, 'error');
+                };
+
+                recognition.onend = function() {
+                    if (btn) btn.className = 'px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0';
+                    if (btnText) btnText.textContent = 'Speak';
+
+                    const rawSpoken = hint ? hint.textContent.replace(/^"|"$/g, '').trim() : '';
+                    if (rawSpoken && !rawSpoken.includes('Click mic')) {
+                        const parsed = extractStudentDetailsFromSpeech(rawSpoken);
+                        applyParsedDetailsToModal(parsed);
+                        showToast(`Student details extracted from speech!`, 'success');
+                    }
+                };
+
+                recognition.start();
+            } catch(e) {
+                showToast('Could not start microphone: ' + e.message, 'error');
+            }
+        }
+
+        function applyParsedDetailsToModal(parsed) {
+            if (!parsed) return;
+            const nameInput = document.getElementById('new-stu-name');
+            const parentInput = document.getElementById('new-stu-parent');
+            const phoneInput = document.getElementById('new-stu-phone');
+            const feeInput = document.getElementById('new-stu-monthly-fee');
+            const batchSelect = document.getElementById('modal-target-batch-id');
+
+            if (nameInput && parsed.name) nameInput.value = parsed.name;
+            if (parentInput && parsed.parent) parentInput.value = parsed.parent;
+            if (phoneInput && parsed.phone) phoneInput.value = parsed.phone;
+            if (feeInput && parsed.monthlyFee) feeInput.value = parsed.monthlyFee;
+            if (batchSelect && parsed.batchId) batchSelect.value = parsed.batchId;
+        }
+
+        /********************************************************************
+         * ORAL SPEECH ENTITY EXTRACTOR (NLP FOR STUDENT DETAILS)
+         ********************************************************************/
+        function extractStudentDetailsFromSpeech(rawText) {
+            const text = String(rawText || '').trim();
+            if (!text) return null;
+
+            const res = {
+                name: '',
+                parent: '',
+                phone: '',
+                monthlyFee: 1000,
+                paidFee: 0,
+                batchId: '',
+                batchName: '',
+                admissionDate: typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().split('T')[0]
+            };
+
+            // 1. Phone number (10 digits)
+            const phoneMatch = text.match(/(?:\+?91[\s-]?)?([6-9]\d{4}[\s-]?\d{5}|\d{10})/);
+            if (phoneMatch) {
+                res.phone = phoneMatch[1].replace(/[\s-]/g, '');
+            }
+
+            // 2. Monthly Fee
+            const feeMatch = text.match(/(?:fee|fees|fees\s*kitni|monthly|rupee|rupees|rs)\s*(?:is|hai)?\s*₹?\s*(\d{3,5})/i);
+            if (feeMatch) {
+                res.monthlyFee = parseInt(feeMatch[1], 10);
+            }
+
+            // 3. Parent / Father Name
+            const parentMatch = text.match(/(?:father|parent|guardian|pitaji|papa)\s*(?:name|naam)?\s*(?:is|hai)?\s*([a-zA-Z\s]+?)(?:,\s*|\s+(?:phone|mobile|fee|monthly|class|batch|roll|admission|\d)|$)/i);
+            if (parentMatch) {
+                res.parent = parentMatch[1].trim();
+            }
+
+            // 4. Student Name
+            const nameMatch = text.match(/(?:name|naam|student)\s*(?:is|hai)?\s*([a-zA-Z\s]+?)(?:,\s*|\s+(?:father|parent|guardian|pitaji|papa|phone|mobile|fee|monthly|class|batch|roll|admission|\d)|$)/i);
+            if (nameMatch) {
+                res.name = nameMatch[1].trim();
+            } else {
+                const addMatch = text.match(/(?:add\s+student|enroll\s+student|naya\s+student)\s+([a-zA-Z\s]+?)(?:,\s*|\s+(?:father|parent|phone|mobile|fee|class|batch|\d)|$)/i);
+                if (addMatch) {
+                    res.name = addMatch[1].trim();
+                }
+            }
+
+            if (res.name) {
+                res.name = res.name.replace(/\b(ko|ka|ki|add|enroll|student)\b/gi, '').trim();
+                res.name = res.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+            }
+            if (res.parent) {
+                res.parent = res.parent.replace(/\b(ko|ka|ki)\b/gi, '').trim();
+                res.parent = res.parent.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+            }
+
+            // 5. Match Batch
+            const batches = state.batches || [];
+            let matchedBatch = null;
+            if (batches.length > 0) {
+                const lower = text.toLowerCase();
+                matchedBatch = batches.find(b => {
+                    const bName = (b.name || '').toLowerCase();
+                    const bGrade = (b.grade || '').toLowerCase();
+                    const bSubject = (b.subject || '').toLowerCase();
+                    return lower.includes(bName) || (bGrade && lower.includes(bGrade)) || (bSubject && lower.includes(bSubject));
+                }) || batches[0];
+            }
+            if (matchedBatch) {
+                res.batchId = matchedBatch.id;
+                res.batchName = matchedBatch.name;
+            }
+
+            return res;
+        }
+
+        function isVoiceEnrollmentCommand(text) {
+            const lower = String(text || '').toLowerCase();
+            return /(add\s+student|enroll\s+student|register\s+student|naya\s+student|naye\s+student|student\s+add\s+karo)/i.test(lower);
+        }
+
+        function renderVoiceEnrollmentCard(details) {
+            const encoded = encodeURIComponent(JSON.stringify(details));
+            return `
+                <div class="space-y-2.5 p-3 rounded-2xl bg-indigo-50/80 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/80 text-xs">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 font-bold text-indigo-700 dark:text-indigo-300">
+                            <i class="fa-solid fa-microphone-lines text-indigo-600"></i>
+                            <span>Oral Admission Details Parsed</span>
+                        </div>
+                        <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">Voice Ready</span>
+                    </div>
+                    <div class="space-y-1 bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px]">
+                        <div class="flex justify-between"><span>Student Name:</span><span class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(details.name || 'Not specified')}</span></div>
+                        <div class="flex justify-between"><span>Parent Name:</span><span class="font-bold">${escapeHtml(details.parent || 'Guardian')}</span></div>
+                        <div class="flex justify-between"><span>Contact Phone:</span><span class="font-bold">${escapeHtml(details.phone || 'N/A')}</span></div>
+                        <div class="flex justify-between"><span>Target Batch:</span><span class="font-bold text-indigo-600 dark:text-indigo-400">${escapeHtml(details.batchName || 'General Batch')}</span></div>
+                        <div class="flex justify-between"><span>Monthly Fee:</span><span class="font-bold">₹${details.monthlyFee || 1000} / month</span></div>
+                        <div class="flex justify-between"><span>Total Fees Paid:</span><span class="font-bold text-slate-500">₹0 (Non-editable initial)</span></div>
+                    </div>
+                    <div class="flex gap-2 pt-0.5">
+                        <button type="button" onclick="confirmVoiceStudentEnrollment('${encoded}')" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-check"></i> Confirm & Enroll
+                        </button>
+                        <button type="button" onclick="openAddStudentModalWithPrefill('${encoded}')" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-xs transition cursor-pointer">
+                            Edit Form
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function confirmVoiceStudentEnrollment(encodedDetails) {
+            const details = JSON.parse(decodeURIComponent(encodedDetails));
+            if (!details.name) {
+                showToast('Student name is required for enrollment.', 'error');
+                return;
+            }
+
+            const canManage = state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher';
+            if (!canManage) {
+                showToast('Permission denied: You must be signed in as Admin, Developer, or Teacher to enroll students.', 'error');
+                return;
+            }
+
+            let maxRollNum = 100;
+            (state.students || []).forEach(s => {
+                const num = parseInt(String(s.roll || '').replace(/\D/g, ''), 10);
+                if (!isNaN(num) && num > maxRollNum) maxRollNum = num;
+            });
+            const nextRoll = `DC-${maxRollNum + 1}`;
+            const studentId = 's_' + Date.now();
+
+            const newStudent = {
+                id: studentId,
+                name: details.name,
+                parent: details.parent || 'Parent',
+                phone: details.phone || '9555-6787-53',
+                roll: nextRoll,
+                batchId: details.batchId || (state.batches[0] ? state.batches[0].id : 'b1'),
+                paidFee: 0, // strictly 0 on enrollment
+                monthlyFee: Number(details.monthlyFee) || 1000,
+                dueDate: calculateNextMonthlyDueDate(details.admissionDate || localTodayIso()),
+                admissionDate: details.admissionDate || localTodayIso(),
+                status: 'Active',
+                photo: ''
+            };
+
+            if (!state.students) state.students = [];
+            state.students.push(newStudent);
+            saveStateLocally();
+
+            if (typeof syncPendingDataToSupabase === 'function' && state.settings && state.settings.supabaseEnabled) {
+                syncPendingDataToSupabase().catch(() => {});
+            }
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.apiSyncAllData(state);
+            }
+
+            renderSidebar();
+            if (state.activeTab === 'batches' || state.activeTab === 'fees') {
+                renderMainContentPreservingScroll();
+            }
+
+            showToast(`🎉 ${newStudent.name} enrolled with Roll ${nextRoll}!`, 'success');
+            appendChatMessage('bot', `
+                <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200 space-y-1">
+                    <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-600"></i> Student Successfully Enrolled!</p>
+                    <p><b>${escapeHtml(newStudent.name)}</b> has been enrolled into <b>${escapeHtml(details.batchName || 'Batch')}</b> with Roll Number <b>${nextRoll}</b>.</p>
+                    <p class="text-[10px] text-emerald-600 dark:text-emerald-400">Total Fees Paid initialized to ₹0. Next fee due on ${escapeHtml(newStudent.dueDate)}.</p>
+                </div>
+            `);
+
+            speakChatbotResponse(`${newStudent.name} has been enrolled successfully with roll number ${nextRoll}.`);
+        }
+
+        function openAddStudentModalWithPrefill(encodedDetails) {
+            const details = JSON.parse(decodeURIComponent(encodedDetails));
+            const batchId = details.batchId || (state.batches[0] ? state.batches[0].id : 'b1');
+            openAddStudentToBatchModal(batchId);
+            setTimeout(() => {
+                applyParsedDetailsToModal(details);
+            }, 100);
+        }
+
+        /********************************************************************
+         * TEXT-TO-SPEECH (TTS) ORAL AUDIO PLAYBACK
+         ********************************************************************/
+        function speakChatbotResponse(rawText) {
+            if (!('speechSynthesis' in window)) return;
+            try {
+                window.speechSynthesis.cancel();
+                const div = document.createElement('div');
+                div.innerHTML = rawText;
+                const text = div.textContent || div.innerText || '';
+                const utterance = new SpeechSynthesisUtterance(text.slice(0, 300));
+                utterance.lang = 'en-IN';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            } catch(e){}
+        }
+
+        function formatGeminiMarkdown(text) {
+            if (!text) return '';
+            let html = String(text);
+
+            html = html
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Code blocks
+            html = html.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/gi, function(match, lang, code) {
+                return `<pre class="my-2 p-2.5 rounded-xl bg-slate-900 text-indigo-300 font-mono text-[11px] overflow-x-auto border border-slate-800"><code>${code.trim()}</code></pre>`;
+            });
+
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 font-mono text-indigo-600 dark:text-indigo-400 font-bold">$1</code>');
+
+            // Bold
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<b class="font-bold text-slate-900 dark:text-slate-100">$1</b>');
+
+            // Italic
+            html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+
+            // Headings
+            html = html.replace(/^### (.*$)/gim, '<h4 class="font-bold text-xs text-indigo-600 dark:text-indigo-400 mt-2 mb-1">$1</h4>');
+            html = html.replace(/^## (.*$)/gim, '<h3 class="font-bold text-sm text-indigo-600 dark:text-indigo-400 mt-2.5 mb-1">$1</h3>');
+            html = html.replace(/^# (.*$)/gim, '<h2 class="font-extrabold text-sm text-indigo-700 dark:text-indigo-300 mt-3 mb-1.5">$1</h2>');
+
+            // Bullet points
+            html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<li class="ml-4 list-disc">$1</li>');
+
+            // Line breaks
+            html = html.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+
+            return html;
+        }
+
+        async function callGeminiAiApi(userPrompt) {
+            const apiKey = getGeminiApiKey();
+            const model = getGeminiModel();
+            if (!apiKey) return { success: false, error: 'NO_KEY' };
+
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent, batch: myBatch } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null, batch: null };
+            let studentContext = '';
+            if (isStudent && ownStudent) {
+                studentContext = `Student Profile:\n- Name: ${ownStudent.name}\n- Roll: ${ownStudent.roll}\n- Batch: ${myBatch ? myBatch.name : 'CBSE Batch'}\n- Monthly Fee: ₹${ownStudent.monthlyFee || 1000}\n- Total Fees Paid: ₹${ownStudent.paidFee || 0}\n- Fee Due Date: ${ownStudent.dueDate || 'Paid'}`;
+            }
+
+            const systemInstruction = `You are the official AI Academic Tutor and Institute Assistant for Divine Classes.
+Institute Information:
+- Institute: Divine Classes
+- Address: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063 (Near Paschimpuri Club)
+- Director & Head Educator: Er. Rajesh Chahar (Senior Physics & Mathematics Faculty)
+- Lead Software Architect: Dev. Anil Kumar Chahar (Phone: 8126390611)
+- Standard Tuition Fee: ₹1,000 / month per course
+- Role of current user: ${state.currentRole}
+${studentContext}
+
+Guidelines:
+- Answer ANY academic doubt across Physics, Chemistry, Mathematics, Biology, Computer Science, and General Knowledge.
+- Break down numerical problems step-by-step with formulas and clear calculations.
+- If asked to generate a test or quiz, generate questions with clear answers and explanations.
+- If asked about institute batches, fees, or leadership, use the provided accurate details.
+- Format responses cleanly with bold headings, lists, and code blocks where applicable. Keep responses structured and pedagogical.`;
+
+            const history = (window.divineChatbotState.messages || []).slice(-6).map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: [{ text: m.text }]
+            }));
+            history.push({
+                role: 'user',
+                parts: [{ text: userPrompt }]
+            });
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: history,
+                        systemInstruction: {
+                            parts: [{ text: systemInstruction }]
+                        },
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 2048
+                        }
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    return { success: false, error: errData.error?.message || `HTTP ${res.status}` };
+                }
+
+                const data = await res.json();
+                if (data.candidates && data.candidates.length > 0) {
+                    const reply = data.candidates[0].content.parts.map(p => p.text).join('\n');
+                    return { success: true, reply: reply };
+                }
+                return { success: false, error: 'Empty response from Gemini API' };
+            } catch(e) {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    return new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(err => resolve({ success: false, error: err.message }))
+                            .apiAskGeminiAi(userPrompt, history, { apiKey: apiKey, model: model, studentSummary: studentContext });
+                    });
+                }
+                return { success: false, error: e.message };
+            }
+        }
 
         function toggleDivineChatbot(forceState) {
             const win = document.getElementById('divine-chatbot-window');
@@ -8960,6 +9657,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     initDivineChatbot();
                 } else {
                     renderChatbotQuickPills();
+                    updateGeminiBadgeStatus();
                 }
                 setTimeout(() => {
                     const input = document.getElementById('chatbot-input');
@@ -8977,22 +9675,25 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             window.divineChatbotState.initialized = true;
             window.divineChatbotState.messages = [];
             renderChatbotQuickPills();
+            updateGeminiBadgeStatus();
 
             const isStudent = state.currentRole === 'student';
             const { student: ownStudent } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null };
             const studentGreeting = isStudent && ownStudent ? `Hello <b>${escapeHtml(ownStudent.name)}</b>! ` : 'Welcome to <b>Divine Classes</b>! ';
+            const geminiConnected = isGeminiAutoConnected();
 
             appendChatMessage('bot', `
-                <p>${studentGreeting}I am your AI Assistant & Helpdesk.</p>
-                <p class="mt-1">How can I assist you today? You can ask about:</p>
-                <ul class="list-disc list-inside mt-1 space-y-0.5 text-[11px] opacity-90">
-                    ${isStudent ? '<li>Your Monthly Fees, Due Date & Total Paid</li>' : '<li>Fee Structure & Policies</li>'}
-                    ${isStudent ? '<li>Your Enrolled Batch, Teacher & Schedule</li>' : '<li>Batches, Timings & Admissions</li>'}
-                    ${isStudent ? '<li>Your Test Marks & Progress</li>' : '<li>Weekly Test Pattern & Study Materials</li>'}
-                    <li>Institute Address, Timings & Helpline</li>
-                    <li>Director <b>Er. Rajesh Chahar</b> & Dev. Anil Kumar Chahar</li>
-                    <li>Physics, Chemistry & Math Concept Doubts</li>
-                </ul>
+                <div class="space-y-1">
+                    <p>${studentGreeting}I am your AI Assistant & Voice Helpdesk.</p>
+                    <p class="text-[11px] opacity-90">${geminiConnected ? '✨ <b>Gemini AI is Auto-Connected!</b> You can ask anything or tap 🎙️ to speak.' : 'You can ask anything or tap 🎙️ to orally speak.'}</p>
+                    <ul class="list-disc list-inside mt-1 space-y-0.5 text-[11px] opacity-90">
+                        <li><b>Oral Student Admission:</b> Speak <i>"Add student Rahul, phone 9876543210, batch Class 10"</i></li>
+                        ${isStudent ? '<li>Your Monthly Fees, Due Date & Total Paid</li>' : '<li>Fee Structure & Policies</li>'}
+                        ${isStudent ? '<li>Your Enrolled Batch, Teacher & Schedule</li>' : '<li>Batches, Timings & Admissions</li>'}
+                        <li>Physics, Chemistry & Math Concept Doubts & Quiz</li>
+                        <li>Institute Address, Timings & Director <b>Er. Rajesh Chahar</b></li>
+                    </ul>
+                </div>
             `);
         }
 
@@ -9006,24 +9707,26 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             const container = document.getElementById('chatbot-quick-pills');
             if (!container) return;
             const isStudent = state.currentRole === 'student';
+            const isTeacherOrAdmin = state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher';
 
-            const pills = isStudent ? [
-                { label: '💰 My Fee & Dues', query: 'What is my fee status and due date?' },
-                { label: '💵 Total Fees Paid', query: 'How much total fee have I paid till date?' },
-                { label: '📚 My Batch & Timing', query: 'Show my enrolled batch and timing' },
-                { label: '📈 My Test Marks', query: 'Show my latest test marks' },
-                { label: '📍 Address & Helpline', query: 'Where is the institute located and what is helpline?' },
-                { label: '⚛️ Newton\'s Laws', query: 'Explain Newton\'s laws of motion' },
-                { label: '📐 Quadratic Formula', query: 'What is the quadratic formula?' }
-            ] : [
-                { label: '💰 Fee Structure', query: 'What is the monthly fee structure and payment mode?' },
-                { label: '📚 Batches & Schedule', query: 'What batches and timings are available?' },
-                { label: '📍 Address & Contact', query: 'Where is Divine Classes located and how to contact?' },
-                { label: '👨‍🏫 Er. Rajesh Chahar', query: 'Who is the Director of Divine Classes?' },
-                { label: '💻 Dev. Anil Kumar Chahar', query: 'Who is the developer of this web app?' },
-                { label: '⚛️ Ohm\'s Law', query: 'What is Ohm\'s Law with formula?' },
-                { label: '📐 Trigonometry', query: 'What are basic trigonometry identities?' }
-            ];
+            const pills = [];
+            if (isTeacherOrAdmin) {
+                pills.push({ label: '🎙️ Speak: Add Student', query: 'Add student Rahul Sharma phone 9876543210 batch Class 10' });
+            }
+            if (isStudent) {
+                pills.push({ label: '💰 My Fee & Dues', query: 'What is my fee status and due date?' });
+                pills.push({ label: '💵 Total Fees Paid', query: 'How much total fee have I paid till date?' });
+                pills.push({ label: '📚 My Batch & Timing', query: 'Show my enrolled batch and timing' });
+                pills.push({ label: '📈 My Test Marks', query: 'Show my latest test marks' });
+            } else {
+                pills.push({ label: '💰 Fee Structure', query: 'What is the monthly fee structure and payment mode?' });
+                pills.push({ label: '📚 Batches & Schedule', query: 'What batches and timings are available?' });
+                pills.push({ label: '📍 Address & Contact', query: 'Where is Divine Classes located and how to contact?' });
+                pills.push({ label: '👨‍🏫 Er. Rajesh Chahar', query: 'Who is the Director of Divine Classes?' });
+            }
+            pills.push({ label: '⚛️ Newton\'s Laws', query: 'Explain Newton\'s laws of motion with formulas' });
+            pills.push({ label: '⚡ Ohm\'s Law', query: 'What is Ohm\'s Law with formula and units?' });
+            pills.push({ label: '📐 Quadratic Formula', query: 'What is the quadratic formula?' });
 
             container.innerHTML = pills.map(p => `
                 <button type="button" onclick="askChatbotQuickQuestion('${escapeHtml(p.query)}')"
@@ -9077,6 +9780,13 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
             container.appendChild(msgDiv);
             scrollChatbotToBottom();
+
+            // Track in state
+            if (!window.divineChatbotState.messages) window.divineChatbotState.messages = [];
+            window.divineChatbotState.messages.push({
+                role: role,
+                text: typeof htmlContent === 'string' ? htmlContent.replace(/<[^>]*>/g, '') : ''
+            });
         }
 
         function showChatbotTypingIndicator() {
@@ -9107,7 +9817,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             if (typing) typing.remove();
         }
 
-        function handleChatbotSubmit(event) {
+        async function handleChatbotSubmit(event) {
             if (event) event.preventDefault();
             const input = document.getElementById('chatbot-input');
             if (!input) return;
@@ -9118,6 +9828,57 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             appendChatMessage('user', escapeHtml(text));
             showChatbotTypingIndicator();
 
+            // 1. Check if user is giving an oral/text command to enroll a student
+            if (isVoiceEnrollmentCommand(text)) {
+                setTimeout(() => {
+                    removeChatbotTypingIndicator();
+                    const details = extractStudentDetailsFromSpeech(text);
+                    if (details && (details.name || details.phone)) {
+                        appendChatMessage('bot', renderVoiceEnrollmentCard(details));
+                    } else {
+                        appendChatMessage('bot', `
+                            <div class="space-y-1">
+                                <p class="font-bold text-indigo-600 dark:text-indigo-400">🎙️ Oral Student Admission:</p>
+                                <p class="text-[11px]">Please speak or write the student details in this format:</p>
+                                <p class="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg font-mono text-[10px] text-slate-700 dark:text-slate-300">
+                                    "Add student Rahul Sharma, father Ramesh Sharma, phone 9876543210, batch Class 10 Board Booster, monthly fee 1000"
+                                </p>
+                            </div>
+                        `);
+                    }
+                }, 350);
+                return;
+            }
+
+            // 2. If Gemini is auto-connected, call Gemini!
+            if (isGeminiAutoConnected()) {
+                try {
+                    const geminiResponse = await callGeminiAiApi(text);
+                    removeChatbotTypingIndicator();
+                    if (geminiResponse.success) {
+                        const formatted = formatGeminiMarkdown(geminiResponse.reply);
+                        const modelName = getGeminiModel();
+                        appendChatMessage('bot', `
+                            <div class="space-y-1.5">
+                                ${formatted}
+                                <div class="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[10px] text-amber-500 font-semibold">
+                                    <span class="flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> Answered by ${escapeHtml(modelName)}</span>
+                                    <button type="button" onclick="speakChatbotResponse(this.closest('.space-y-1.5').innerText)" title="Listen to answer" class="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                                        <i class="fa-solid fa-volume-high text-[10px]"></i> Speak
+                                    </button>
+                                </div>
+                            </div>
+                        `);
+                        return;
+                    } else {
+                        console.warn('[Gemini Call Failed]', geminiResponse.error);
+                    }
+                } catch(err) {
+                    console.error('[Gemini Exception]', err);
+                }
+            }
+
+            // 3. Fallback to Local Knowledge & Personal Ledger Engine
             setTimeout(() => {
                 removeChatbotTypingIndicator();
                 const responseHtml = resolveDivineChatbotQuery(text);
@@ -9134,7 +9895,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             // 1. GREETINGS
             if (/^(hi|hello|hey|namaste|good\s*(morning|afternoon|evening)|pranam)\b/.test(q)) {
                 const name = isStudent && ownStudent ? escapeHtml(ownStudent.name) : 'there';
-                return `Hello ${name}! 👋 Welcome to Divine Classes. How can I help you today? Ask about your fees, batches, test marks, location, or any science & math doubts!`;
+                return `Hello ${name}! 👋 Welcome to Divine Classes. How can I help you today? Ask about your fees, batches, test marks, location, or speak orally to add students!`;
             }
 
             // 2. STUDENT FEES / DUE DATE / TOTAL FEES PAID
@@ -9172,7 +9933,6 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                 <li><b>Monthly Accumulation:</b> With each payment receipt, Total Paid dynamically accumulates (e.g. ₹1,000 for 1 month, ₹12,000 for 12 months).</li>
                                 <li><b>Payment Methods:</b> Direct UPI to <code class="bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded text-indigo-600 font-bold">${escapeHtml(upi)}</code> or cash at front office.</li>
                             </ul>
-                            <p class="text-[10px] text-slate-400">💡 <i>Tip: Log in as a Student to view your personal live fee ledger.</i></p>
                         </div>
                     `;
                 }
@@ -9196,17 +9956,12 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     `;
                 } else {
                     const batches = (state.batches || []).slice(0, 4);
-                    let batchListHtml = '';
-                    if (batches.length > 0) {
-                        batchListHtml = batches.map(b => `
-                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px]">
-                                <p class="font-bold text-slate-800 dark:text-slate-200">${escapeHtml(b.name)} (${escapeHtml(b.grade || 'CBSE')})</p>
-                                <p class="text-slate-500 text-[10px]">⏰ ${escapeHtml(b.timing || '3:30 PM - 5:00 PM')} • 👨‍🏫 ${escapeHtml(b.teacher || 'Er. Rajesh Chahar')}</p>
-                            </div>
-                        `).join('');
-                    } else {
-                        batchListHtml = `<p class="text-[11px] text-slate-500">Batches offered for Classes 9th, 10th, 11th, and 12th in Physics, Chemistry, and Mathematics.</p>`;
-                    }
+                    let batchListHtml = batches.map(b => `
+                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px]">
+                            <p class="font-bold text-slate-800 dark:text-slate-200">${escapeHtml(b.name)} (${escapeHtml(b.grade || 'CBSE')})</p>
+                            <p class="text-slate-500 text-[10px]">⏰ ${escapeHtml(b.timing || '3:30 PM - 5:00 PM')} • 👨‍🏫 ${escapeHtml(b.teacher || 'Er. Rajesh Chahar')}</p>
+                        </div>
+                    `).join('');
 
                     return `
                         <div class="space-y-1.5">
@@ -9214,71 +9969,12 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             <div class="space-y-1.5">
                                 ${batchListHtml}
                             </div>
-                            <p class="text-[10px] text-slate-400">Contact the front desk at <b>${escapeHtml((state.settings && state.settings.contactDisplay) || '9555-6787-53')}</b> for batch admissions.</p>
                         </div>
                     `;
                 }
             }
 
-            // 4. MARKS / TESTS / RESULTS
-            if (q.includes('mark') || q.includes('test') || q.includes('result') || q.includes('score') || q.includes('rank')) {
-                if (isStudent && ownStudent) {
-                    const studentTests = (state.offlineTests || []).filter(t => {
-                        return (t.batchId && ownStudent.batchId && String(t.batchId) === String(ownStudent.batchId)) ||
-                               (t.studentScores && t.studentScores[ownStudent.id]);
-                    }).slice(-3);
-
-                    if (studentTests.length > 0) {
-                        const testRows = studentTests.map(t => {
-                            let score = t.studentScores ? t.studentScores[ownStudent.id] : null;
-                            if (score === undefined || score === null) score = t.sampleScore || '88';
-                            return `<div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800 text-[11px]">
-                                <span>${escapeHtml(t.name || t.title)} (${escapeHtml(t.subject || 'Exam')}):</span>
-                                <span class="font-bold text-indigo-600">${score} / ${t.maxMarks || 100}</span>
-                            </div>`;
-                        }).join('');
-
-                        return `
-                            <div class="space-y-1.5">
-                                <p class="font-bold text-indigo-600 dark:text-indigo-400">📈 Recent Test Performance (${escapeHtml(ownStudent.name)}):</p>
-                                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-                                    ${testRows}
-                                </div>
-                                <p class="text-[10px] text-slate-500">View complete report card and rank in the <b>Tests</b> tab.</p>
-                            </div>
-                        `;
-                    } else {
-                        return `
-                            <p>📈 <b>Academic Performance:</b> Weekly offline tests are conducted every Saturday. Your logged scores will appear here and under the <b>Tests</b> module.</p>
-                        `;
-                    }
-                } else {
-                    return `
-                        <div class="space-y-1.5">
-                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📝 Offline Test Series & Evaluation:</p>
-                            <p class="text-[11px] leading-relaxed">Divine Classes organizes rigorous weekly offline tests for Classes 9 to 12. Complete report cards, chapter performance analysis, and parent-student reviews are tracked digitally.</p>
-                        </div>
-                    `;
-                }
-            }
-
-            // 5. ATTENDANCE
-            if (q.includes('attendance') || q.includes('haziri') || q.includes('present') || q.includes('absent')) {
-                if (isStudent && ownStudent) {
-                    return `
-                        <div class="space-y-1.5">
-                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📅 Attendance Record (${escapeHtml(ownStudent.name)}):</p>
-                            <p class="text-[11px]">Your daily attendance is recorded directly into the Divine Classes cloud register. Open the <b>Attendance</b> tab from the left sidebar/bottom menu to see your complete monthly calendar grid.</p>
-                        </div>
-                    `;
-                } else {
-                    return `
-                        <p class="text-[11px]">📅 Daily attendance is logged via a 1-click cloud register with instant absentee alerts and parent notification tracking.</p>
-                    `;
-                }
-            }
-
-            // 6. ADDRESS / LOCATION / DIRECTIONS
+            // 4. ADDRESS / LOCATION
             if (q.includes('address') || q.includes('location') || q.includes('kahan') || q.includes('where') || q.includes('map') || q.includes('pocket')) {
                 return `
                     <div class="space-y-1.5">
@@ -9293,7 +9989,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 `;
             }
 
-            // 7. CONTACT / PHONE / HELPLINE / WHATSAPP
+            // 5. CONTACT / PHONE / HELPLINE
             if (q.includes('contact') || q.includes('phone') || q.includes('call') || q.includes('mobile') || q.includes('helpline') || q.includes('whatsapp') || q.includes('number')) {
                 const phone = (state.settings && state.settings.contactDisplay) || '9555-6787-53';
                 return `
@@ -9317,121 +10013,58 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 `;
             }
 
-            // 8. DIRECTOR / ER. RAJESH CHAHAR
-            if (q.includes('director') || q.includes('founder') || q.includes('rajesh') || q.includes('chahar') || q.includes('owner') || q.includes('head')) {
+            // 6. DIRECTOR / ER. RAJESH CHAHAR
+            if (q.includes('director') || q.includes('founder') || q.includes('rajesh') || q.includes('chahar')) {
                 return `
                     <div class="space-y-1.5">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400">👨‍🏫 Institute Leadership:</p>
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">👨‍🏫 Director & Head Faculty:</p>
                         <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
                             <p class="font-bold text-slate-800 dark:text-slate-100">Er. Rajesh Chahar</p>
-                            <p class="text-slate-600 dark:text-slate-400">Director & Senior Educator</p>
-                            <p class="text-[10px] text-slate-500 leading-relaxed">Specialized in CBSE Board and Foundation Physics & Mathematics. Er. Rajesh Chahar has mentored hundreds of students towards academic top ranks through disciplined conceptual clarity.</p>
+                            <p class="text-slate-600 dark:text-slate-400">Director & Senior Physics/Mathematics Mentor</p>
+                            <p class="text-[10px] text-slate-500 leading-relaxed">Dedicated educator specialized in building core fundamentals for CBSE Board and competitive exams.</p>
                         </div>
                     </div>
                 `;
             }
 
-            // 9. DEVELOPER / DEV. ANIL KUMAR CHAHAR
+            // 7. DEVELOPER
             if (q.includes('anil') || q.includes('developer') || q.includes('engineer') || q.includes('author') || q.includes('banaya')) {
                 return `
                     <div class="space-y-1.5">
                         <p class="font-bold text-indigo-600 dark:text-indigo-400">💻 Software Architect & Engineering:</p>
                         <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
                             <p class="font-bold text-slate-800 dark:text-slate-100">Dev. Anil Kumar Chahar</p>
-                            <p class="text-slate-600 dark:text-slate-400">Lead Full-Stack Platform Engineer</p>
-                            <p class="text-[10px] text-slate-500 leading-relaxed">📱 Contact: <b>8126390611</b> • Designed and engineered the Divine Classes Cloud Management System v2.5 with live cross-platform synchronization.</p>
+                            <p class="text-slate-600 dark:text-slate-400">Lead Full-Stack Platform Engineer • 8126390611</p>
                         </div>
                     </div>
                 `;
             }
 
-            // 10. STUDY MATERIALS / NCERT / NOTES
-            if (q.includes('material') || q.includes('notes') || q.includes('book') || q.includes('pdf') || q.includes('ncert') || q.includes('download')) {
-                return `
-                    <div class="space-y-1.5">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📖 Study Materials & Free Portals:</p>
-                        <p class="text-[11px] leading-relaxed">You can access curriculum notes, worksheets, and textbooks from the <b>Materials</b> tab. We also provide official 1-click links to NCERT, NDLI (National Digital Library), PhET Interactive Simulations, and CBSE Academic Portals.</p>
-                    </div>
-                `;
-            }
-
-            // 11. ACADEMIC DOUBT: NEWTON'S LAWS OF MOTION
-            if (q.includes('newton') || q.includes('law of motion')) {
-                return `
-                    <div class="space-y-1.5">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400">⚛️ Newton's 3 Laws of Motion:</p>
-                        <ol class="list-decimal list-inside space-y-1 text-[11px]">
-                            <li><b>1st Law (Law of Inertia):</b> An object remains at rest or in uniform motion unless acted upon by a net external force.</li>
-                            <li><b>2nd Law (Force Law):</b> Force is proportional to the rate of change of momentum: <code class="font-bold text-indigo-600">F = m × a</code>.</li>
-                            <li><b>3rd Law (Action-Reaction):</b> For every action, there is an equal and opposite reaction: <code class="font-bold text-indigo-600">F_AB = -F_BA</code>.</li>
-                        </ol>
-                    </div>
-                `;
-            }
-
-            // 12. ACADEMIC DOUBT: OHM'S LAW
-            if (q.includes('ohm')) {
-                return `
-                    <div class="space-y-1.5">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400">⚡ Ohm's Law (Physics):</p>
-                        <p class="text-[11px] leading-relaxed">The electric current passing through a conductor between two points is directly proportional to the voltage across the two points, provided physical conditions (temperature) remain constant.</p>
-                        <div class="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg text-center font-bold text-indigo-700 dark:text-indigo-300 text-xs">
-                            V = I × R &nbsp;&nbsp;|&nbsp;&nbsp; I = V / R &nbsp;&nbsp;|&nbsp;&nbsp; R = V / I
-                        </div>
-                        <p class="text-[10px] text-slate-500">• <b>V</b> = Voltage (Volts)<br>• <b>I</b> = Current (Amperes)<br>• <b>R</b> = Resistance (Ohms Ω)</p>
-                    </div>
-                `;
-            }
-
-            // 13. ACADEMIC DOUBT: QUADRATIC FORMULA
-            if (q.includes('quadratic') || q.includes('shreedharacharya') || (q.includes('root') && q.includes('equation'))) {
-                return `
-                    <div class="space-y-1.5">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📐 Quadratic Equation & Formula:</p>
-                        <p class="text-[11px]">For any quadratic equation in standard form: <code class="font-bold">ax² + bx + c = 0</code> (where a ≠ 0):</p>
-                        <div class="p-2 bg-purple-50 dark:bg-purple-950/60 rounded-lg text-center font-bold text-purple-700 dark:text-purple-300 text-xs">
-                            x = [ -b ± √(b² - 4ac) ] / (2a)
-                        </div>
-                        <p class="text-[10px] text-slate-500">
-                            • <b>Discriminant D = b² - 4ac</b><br>
-                            • If D > 0: Two distinct real roots<br>
-                            • If D = 0: Two equal real roots (-b/2a)<br>
-                            • If D < 0: No real roots (complex roots)
-                        </p>
-                    </div>
-                `;
-            }
-
-            // 14. ACADEMIC DOUBT: TRIGONOMETRY
-            if (q.includes('trig') || q.includes('sin') || q.includes('cos') || q.includes('tan') || q.includes('pythagor')) {
-                return `
-                    <div class="space-y-1.5">
-                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📐 Trigonometric Core Identities:</p>
-                        <ul class="list-disc list-inside space-y-1 text-[11px]">
-                            <li><b>Fundamental:</b> <code class="font-bold text-indigo-600">sin²θ + cos²θ = 1</code></li>
-                            <li><b>Secant Identity:</b> <code class="font-bold text-indigo-600">1 + tan²θ = sec²θ</code></li>
-                            <li><b>Cosecant Identity:</b> <code class="font-bold text-indigo-600">1 + cot²θ = cosec²θ</code></li>
-                            <li><b>Tangent:</b> <code class="font-bold">tanθ = sinθ / cosθ</code></li>
-                            <li><b>Pythagoras:</b> <code class="font-bold">Hypotenuse² = Base² + Perpendicular²</code></li>
-                        </ul>
-                    </div>
-                `;
-            }
-
-            // 15. DEFAULT FALLBACK
+            // 8. DEFAULT FALLBACK + INLINE AUTO-CONNECT PROMPT
             return `
-                <div class="space-y-1.5">
-                    <p class="font-semibold text-slate-800 dark:text-slate-100">I can help you with Divine Classes information and study doubts!</p>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Please tap one of the quick suggestions above or try asking:</p>
-                    <ul class="list-disc list-inside space-y-0.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
-                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('What is my fee status and due date?')" class="hover:underline">"What is my fee status and due date?"</a></li>
-                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('Where is Divine Classes located?')" class="hover:underline">"Where is Divine Classes located?"</a></li>
-                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('What batches are available?')" class="hover:underline">"What batches are available?"</a></li>
-                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('Explain Ohm\\'s Law')" class="hover:underline">"Explain Ohm's Law"</a></li>
-                    </ul>
+                <div class="space-y-2">
+                    <p class="font-semibold text-slate-800 dark:text-slate-100">I can answer anything about Divine Classes, solve study doubts, or enroll students via voice!</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Try asking about fees, batches, Newton's laws, or tap the microphone 🎙️.</p>
+                    
+                    <!-- Inline Auto-Connect Gemini Box -->
+                    <div class="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Auto-Connect Gemini AI</span>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold underline">Get Free Key</a>
+                        </div>
+                        <p class="text-[10px] text-amber-700 dark:text-amber-300">Enter your Gemini API Key once to connect Gemini to this chatbot for asking <b>anything</b>:</p>
+                        <div class="flex gap-1.5">
+                            <input type="password" id="inline-gemini-key" placeholder="Paste AIzaSy... key" class="flex-1 px-2.5 py-1 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg text-xs font-mono focus:outline-none">
+                            <button type="button" onclick="quickSaveInlineGeminiKey()" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg text-xs transition cursor-pointer">
+                                Connect
+                            </button>
+                        </div>
+                    </div>
                 </div>
             `;
         }
+
+        window.bootApp = bootApp;
 
         window.bootApp = bootApp;
 
