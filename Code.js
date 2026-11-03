@@ -724,7 +724,7 @@ function mergeStudentsFromSheet_(appData, spreadsheet) {
         stu.status = status;
         stu.parentName = parentName || stu.parentName;
         stu.phone = phone || stu.phone;
-        stu.totalFee = totalFee;
+        stu.totalFee = Math.max(totalFee, paidFee);
         stu.paidFee = paidFee;
         if (dueDate && !/^fully paid$/i.test(dueDate)) stu.dueDate = dueDate;
         stu.lastReminder = lastReminder;
@@ -741,7 +741,7 @@ function mergeStudentsFromSheet_(appData, spreadsheet) {
           status: status,
           parentName: parentName,
           phone: phone,
-          totalFee: totalFee,
+          totalFee: Math.max(totalFee, paidFee),
           paidFee: paidFee,
           dueDate: /^fully paid$/i.test(dueDate) ? '' : dueDate,
           lastReminder: lastReminder,
@@ -1182,8 +1182,7 @@ function apiRunDailyFeeReminders() {
     (data.students || []).forEach(function (stu) {
       var due = String(stu.dueDate || stu.nextDueDate || '').slice(0, 10);
       var monthlyFee = Number(stu.monthlyFee || 0);
-      var balance = Math.max(0, Number(stu.totalFee || 0) - Number(stu.paidFee || 0));
-      if (!due || !/^\d{4}-\d{2}-\d{2}$/.test(due) || !monthlyFee || !balance || due === 'Paid') return;
+      if (!due || !/^\d{4}-\d{2}-\d{2}$/.test(due) || !monthlyFee || due === 'Paid') return;
       var reminderDay = addDaysToIsoDate_(due, 1);
       if (today < reminderDay) return;
       var key = 'monthly_fee_' + stu.id + '_' + due;
@@ -2116,6 +2115,7 @@ function apiUpdateStudentProfile(studentId, profileData) {
     if (profileData.password !== undefined) student.password = String(profileData.password).trim();
     if (profileData.totalFee !== undefined) student.totalFee = Number(profileData.totalFee) || 0;
     if (profileData.paidFee !== undefined) student.paidFee = Number(profileData.paidFee) || 0;
+    student.totalFee = Math.max(Number(student.totalFee || 0), Number(student.paidFee || 0));
     if (profileData.dueDate !== undefined) student.dueDate = String(profileData.dueDate).trim();
     if (profileData.admissionDate !== undefined) student.admissionDate = String(profileData.admissionDate).trim();
     if (profileData.monthlyFee !== undefined) student.monthlyFee = Number(profileData.monthlyFee) || 0;
@@ -2165,11 +2165,9 @@ function apiRecordStudentPayment(studentId, amount, mode, reference) {
   const data = dbLoadAll() || apiGetInitialData();
   const student = (data.students || []).find(function (item) { return String(item.id) === String(studentId); });
   if (!student || student.status === 'Inactive' || student.status === 'Blocked') return { success: false, error: 'Student is not active.' };
-  const balance = Math.max(0, Number(student.totalFee || 0) - Number(student.paidFee || 0));
-  if (paymentAmount > balance) return { success: false, error: 'Payment exceeds the outstanding balance.' };
   var oldPaid = Number(student.paidFee || 0);
-  var oldBalance = Math.max(0, Number(student.totalFee || 0) - oldPaid);
   student.paidFee = oldPaid + paymentAmount;
+  student.totalFee = Math.max(Number(student.totalFee || 0), student.paidFee);
   if (!Array.isArray(student.paymentHistory)) student.paymentHistory = [];
   student.paymentHistory.unshift({
     id: 'pay_' + Date.now(), amount: paymentAmount, mode: String(mode || 'UPI'),
@@ -2178,19 +2176,11 @@ function apiRecordStudentPayment(studentId, amount, mode, reference) {
   var monthlyFee = Number(student.monthlyFee || 0);
   if (monthlyFee > 0 && /^\d{4}-\d{2}-\d{2}$/.test(String(student.dueDate || ''))) {
     var unappliedCyclePayment = Number(student.monthlyPaidThisCycle || 0) + paymentAmount;
-    var remainingCycleBalance = oldBalance;
-    while (remainingCycleBalance > 0) {
-      var cycleTarget = Math.min(monthlyFee, remainingCycleBalance);
-      if (unappliedCyclePayment < cycleTarget) break;
-      unappliedCyclePayment -= cycleTarget;
-      remainingCycleBalance -= cycleTarget;
+    var monthsToAdvance = Math.floor(unappliedCyclePayment / monthlyFee);
+    for (var m = 0; m < monthsToAdvance; m++) {
       student.dueDate = nextMonthlyDueDateFromAnchor_(student.admissionDate, student.dueDate);
     }
-    student.monthlyPaidThisCycle = remainingCycleBalance > 0 ? unappliedCyclePayment : 0;
-  }
-  if (student.paidFee >= Number(student.totalFee || 0)) {
-    student.paidFee = Number(student.totalFee || 0);
-    student.dueDate = 'Paid';
+    student.monthlyPaidThisCycle = unappliedCyclePayment % monthlyFee;
   }
   dbSaveAll(data);
   try {

@@ -2254,14 +2254,14 @@
                                 <input type="text" id="new-stu-phone" required placeholder="+91 98765 11223" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Total Course Fee (₹) *</label>
-                                <input type="number" id="new-stu-fee" required value="48000" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Total Fees Paid (₹)</label>
+                                <input type="number" id="new-stu-fee" value="0" readonly disabled class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold cursor-not-allowed select-none" title="Non-editable even for admin. Automatically initialized to ₹0 on admission and updates as fee payments are recorded.">
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">Monthly Fee (₹) *</label>
-                                <input type="number" id="new-stu-monthly-fee" required min="1" value="4000" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
+                                <input type="number" id="new-stu-monthly-fee" required min="1" value="1000" placeholder="e.g. 1000" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl">
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">Admission Date *</label>
@@ -2356,8 +2356,7 @@
             const name = document.getElementById('new-stu-name').value.trim();
             const parentName = document.getElementById('new-stu-parent').value.trim();
             const phone = document.getElementById('new-stu-phone').value.trim();
-            const totalFee = parseInt(document.getElementById('new-stu-fee').value, 10) || 48000;
-            const monthlyFee = parseInt(document.getElementById('new-stu-monthly-fee').value, 10) || 4000;
+            const monthlyFee = parseInt(document.getElementById('new-stu-monthly-fee').value, 10) || 1000;
             const admissionDate = document.getElementById('new-stu-admission-date').value;
             const dueDate = nextMonthlyDueDate(admissionDate);
 
@@ -2367,7 +2366,7 @@
                 name,
                 parentName,
                 phone,
-                totalFee,
+                totalFee: 0,
                 paidFee: 0,
                 monthlyFee,
                 admissionDate,
@@ -2839,20 +2838,16 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Total Course Fee (₹) *</label>
-                            <input type="number" id="edit-stu-totalfee" value="${Number(stu.totalFee) || 0}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Total Fees Paid (₹)</label>
+                            <input type="number" id="edit-stu-paidfee" value="${Number(stu.paidFee) || 0}" readonly disabled class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold cursor-not-allowed select-none" title="Non-editable even for admin. Automatically accumulates as fee payments are recorded.">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Paid Fee (₹) *</label>
-                            <input type="number" id="edit-stu-paidfee" value="${Number(stu.paidFee) || 0}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Monthly Fee (₹) *</label>
+                            <input type="number" min="0" id="edit-stu-monthly-fee" value="${Number(stu.monthlyFee) || 0}" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Fee Due Date *</label>
                             <input type="date" id="edit-stu-duedate" value="${/^\d{4}-\d{2}-\d{2}$/.test(String(stu.dueDate || '')) ? escapeAttr(stu.dueDate) : ''}" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Monthly Fee (₹)</label>
-                            <input type="number" min="0" id="edit-stu-monthly-fee" value="${Number(stu.monthlyFee) || 0}" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Admission Date</label>
@@ -2894,8 +2889,7 @@
             const parentName = document.getElementById('edit-stu-parent').value.trim();
             const batchId = document.getElementById('edit-stu-batch').value;
             const status = document.getElementById('edit-stu-status').value;
-            const totalFee = parseInt(document.getElementById('edit-stu-totalfee').value, 10) || 0;
-            const paidFee = parseInt(document.getElementById('edit-stu-paidfee').value, 10) || 0;
+            const paidFee = Number(stu.paidFee) || 0; // strictly non-editable even for admin, records accumulated payments
             const dueDate = document.getElementById('edit-stu-duedate').value.trim();
             const monthlyFee = parseInt(document.getElementById('edit-stu-monthly-fee').value, 10) || 0;
             const admissionDate = document.getElementById('edit-stu-admission-date').value;
@@ -2908,8 +2902,8 @@
             stu.phone = phone;
             stu.parentName = parentName;
             stu.status = status;
-            stu.totalFee = totalFee;
             stu.paidFee = paidFee;
+            stu.totalFee = Math.max(Number(stu.totalFee || 0), paidFee);
             stu.dueDate = dueDate || stu.dueDate;
             stu.monthlyFee = monthlyFee;
             stu.admissionDate = admissionDate || stu.admissionDate || '';
@@ -2946,7 +2940,7 @@
                         showToast(`Student ${name} (${roll}) updated in the database.`, 'success');
                     })
                     .apiUpdateStudentProfile(studentId, {
-                        name, roll, phone, parentName, batchId, status, totalFee, paidFee, dueDate, monthlyFee, admissionDate, password, photo
+                        name, roll, phone, parentName, batchId, status, totalFee: stu.totalFee, paidFee, dueDate, monthlyFee, admissionDate, password, photo
                     });
             } else {
                 showToast(`Student ${name} updated successfully!`, 'success');
@@ -3175,11 +3169,13 @@
          ********************************************************************/
         function renderFeesView() {
             const activeStudents = (state.students || []).filter(s => s.status !== 'Inactive');
-            const totalExpected = activeStudents.reduce((sum, s) => sum + s.totalFee, 0);
-            const totalCollected = activeStudents.reduce((sum, s) => sum + s.paidFee, 0);
-            const totalPending = totalExpected - totalCollected;
-            const pendingCount = activeStudents.filter(s => s.paidFee < s.totalFee).length;
-            const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+            const todayIso = localTodayIso();
+            const totalCollected = activeStudents.reduce((sum, s) => sum + (Number(s.paidFee) || 0), 0);
+            const totalMonthly = activeStudents.reduce((sum, s) => sum + (Number(s.monthlyFee) || 1000), 0);
+            const pendingStudents = activeStudents.filter(s => !s.dueDate || (s.dueDate !== 'Paid' && s.dueDate <= todayIso));
+            const pendingCount = pendingStudents.length;
+            const upToDateCount = activeStudents.length - pendingCount;
+            const collectionRate = activeStudents.length > 0 ? Math.round((upToDateCount / activeStudents.length) * 100) : 100;
 
             return `
                 <div class="fade-in space-y-6">
@@ -3204,19 +3200,19 @@
                     <!-- Financial Summary Cards -->
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                         <div class="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200">
-                            <p class="text-[10px] sm:text-xs font-semibold text-slate-500">Total Course Fees</p>
-                            <p class="text-base sm:text-2xl font-bold text-slate-900 mt-1 font-heading">₹${totalExpected.toLocaleString('en-IN')}</p>
+                            <p class="text-[10px] sm:text-xs font-semibold text-slate-500">Monthly Expected Fees</p>
+                            <p class="text-base sm:text-2xl font-bold text-slate-900 mt-1 font-heading">₹${totalMonthly.toLocaleString('en-IN')}</p>
                             <p class="text-[9px] sm:text-xs text-slate-500 mt-1">${activeStudents.length} Active Enrolled</p>
                         </div>
                         <div class="bg-white p-3 sm:p-5 rounded-2xl border border-emerald-200 bg-emerald-50/20">
-                            <p class="text-[10px] sm:text-xs font-semibold text-emerald-600">Total Collected</p>
+                            <p class="text-[10px] sm:text-xs font-semibold text-emerald-600">Total Fees Collected</p>
                             <p class="text-base sm:text-2xl font-bold text-emerald-600 mt-1 font-heading">₹${totalCollected.toLocaleString('en-IN')}</p>
-                            <p class="text-[9px] sm:text-xs text-emerald-700 font-semibold mt-1">${collectionRate}% Collected</p>
+                            <p class="text-[9px] sm:text-xs text-emerald-700 font-semibold mt-1">Cumulative till date</p>
                         </div>
                         <div class="bg-white p-3 sm:p-5 rounded-2xl border border-rose-200 bg-rose-50/20">
-                            <p class="text-[10px] sm:text-xs font-semibold text-rose-600">Total Pending Dues</p>
-                            <p class="text-base sm:text-2xl font-bold text-rose-600 mt-1 font-heading">₹${totalPending.toLocaleString('en-IN')}</p>
-                            <p class="text-[9px] sm:text-xs text-rose-700 font-semibold mt-1">${pendingCount} Students Pending</p>
+                            <p class="text-[10px] sm:text-xs font-semibold text-rose-600">Fee Due Students</p>
+                            <p class="text-base sm:text-2xl font-bold text-rose-600 mt-1 font-heading">${pendingCount}</p>
+                            <p class="text-[9px] sm:text-xs text-rose-700 font-semibold mt-1">${upToDateCount} Up to Date</p>
                         </div>
                         <div class="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between">
                             <div>
@@ -3225,7 +3221,7 @@
                                     <div class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-3 rounded-full" style="width: ${collectionRate}%"></div>
                                 </div>
                             </div>
-                            <p class="text-[9px] sm:text-[11px] text-slate-400 mt-2">Target: 100% by month end</p>
+                            <p class="text-[9px] sm:text-[11px] text-slate-400 mt-2">${collectionRate}% on schedule</p>
                         </div>
                     </div>
 
@@ -3234,7 +3230,7 @@
                         <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
                                 <h3 class="text-sm font-bold text-slate-900 font-heading">Student Fee Ledger & Automated Reminders${shouldShowReqLabels() ? ' (Req #5)' : ''}</h3>
-                                <p class="text-xs text-slate-500">Click WhatsApp or SMS reminder buttons to notify parent immediately</p>
+                                <p class="text-xs text-slate-500">Total fees paid accumulate dynamically on payment. Remind parents via WhatsApp or SMS in 1 click.</p>
                             </div>
                             <button onclick="exportFeesToCSV()" class="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto">
                                 <i class="fa-solid fa-file-excel text-emerald-600"></i> Export to CSV
@@ -3246,21 +3242,21 @@
                                     <tr class="bg-slate-50 text-xs font-semibold text-slate-600 border-b border-slate-200">
                                         <th class="py-3.5 px-4">Student & Roll</th>
                                         <th class="hidden sm:table-cell py-3.5 px-4">Parent / Contact</th>
-                                        <th class="py-3.5 px-4">Total Fee</th>
-                                        <th class="hidden sm:table-cell py-3.5 px-4">Paid</th>
-                                        <th class="hidden sm:table-cell py-3.5 px-4">Pending Balance</th>
-                                        <th class="hidden sm:table-cell py-3.5 px-4 min-w-[160px] whitespace-nowrap">Status / Due Date</th>
-                                        <th class="py-3.5 px-3 sm:px-4 text-right"><span class="hidden sm:inline">Reminder Actions${shouldShowReqLabels() ? ' (Req #5)' : ''}</span></th>
+                                        <th class="py-3.5 px-4">Total Paid (₹)</th>
+                                        <th class="hidden sm:table-cell py-3.5 px-4">Monthly Fee (₹)</th>
+                                        <th class="hidden sm:table-cell py-3.5 px-4 min-w-[160px] whitespace-nowrap">Status / Fee Due Date</th>
+                                        <th class="py-3.5 px-3 sm:px-4 text-right"><span class="hidden sm:inline">Actions${shouldShowReqLabels() ? ' (Req #5)' : ''}</span></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-xs">
                                     ${activeStudents.length === 0 ? `
                                         <tr>
-                                            <td colspan="7" class="py-8 text-center text-slate-400">No active students enrolled.</td>
+                                            <td colspan="6" class="py-8 text-center text-slate-400">No active students enrolled.</td>
                                         </tr>
                                     ` : activeStudents.map(stu => {
-                                        const balance = stu.totalFee - stu.paidFee;
-                                        const isPaid = balance <= 0;
+                                        const isDue = !stu.dueDate || (stu.dueDate !== 'Paid' && stu.dueDate <= todayIso);
+                                        const paid = Number(stu.paidFee) || 0;
+                                        const monthly = Number(stu.monthlyFee) || 1000;
                                         return `
                                             <tr class="hover:bg-slate-50/80 transition">
                                                 <td class="py-3.5 px-4">
@@ -3282,23 +3278,20 @@
                                                     <p class="font-medium text-slate-700">${stu.parentName}</p>
                                                     <p class="text-[11px] text-slate-400">${stu.phone}</p>
                                                 </td>
-                                                <td class="py-3.5 px-2 sm:px-4 font-semibold text-slate-700 whitespace-nowrap">₹${stu.totalFee.toLocaleString('en-IN')}</td>
-                                                <td class="hidden sm:table-cell py-3.5 px-4 font-semibold text-emerald-600">₹${stu.paidFee.toLocaleString('en-IN')}</td>
-                                                <td class="hidden sm:table-cell py-3.5 px-4 font-bold ${isPaid ? 'text-slate-400' : 'text-rose-600'}">
-                                                    ₹${balance.toLocaleString('en-IN')}
-                                                </td>
+                                                <td class="py-3.5 px-2 sm:px-4 font-bold text-emerald-600 whitespace-nowrap">₹${paid.toLocaleString('en-IN')}</td>
+                                                <td class="hidden sm:table-cell py-3.5 px-4 font-semibold text-slate-700">₹${monthly.toLocaleString('en-IN')}</td>
                                                 <td class="hidden sm:table-cell py-3.5 px-4 min-w-[160px] whitespace-nowrap">
-                                                    ${isPaid ? `
-                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
-                                                            <i class="fa-solid fa-circle-check mr-1"></i>Fully Paid
-                                                        </span>
-                                                    ` : `
+                                                    ${isDue ? `
                                                         <div>
                                                             <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
-                                                                Due: ${stu.dueDate}
+                                                                Due: ${stu.dueDate || 'Immediate'}
                                                             </span>
-                                                            <p class="text-[10px] text-slate-400 mt-1">Last reminded: ${stu.lastReminder}</p>
+                                                            <p class="text-[10px] text-slate-400 mt-1">Last reminded: ${stu.lastReminder || 'Never'}</p>
                                                         </div>
+                                                    ` : `
+                                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
+                                                            <i class="fa-solid fa-circle-check mr-1"></i>Up to date (${stu.dueDate || 'Paid'})
+                                                        </span>
                                                     `}
                                                 </td>
                                                 <td class="py-2 sm:py-3.5 px-2 sm:px-4 text-right">
@@ -3309,7 +3302,7 @@
                                                                 <span class="hidden sm:inline">Edit</span>
                                                             </button>
                                                         ` : ''}
-                                                        ${!isPaid ? `
+                                                        ${isDue ? `
                                                             <!-- 1-Click WhatsApp Reminder -->
                                                             <button type="button" onclick="sendWhatsAppFeeReminder('${stu.id}')" title="Send WhatsApp Reminder Message" aria-label="Send WhatsApp reminder" class="w-8 h-8 sm:w-auto sm:px-3 inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg text-base sm:text-xs font-bold shadow-2xs transition focus:outline-none focus:ring-2 focus:ring-emerald-400">
                                                                 <i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span class="hidden sm:inline">WhatsApp</span>
@@ -3318,15 +3311,15 @@
                                                             <button type="button" onclick="sendSingleFeeReminder('${stu.id}')" title="Send SMS / App Notification" aria-label="Send reminder notification" class="w-9 h-9 sm:w-auto sm:px-3 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-sm sm:text-xs font-bold shadow-2xs transition focus:outline-none focus:ring-2 focus:ring-amber-400">
                                                                 <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="hidden sm:inline">Reminder</span>
                                                             </button>
-                                                            <!-- Record Payment -->
-                                                            <button type="button" onclick="openRecordPaymentModal('${stu.id}')" title="Record Partial or Full Payment" aria-label="Record payment" class="w-9 h-9 sm:w-auto sm:px-3 inline-flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm sm:text-xs font-semibold border border-indigo-200 transition focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                                                <i class="fa-solid fa-indian-rupee-sign" aria-hidden="true"></i><span class="hidden sm:inline">Payment</span>
-                                                            </button>
-                                                        ` : `
-                                                            <button type="button" onclick="printFeeReceipt('${stu.id}')" title="Print fee receipt" aria-label="Print fee receipt" class="w-8 h-8 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm sm:text-xs transition inline-flex items-center justify-center gap-1">
-                                                                <i class="fa-solid fa-receipt text-indigo-600"></i><span class="hidden sm:inline">Receipt</span>
-                                                            </button>
-                                                        `}
+                                                        ` : ''}
+                                                        <!-- Record Payment -->
+                                                        <button type="button" onclick="openRecordPaymentModal('${stu.id}')" title="Record Monthly or Advance Payment" aria-label="Record payment" class="w-9 h-9 sm:w-auto sm:px-3 inline-flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm sm:text-xs font-semibold border border-indigo-200 transition focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                            <i class="fa-solid fa-indian-rupee-sign" aria-hidden="true"></i><span class="hidden sm:inline">Payment</span>
+                                                        </button>
+                                                        <!-- Receipt -->
+                                                        <button type="button" onclick="printFeeReceipt('${stu.id}')" title="Print fee receipt" aria-label="Print fee receipt" class="w-8 h-8 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm sm:text-xs transition inline-flex items-center justify-center gap-1">
+                                                            <i class="fa-solid fa-receipt text-indigo-600"></i><span class="hidden sm:inline">Receipt</span>
+                                                        </button>
                                                         <button type="button" onclick="toggleFeeRowDetails('${stu.id}', this)" aria-label="Show more fee details for ${escapeHtml(stu.name)}" aria-expanded="false" aria-controls="fee-details-${stu.id}" class="sm:hidden w-8 h-8 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition" title="Show all fee details">
                                                             <i class="fa-solid fa-plus" aria-hidden="true"></i>
                                                         </button>
@@ -3334,12 +3327,12 @@
                                                 </td>
                                             </tr>
                                             <tr id="fee-details-${stu.id}" class="hidden sm:hidden bg-slate-50/70">
-                                                <td colspan="7" class="px-3 pb-3 pt-1">
+                                                <td colspan="6" class="px-3 pb-3 pt-1">
                                                     <div class="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left">
                                                         <div class="min-w-0"><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Parent / Contact</p><p class="mt-0.5 font-semibold text-slate-700 break-words">${escapeHtml(stu.parentName || '—')}</p><p class="text-[11px] text-slate-500 break-all">${escapeHtml(stu.phone || '—')}</p></div>
-                                                        <div><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Paid</p><p class="mt-0.5 font-bold text-emerald-600">₹${stu.paidFee.toLocaleString('en-IN')}</p></div>
-                                                        <div><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pending Balance</p><p class="mt-0.5 font-bold ${isPaid ? 'text-slate-400' : 'text-rose-600'}">₹${balance.toLocaleString('en-IN')}</p></div>
-                                                        <div><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Status / Due Date</p>${isPaid ? `<p class="mt-0.5 font-semibold text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-circle-check mr-1"></i>Fully Paid</p>` : `<p class="mt-0.5 font-semibold text-amber-800 whitespace-nowrap">Due: ${escapeHtml(stu.dueDate || '—')}</p><p class="text-[10px] text-slate-400 mt-0.5">Last reminded: ${escapeHtml(stu.lastReminder || '—')}</p>`}</div>
+                                                        <div><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total Fees Paid</p><p class="mt-0.5 font-bold text-emerald-600">₹${paid.toLocaleString('en-IN')}</p></div>
+                                                        <div><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Monthly Fee</p><p class="mt-0.5 font-bold text-slate-700">₹${monthly.toLocaleString('en-IN')}</p></div>
+                                                        <div><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Status / Due Date</p>${isDue ? `<p class="mt-0.5 font-semibold text-amber-800 whitespace-nowrap">Due: ${escapeHtml(stu.dueDate || '—')}</p><p class="text-[10px] text-slate-400 mt-0.5">Last reminded: ${escapeHtml(stu.lastReminder || '—')}</p>` : `<p class="mt-0.5 font-semibold text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-circle-check mr-1"></i>Up to date (${escapeHtml(stu.dueDate || 'Paid')})</p>`}</div>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -3367,8 +3360,10 @@
         function addFeeReminderNotification(studentId, channel = 'App Notification') {
             const stu = state.students.find(s => s.id === studentId);
             if (!stu) return;
-            const balance = stu.totalFee - stu.paidFee;
-            if (balance <= 0) return;
+            const todayIso = localTodayIso();
+            const isDue = !stu.dueDate || (stu.dueDate !== 'Paid' && stu.dueDate <= todayIso);
+            if (!isDue) return;
+            const monthly = Number(stu.monthlyFee || 0) || 1000;
 
             if (!state.notifications) state.notifications = [];
 
@@ -3377,8 +3372,8 @@
 
             const newNotif = {
                 id: 'notif_fee_' + stu.id + '_' + Date.now(),
-                title: `Fee Payment Reminder: ₹${balance.toLocaleString('en-IN')}`,
-                message: `Dear ${stu.name} (${stu.roll}), your tuition fee installment balance of ₹${balance.toLocaleString('en-IN')} is due on ${stu.dueDate || 'this week'}. Sent via ${channel}. Please clear via UPI: ${state.settings.upiId || 'divineclasses@upi'}.`,
+                title: `Fee Due: ₹${monthly.toLocaleString('en-IN')}`,
+                message: `Dear ${stu.name} (${stu.roll}), your monthly tuition fee of ₹${monthly.toLocaleString('en-IN')} is due on ${stu.dueDate || 'this month'}. Sent via ${channel}. Please clear via UPI: ${(state.settings && state.settings.upiId) || 'divineclasses@upi'}.`,
                 time: 'Just now',
                 timestamp: Date.now(),
                 read: false,
@@ -3392,7 +3387,7 @@
                 targetRoll: stu.roll,
                 targetRole: 'student',
                 studentName: stu.name,
-                feeBalance: balance
+                feeBalance: monthly
             };
 
             state.notifications.unshift(newNotif);
@@ -3427,8 +3422,10 @@
                 }
             }
 
-            const balance = stu.totalFee - stu.paidFee;
-            const isPaid = balance <= 0;
+            const todayIso = localTodayIso();
+            const monthly = Number(stu.monthlyFee || 0) || 1000;
+            const paid = Number(stu.paidFee || 0);
+            const isDue = !stu.dueDate || (stu.dueDate !== 'Paid' && stu.dueDate <= todayIso);
             const upiId = (state.settings && state.settings.upiId) ? state.settings.upiId : 'divineclasses@upi';
 
             const modalHtml = `
@@ -3448,27 +3445,27 @@
                 <div class="py-4 space-y-4 text-xs">
                     <div class="grid grid-cols-3 gap-2.5 text-center">
                         <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                            <p class="text-xs text-slate-500 font-semibold">Total Course Fee</p>
-                            <p class="text-sm font-bold text-slate-900 mt-1">₹${stu.totalFee.toLocaleString('en-IN')}</p>
+                            <p class="text-xs text-slate-500 font-semibold">Monthly Fee</p>
+                            <p class="text-sm font-bold text-slate-900 mt-1">₹${monthly.toLocaleString('en-IN')}</p>
                         </div>
                         <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                            <p class="text-xs text-emerald-700 font-semibold">Paid Amount</p>
-                            <p class="text-sm font-bold text-emerald-700 mt-1">₹${stu.paidFee.toLocaleString('en-IN')}</p>
+                            <p class="text-xs text-emerald-700 font-semibold">Total Fees Paid</p>
+                            <p class="text-sm font-bold text-emerald-700 mt-1">₹${paid.toLocaleString('en-IN')}</p>
                         </div>
-                        <div class="p-3 rounded-xl ${isPaid ? 'bg-slate-50 border-slate-200' : 'bg-rose-50 border-rose-200'} border">
-                            <p class="text-xs ${isPaid ? 'text-slate-500' : 'text-rose-700'} font-semibold">Outstanding</p>
-                            <p class="text-sm font-bold ${isPaid ? 'text-slate-700' : 'text-rose-700'} mt-1">₹${balance.toLocaleString('en-IN')}</p>
+                        <div class="p-3 rounded-xl ${isDue ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border">
+                            <p class="text-xs ${isDue ? 'text-amber-700' : 'text-emerald-700'} font-semibold">Next Due Date</p>
+                            <p class="text-sm font-bold ${isDue ? 'text-amber-800' : 'text-emerald-700'} mt-1">${stu.dueDate || 'Paid'}</p>
                         </div>
                     </div>
 
-                    ${!isPaid ? `
+                    ${isDue ? `
                         <div class="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200 space-y-2">
                             <div class="flex items-center gap-2 text-amber-800 font-bold">
                                 <i class="fa-solid fa-bell animate-pulse text-amber-600"></i>
                                 <span>Fee Due Date: ${stu.dueDate || 'Immediate'}</span>
                             </div>
                             <p class="text-[11px] text-amber-900 leading-relaxed">
-                                Please clear the pending fee balance of <strong>₹${balance.toLocaleString('en-IN')}</strong> to maintain active batch enrollment and test reports.
+                                Please clear the pending monthly tuition fee of <strong>₹${monthly.toLocaleString('en-IN')}</strong> to maintain active batch enrollment and test reports.
                             </p>
                             <div class="flex items-center justify-between p-2.5 bg-white rounded-lg border border-amber-200 mt-2">
                                 <div>
@@ -3483,8 +3480,8 @@
                     ` : `
                         <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center text-emerald-800">
                             <i class="fa-solid fa-circle-check text-xl mb-1 text-emerald-600"></i>
-                            <p class="font-bold">Tuition Fees Fully Paid!</p>
-                            <p class="text-[11px] text-emerald-600 mt-0.5">Thank you for keeping your account in good standing.</p>
+                            <p class="font-bold">Tuition Fees Up to Date!</p>
+                            <p class="text-[11px] text-emerald-600 mt-0.5">Next monthly fee is due on ${stu.dueDate || 'Paid'}. Thank you!</p>
                         </div>
                     `}
 
@@ -3505,7 +3502,7 @@
         function sendWhatsAppFeeReminder(studentId) {
             const stu = state.students.find(s => s.id === studentId);
             if (!stu) return;
-            const balance = stu.totalFee - stu.paidFee;
+            const monthly = Number(stu.monthlyFee || 0) || 1000;
             stu.lastReminder = 'Just now (WhatsApp)';
             addFeeReminderNotification(studentId, 'WhatsApp & Notification');
             saveStateLocally();
@@ -3516,7 +3513,7 @@
             const phoneParam = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
 
             const text = encodeURIComponent(
-                `Dear ${stu.parentName},\nGreetings from *Divine Classes*.\nThis is a gentle reminder regarding ${stu.name}'s (Roll: ${stu.roll}) pending tuition fee balance of *₹${balance.toLocaleString('en-IN')}* due on ${stu.dueDate}.\nKindly clear the dues at your earliest convenience to ensure uninterrupted class materials & test series.\nUPI ID: ${state.settings.upiId}\nThank you,\nAdministration, Divine Classes`
+                `Dear ${stu.parentName},\nGreetings from *Divine Classes*.\nThis is a gentle reminder regarding ${stu.name}'s (Roll: ${stu.roll}) monthly tuition fee of *₹${monthly.toLocaleString('en-IN')}* due on ${stu.dueDate || 'this month'}.\nKindly clear the dues at your earliest convenience to ensure uninterrupted class materials & test series.\nUPI ID: ${(state.settings && state.settings.upiId) || 'divineclasses@upi'}\nThank you,\nAdministration, Divine Classes`
             );
 
             const waUrl = 'https://wa.me/' + phoneParam + '?text=' + text;
@@ -3527,7 +3524,6 @@
         function sendSingleFeeReminder(studentId) {
             const stu = state.students.find(s => s.id === studentId);
             if (!stu) return;
-            const balance = stu.totalFee - stu.paidFee;
             stu.lastReminder = 'Just now (In-App & Bell)';
             addFeeReminderNotification(studentId, 'In-App & Bell Notification');
             saveStateLocally();
@@ -3536,9 +3532,10 @@
         }
 
         function sendBulkFeeReminders() {
-            const pending = (state.students || []).filter(s => s.status !== 'Inactive' && s.paidFee < s.totalFee);
+            const todayIso = localTodayIso();
+            const pending = (state.students || []).filter(s => s.status !== 'Inactive' && (!s.dueDate || (s.dueDate !== 'Paid' && s.dueDate <= todayIso)));
             if (pending.length === 0) {
-                showToast('All students have paid their fees in full!', 'info');
+                showToast('All active students have fees up to date!', 'info');
                 return;
             }
             pending.forEach(s => {
@@ -3552,20 +3549,23 @@
 
         function openRecordPaymentModal(studentId) {
             const stu = state.students.find(s => s.id === studentId);
-            const balance = stu.totalFee - stu.paidFee;
+            if (!stu) return;
+            const monthly = Number(stu.monthlyFee) || 1000;
+            const currentPaid = Number(stu.paidFee) || 0;
 
             const modal = `
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="text-base font-bold text-slate-900 font-heading">Record Fee Payment</h3>
-                        <p class="text-xs text-slate-500">${stu.name} (${stu.roll}) • Outstanding: ₹${balance.toLocaleString('en-IN')}</p>
+                        <p class="text-xs text-slate-500">${stu.name} (${stu.roll}) • Monthly: ₹${monthly.toLocaleString('en-IN')} • Current Total Paid: ₹${currentPaid.toLocaleString('en-IN')}</p>
                     </div>
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <form onsubmit="handleRecordPayment(event, '${stu.id}')" class="space-y-4 mt-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Amount (₹) *</label>
-                        <input type="number" id="pay-amount" required max="${balance}" value="${balance}" min="1" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                        <input type="number" id="pay-amount" required value="${monthly}" min="1" step="100" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold">
+                        <p class="text-[10px] text-slate-400 mt-1">E.g., ₹${monthly} for 1 month, ₹${monthly * 12} for 12 months. Total Paid updates automatically.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Mode *</label>
@@ -3596,9 +3596,8 @@
             const amount = Number(document.getElementById('pay-amount').value) || 0;
             const mode = document.getElementById('pay-mode').value;
             const ref = document.getElementById('pay-ref').value.trim() || 'N/A';
-            const balance = Math.max(0, Number(stu.totalFee || 0) - Number(stu.paidFee || 0));
-            if (!Number.isFinite(amount) || amount <= 0 || amount > balance) {
-                showToast(amount > balance ? 'Payment cannot exceed the outstanding balance.' : 'Enter a valid payment amount.', 'error');
+            if (!Number.isFinite(amount) || amount <= 0) {
+                showToast('Enter a valid payment amount.', 'error');
                 return;
             }
             const button = document.getElementById('btn-record-payment');
@@ -3610,6 +3609,7 @@
                     return;
                 }
                 stu.paidFee = Number(result.paidFee);
+                stu.totalFee = Math.max(Number(stu.totalFee || 0), stu.paidFee);
                 stu.dueDate = result.dueDate || stu.dueDate;
                 if (!Array.isArray(stu.paymentHistory)) stu.paymentHistory = [];
                 if (result.payment) stu.paymentHistory.unshift(result.payment);
@@ -3619,7 +3619,7 @@
             }
                 closeModal();
                 renderMainContent();
-                showToast(`₹${amount.toLocaleString('en-IN')} payment recorded for ${stu.name}!`, 'success');
+                showToast(`₹${amount.toLocaleString('en-IN')} payment recorded for ${stu.name}! Total Paid: ₹${stu.paidFee.toLocaleString('en-IN')}`, 'success');
                 printFeeReceipt(stu.id, amount, mode, ref);
             };
             if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -3629,9 +3629,20 @@
                 }).apiRecordStudentPayment(studentId, amount, mode, ref);
             } else {
                 stu.paidFee = Number(stu.paidFee || 0) + amount;
+                stu.totalFee = Math.max(Number(stu.totalFee || 0), stu.paidFee);
                 if (!Array.isArray(stu.paymentHistory)) stu.paymentHistory = [];
                 stu.paymentHistory.unshift({ id: 'pay_' + Date.now(), amount, mode, reference: ref, paidAt: new Date().toISOString() });
-                if (stu.paidFee >= Number(stu.totalFee || 0)) { stu.paidFee = Number(stu.totalFee || 0); stu.dueDate = 'Paid'; }
+                const monthlyFee = Number(stu.monthlyFee || 0);
+                if (monthlyFee > 0 && /^\d{4}-\d{2}-\d{2}$/.test(String(stu.dueDate || ''))) {
+                    const unapplied = (Number(stu.monthlyPaidThisCycle || 0) + amount);
+                    const monthsToAdvance = Math.floor(unapplied / monthlyFee);
+                    let currDate = stu.dueDate;
+                    for (let m = 0; m < monthsToAdvance; m++) {
+                        currDate = nextMonthlyDueDate(currDate);
+                    }
+                    stu.dueDate = currDate;
+                    stu.monthlyPaidThisCycle = unapplied % monthlyFee;
+                }
                 finish({ success: true, paidFee: stu.paidFee, dueDate: stu.dueDate, payment: stu.paymentHistory[0] });
             }
         }
@@ -3671,16 +3682,20 @@
                     </div>
                     <div class="py-4 border-b border-slate-200 space-y-2 text-xs">
                         <div class="flex justify-between">
-                            <span class="text-slate-600">Total Course Fee</span>
-                            <span class="font-bold">₹${stu.totalFee.toLocaleString('en-IN')}</span>
+                            <span class="text-slate-600">Monthly Tuition Fee</span>
+                            <span class="font-bold">₹${(Number(stu.monthlyFee) || 1000).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div class="flex justify-between text-indigo-700 font-bold">
+                            <span>Payment Recorded / Received</span>
+                            <span>₹${Number(lastPaidAmount || stu.monthlyFee || 0).toLocaleString('en-IN')}</span>
                         </div>
                         <div class="flex justify-between text-emerald-700 font-bold">
-                            <span>Total Paid till Date</span>
-                            <span>₹${stu.paidFee.toLocaleString('en-IN')}</span>
+                            <span>Total Fees Paid till Date</span>
+                            <span>₹${(Number(stu.paidFee) || 0).toLocaleString('en-IN')}</span>
                         </div>
-                        <div class="flex justify-between text-rose-600 font-bold">
-                            <span>Balance Due</span>
-                            <span>₹${(stu.totalFee - stu.paidFee).toLocaleString('en-IN')}</span>
+                        <div class="flex justify-between text-slate-700 font-medium">
+                            <span>Next Fee Due Date</span>
+                            <span class="font-bold text-amber-700">${stu.dueDate || 'Paid'}</span>
                         </div>
                         <div class="flex justify-between text-[11px] text-slate-500 pt-1">
                             <span>Payment Mode / Ref:</span>
@@ -3712,19 +3727,23 @@
         }
 
         function exportFeesToCSV() {
-            const headers = ['Roll No', 'Student Name', 'Parent Name', 'Phone', 'Total Fee', 'Paid Fee', 'Balance Due', 'Status', 'Last Reminder'];
+            const headers = ['Roll No', 'Student Name', 'Parent Name', 'Phone', 'Total Fees Paid', 'Monthly Fee', 'Fee Due Date', 'Status', 'Last Reminder'];
             const activeStudents = (state.students || []).filter(s => s.status !== 'Inactive');
-            const rows = activeStudents.map(s => [
-                s.roll,
-                `"${s.name}"`,
-                `"${s.parentName}"`,
-                `"${s.phone}"`,
-                s.totalFee,
-                s.paidFee,
-                s.totalFee - s.paidFee,
-                s.paidFee >= s.totalFee ? 'Fully Paid' : s.dueDate,
-                `"${s.lastReminder}"`
-            ]);
+            const todayIso = localTodayIso();
+            const rows = activeStudents.map(s => {
+                const isDue = !s.dueDate || (s.dueDate !== 'Paid' && s.dueDate <= todayIso);
+                return [
+                    s.roll,
+                    `"${s.name}"`,
+                    `"${s.parentName}"`,
+                    `"${s.phone}"`,
+                    Number(s.paidFee) || 0,
+                    Number(s.monthlyFee) || 1000,
+                    `"${s.dueDate || 'Paid'}"`,
+                    isDue ? 'Due' : 'Up to date',
+                    `"${s.lastReminder || 'Never'}"`
+                ];
+            });
 
             const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
             const encodedUri = encodeURI(csvContent);
