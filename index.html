@@ -12163,6 +12163,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             const isAndroid = /Android/i.test(ua);
             const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
             const browserName = isEdge ? 'Microsoft Edge' : (isChrome ? 'Google Chrome' : 'Your Browser');
+            const isGoogleAppsScriptIframe = window.self !== window.top || window.location.hostname.includes('googleusercontent.com') || window.location.hostname.includes('script.google.com');
 
             const html = `
                 <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100 max-w-lg">
@@ -12171,14 +12172,35 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             <i class="fa-solid fa-microphone-slash"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold">Microphone Access is Blocked</h3>
+                            <h3 class="text-base font-bold">Microphone Status & Guidance</h3>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
-                                Detected: <span class="font-semibold text-indigo-600 dark:text-indigo-400">${isAndroid ? '📱 Android Mobile APK' : (isMac ? '🍎 macOS (' + browserName + ')' : browserName)}</span>
+                                Platform: <span class="font-semibold text-indigo-600 dark:text-indigo-400">${isAndroid ? '📱 Android Mobile APK' : (isMac ? '🍎 macOS (' + browserName + ')' : browserName)}</span>
                             </p>
                         </div>
                     </div>
 
-                    ${isAndroid ? `
+                    ${isGoogleAppsScriptIframe ? `
+                    <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2.5 text-xs leading-relaxed">
+                        <div class="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>Google Apps Script Iframe Security Note</span>
+                        </div>
+                        <p class="text-slate-700 dark:text-slate-300">
+                            You have already correctly enabled the microphone in <strong>Mac System Settings</strong> and <strong>${browserName}</strong>!
+                        </p>
+                        <p class="text-slate-600 dark:text-slate-400">
+                            However, the Google Apps Script test URL (<code>script.google.com</code>) renders web apps inside a nested sandbox iframe without <code>allow="microphone"</code>. Google's cloud policy blocks audio hardware inside this container.
+                        </p>
+                        <div class="pt-2 border-t border-amber-200 dark:border-amber-800 space-y-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                            <div class="text-indigo-600 dark:text-indigo-400">✨ Where Your Voice Input Works 100%:</div>
+                            <ul class="list-disc list-inside space-y-1 font-normal text-slate-600 dark:text-slate-300 ml-1">
+                                <li><strong>📱 Mobile APK:</strong> Your Android APK WebView runs outside Google's iframe container.</li>
+                                <li><strong>💻 Local Preview:</strong> Run <code>2_Local_Preview.bat</code> (or <code>python3 Automation/2_Local_Preview.py</code>) to test live speech in ${browserName} at <code>http://127.0.0.1:8765</code>.</li>
+                                <li><strong>🌐 Vercel / Web Domain:</strong> Runs as a top-level web app with full native microphone support.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    ` : isAndroid ? `
                     <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
                         <div class="space-y-1.5">
                             <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
@@ -12191,9 +12213,6 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                 <li>Select <strong>"Allow only while using the app"</strong>.</li>
                                 <li>Return here and tap <strong>"Try Again"</strong> below!</li>
                             </ul>
-                        </div>
-                        <div class="pt-2 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400">
-                            💡 <em>Note for APK Developer: Ensure WebChromeClient.onPermissionRequest grants RECORD_AUDIO permission to the WebView.</em>
                         </div>
                     </div>
                     ` : `
@@ -12212,27 +12231,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         ${isMac ? `
                         <div class="pt-2.5 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
                             <div class="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                                <span>2️⃣ In Mac System Settings (Crucial macOS Step):</span>
+                                <span>2️⃣ In Mac System Settings:</span>
                             </div>
-                            <p class="text-slate-600 dark:text-slate-300">Even if allowed in the browser, macOS blocks hardware access if ${browserName} is disabled in Mac settings:</p>
-                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
-                                <li>Click <strong>Apple menu ()</strong> at the very top-left corner &gt; <strong>System Settings</strong>.</li>
-                                <li>Go to <strong>Privacy & Security</strong> &gt; <strong>Microphone</strong>.</li>
-                                <li>Find <strong>${browserName}</strong> in the list and turn the switch <strong>ON (Green)</strong>.</li>
-                                <li><em>If you just turned it on, close & reopen ${browserName} or click Reload Page below.</em></li>
-                            </ul>
+                            <p class="text-slate-600 dark:text-slate-300">Ensure ${browserName} is toggled ON under <strong>System Settings &gt; Privacy & Security &gt; Microphone</strong>.</p>
                         </div>
-                        ` : `
-                        <div class="pt-2.5 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
-                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                                <span>2️⃣ Windows Privacy Settings:</span>
-                            </div>
-                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
-                                <li>Open Windows <strong>Settings</strong> &gt; <strong>Privacy & Security</strong> &gt; <strong>Microphone</strong>.</li>
-                                <li>Ensure <em>"Let desktop apps access your microphone"</em> is turned <strong>ON</strong>.</li>
-                            </ul>
-                        </div>
-                        `}
+                        ` : ''}
                     </div>
                     `}
 
@@ -12264,17 +12267,13 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
 
-            // Proactively request media stream to trigger native OS/browser prompt if not yet prompted
+            // Proactively try media stream to trigger native OS/browser prompt, but don't hard-block
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     stream.getTracks().forEach(t => t.stop());
                 } catch(err) {
                     console.warn('[Microphone getUserMedia check]', err);
-                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                        showMicrophonePermissionHelpModal();
-                        return;
-                    }
                 }
             }
 
