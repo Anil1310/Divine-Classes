@@ -341,6 +341,59 @@
         return out;
     }
 
+    /********************************************************************
+     * MIRROR-TABLE WRITER
+     * The relational mirror tables are secondary to the db_json snapshot,
+     * so a single unknown column must never block the whole row. PostgREST
+     * answers PGRST204 ("Could not find the 'x' column"), so drop that
+     * column and retry until the payload fits the live schema.
+     ********************************************************************/
+    const SUPABASE_REJECTED_COLUMNS = {};
+
+    async function postSupabaseRows(table, rows, conflictColumn) {
+        if (!Array.isArray(rows) || !rows.length) return { ok: true, skipped: true, count: 0 };
+
+        const rejected = SUPABASE_REJECTED_COLUMNS[table] || (SUPABASE_REJECTED_COLUMNS[table] = {});
+        let payload = rows.map(function (row) {
+            const copy = Object.assign({}, row);
+            Object.keys(rejected).forEach(function (col) { delete copy[col]; });
+            return copy;
+        });
+
+        let lastStatus = 0;
+        let lastBody = '';
+
+        for (let attempt = 0; attempt < 12; attempt++) {
+            let res;
+            try {
+                res = await supabaseFetch(table + '?on_conflict=' + encodeURIComponent(conflictColumn || 'id'), {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (err) {
+                return { ok: false, networkError: String(err && err.message || err), count: 0 };
+            }
+
+            if (res.ok || res.status === 204) {
+                return { ok: true, status: res.status, count: payload.length, droppedColumns: Object.keys(rejected) };
+            }
+
+            lastStatus = res.status;
+            lastBody = await res.text().catch(function () { return ''; });
+
+            // Schema drift only: remove the offending column and retry.
+            const missing = lastBody.match(/Could not find the '([^']+)' column/i);
+            if (!missing) break;
+            rejected[missing[1]] = true;
+            payload.forEach(function (row) { delete row[missing[1]]; });
+            console.warn('[Supabase] ' + table + ' has no column "' + missing[1] + '" — retrying without it');
+        }
+
+        console.warn('[Supabase] ' + table + ' mirror sync failed:', lastStatus, lastBody.slice(0, 200));
+        return { ok: false, status: lastStatus, body: lastBody, count: 0 };
+    }
+
     /**
      * Persist pending edits directly to Supabase
      */
@@ -424,41 +477,17 @@
         });
 
         try {
-            const bRes = await supabaseFetch('batches?on_conflict=id', {
-                method: 'POST',
-                headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                body: JSON.stringify(standardBatchesPayload)
-            });
-            if (!bRes.ok) console.warn('[Supabase] batches sync status:', bRes.status, await bRes.text().catch(function(){return ''}));
+            const bSync = await postSupabaseRows('batches', standardBatchesPayload, 'id');
+            if (!bSync.ok) await postSupabaseRows('batches_roster', batchesPayload, 'batch_id');
         } catch (e1) {
-            try {
-                await supabaseFetch('batches_roster?on_conflict=batch_id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(batchesPayload)
-                });
-            } catch (e2) {
-                console.warn('[Supabase] batches fallback error:', e2);
-            }
+            console.warn('[Supabase] batches sync error:', e1 && e1.message);
         }
 
         try {
-            const sRes = await supabaseFetch('students?on_conflict=id', {
-                method: 'POST',
-                headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                body: JSON.stringify(standardStudentsPayload)
-            });
-            if (!sRes.ok) console.warn('[Supabase] students sync status:', sRes.status, await sRes.text().catch(function(){return ''}));
+            const sSync = await postSupabaseRows('students', standardStudentsPayload, 'id');
+            if (!sSync.ok) await postSupabaseRows('students_master', studentsPayload, 'roll_no');
         } catch (e3) {
-            try {
-                await supabaseFetch('students_master?on_conflict=roll_no', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(studentsPayload)
-                });
-            } catch (e4) {
-                console.warn('[Supabase] students fallback error:', e4);
-            }
+            console.warn('[Supabase] students sync error:', e3 && e3.message);
         }
 
         // 3. Teachers sync
@@ -477,16 +506,11 @@
                     initials: t.initials || '',
                     password: t.password || 'teacher123',
                     status: t.status || 'Active',
-                    photo: t.photo || '',
                     avatar_color: t.avatarColor || 'from-indigo-600 to-blue-600'
                 };
             });
             try {
-                await supabaseFetch('teachers?on_conflict=id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(teachersPayload)
-                });
+                await postSupabaseRows('teachers', teachersPayload, 'id');
             } catch (et) {}
         }
 
@@ -500,16 +524,13 @@
                     batch_id: m.batchId || '',
                     category: m.category || '',
                     drive_url: m.driveUrl || m.downloadUrl || '',
-                    type: m.type || 'PDF',
-                    date: m.date || m.uploadDate || ''
+                    download_url: m.downloadUrl || m.driveUrl || '',
+                    description: m.description || '',
+                    upload_date: m.date || m.uploadDate || ''
                 };
             });
             try {
-                await supabaseFetch('materials?on_conflict=id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(materialsPayload)
-                });
+                await postSupabaseRows('materials', materialsPayload, 'id');
             } catch (em) {}
         }
 
@@ -519,21 +540,15 @@
                 return {
                     id: ot.id,
                     batch_id: ot.batchId || '',
-                    name: ot.name || ot.title || '',
                     title: ot.title || ot.name || '',
-                    date: ot.date || '',
+                    test_date: ot.date || '',
                     max_marks: Number(ot.maxMarks || 100),
                     subject: ot.subject || '',
-                    results: ot.results || [],
                     marks: ot.marks || {}
                 };
             });
             try {
-                await supabaseFetch('offline_tests?on_conflict=id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(testsPayload)
-                });
+                await postSupabaseRows('offline_tests', testsPayload, 'id');
             } catch (eot) {}
         }
 
@@ -543,17 +558,15 @@
                 return {
                     id: g.id,
                     title: g.title || '',
-                    url: g.url || '',
+                    image_url: g.imageUrl || g.url || '',
                     category: g.category || '',
+                    caption: g.caption || '',
+                    badge: g.badge || '',
                     date: g.date || ''
                 };
             });
             try {
-                await supabaseFetch('gallery?on_conflict=id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(galleryPayload)
-                });
+                await postSupabaseRows('gallery', galleryPayload, 'id');
             } catch (eg) {}
         }
 
@@ -564,15 +577,12 @@
                     id: l.id,
                     title: l.title || '',
                     url: l.url || '',
-                    category: l.category || ''
+                    description: l.description || '',
+                    subject: l.subject || ''
                 };
             });
             try {
-                await supabaseFetch('external_links?on_conflict=id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(linksPayload)
-                });
+                await postSupabaseRows('external_links', linksPayload, 'id');
             } catch (el) {}
         }
 
@@ -589,11 +599,7 @@
                 };
             });
             try {
-                await supabaseFetch('feedbacks?on_conflict=id', {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(feedbacksPayload)
-                });
+                await postSupabaseRows('feedbacks', feedbacksPayload, 'id');
             } catch (ef) {}
         }
 
