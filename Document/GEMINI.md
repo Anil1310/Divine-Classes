@@ -52,3 +52,25 @@ Every web application must provide ready-to-run automation scripts for both plat
 - **Auto-Formatting**: Google Sheets tabs must maintain Calibri 10pt font, bold frozen header rows, and column auto-sizing.
 - **Baseline Seed Data**: Keep complete demo seed files (`Seeds.js` and `Create_Database.sql`) with real-world credentials for instant testing.
 
+---
+
+## 6. Universal Developer Attribution & Footers
+- All views, login screens, and logout screens must feature clean single-line developer attribution:
+  `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition`
+- Do NOT repeat institute address or helpline in the footer when already visible inside portal/login cards.
+- Do NOT use heart emojis in the attribution; use official title `Dev. Anil Kumar Chahar`.
+
+---
+
+## 7. Authentication, 10-Day "Remember Me" & 2-Hour Inactivity Auto-Logout
+Applies identically across Web Browsers and Mobile APK (WebView):
+- **10-Day Remember Me**:
+  - When the user checks "Remember Me" on login, save their login ID and password in `localStorage` (`DIVINE_SAVED_CREDS`) with an expiration timestamp of exactly 10 days (`10 * 24 * 60 * 60 * 1000` ms).
+  - On the login screen, auto-populate the saved login ID and password and pre-check the "Remember Me" checkbox.
+  - After 10 days, the stored credentials automatically expire, are purged, and the user must re-enter their username and password.
+- **2-Hour Inactivity Auto-Logout**:
+  - Track user activity across mouse, touch, keyboard, and scroll events (`mousemove`, `mousedown`, `keydown`, `touchstart`, `touchmove`, `scroll`, `click`).
+  - Store and throttle `DIVINE_LAST_ACTIVITY`. If 2 hours (120 minutes = 7,200,000 ms) pass without any activity, automatically end the session, redirect to the login/landing screen, and display an inactivity notification.
+- **Independence of Credentials vs. Session**:
+  - Auto-logout or manual logout closes the active session (`DIVINE_AUTH_SESSION`), but keeps the 10-day remembered credentials intact. This allows the user to immediately log back in with their remembered credentials until the 10-day limit expires.
+

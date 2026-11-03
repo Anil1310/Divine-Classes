@@ -716,16 +716,87 @@
         const primaryMenuIds = ['dashboard', 'batches', 'attendance', 'materials', 'marks', 'fees'];
 
         const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+        const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000; // 10 days for Remember Me credentials
+        const INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours of inactivity auto-logout
 
         function escapeAttr(str) {
             return (str || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
+        let _lastActivityRecorded = Date.now();
+        let _inactivityTimer = null;
+
+        function recordUserActivity() {
+            _lastActivityRecorded = Date.now();
+            try {
+                localStorage.setItem('DIVINE_LAST_ACTIVITY', String(_lastActivityRecorded));
+            } catch (e) {}
+        }
+
+        function checkInactivityTimeout() {
+            if (!state.isAuthenticated) return;
+            let lastAct = _lastActivityRecorded;
+            try {
+                const stored = parseInt(localStorage.getItem('DIVINE_LAST_ACTIVITY') || '0', 10);
+                if (stored && stored > lastAct) lastAct = stored;
+            } catch (e) {}
+            if (Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS) {
+                console.warn('[Auth] Automatically logged out after 2 hours of inactivity (Browser & Mobile APK).');
+                try {
+                    localStorage.removeItem('DIVINE_AUTH_SESSION');
+                    sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+                    localStorage.removeItem('DIVINE_LAST_ACTIVITY');
+                } catch(e) {}
+                state.isAuthenticated = false;
+                state.currentUser = null;
+                state.currentRole = 'student';
+                state.isDeveloper = false;
+                state.activeTab = 'dashboard';
+                renderAuthHeader();
+                updateRoleUI();
+                renderSidebar();
+                renderMainContent();
+                showToast('Logged out due to 2 hours of inactivity.', 'info');
+            }
+        }
+
+        function initInactivityTracker() {
+            if (window._inactivityTrackerInitialized) return;
+            window._inactivityTrackerInitialized = true;
+            recordUserActivity();
+            const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'touchmove', 'scroll', 'click'];
+            let throttleTimer = null;
+            function onUserInteraction() {
+                if (!throttleTimer) {
+                    throttleTimer = setTimeout(function() {
+                        recordUserActivity();
+                        throttleTimer = null;
+                    }, 5000);
+                }
+            }
+            activityEvents.forEach(function(evt) {
+                window.addEventListener(evt, onUserInteraction, { passive: true });
+            });
+            if (_inactivityTimer) clearInterval(_inactivityTimer);
+            _inactivityTimer = setInterval(checkInactivityTimeout, 30000);
+        }
+
         function getSavedCredentials() {
             try {
-                localStorage.removeItem('DIVINE_SAVED_CREDS');
+                const raw = localStorage.getItem('DIVINE_SAVED_CREDS');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (data && data.expiresAt && Date.now() <= data.expiresAt) {
+                        return {
+                            identifier: data.identifier || '',
+                            password: data.password || ''
+                        };
+                    }
+                    // Expired after 10 days
+                    localStorage.removeItem('DIVINE_SAVED_CREDS');
+                }
             } catch (e) {
-                console.warn('Could not clear saved credentials', e);
+                console.warn('Could not read saved credentials', e);
             }
             return { identifier: '', password: '' };
         }
@@ -751,8 +822,18 @@
                         localStorage.removeItem('DIVINE_AUTH_SESSION');
                     }
                 }
-                // Never persist passwords in browser storage.
-                localStorage.removeItem('DIVINE_SAVED_CREDS');
+                // 10-day Credential Remember (compatible with Browser & Mobile APK WebView)
+                if (rememberMe && (identifier || password)) {
+                    const credData = JSON.stringify({
+                        identifier: identifier || '',
+                        password: password || '',
+                        expiresAt: Date.now() + TEN_DAYS_MS
+                    });
+                    localStorage.setItem('DIVINE_SAVED_CREDS', credData);
+                } else if (!rememberMe) {
+                    localStorage.removeItem('DIVINE_SAVED_CREDS');
+                }
+                recordUserActivity();
             } catch (e) {
                 console.warn('Could not save auth session', e);
             }
@@ -760,6 +841,15 @@
 
         function loadAuthSession() {
             try {
+                // Check 2-hour inactivity before restoring session
+                const lastAct = parseInt(localStorage.getItem('DIVINE_LAST_ACTIVITY') || '0', 10);
+                if (lastAct && (Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS)) {
+                    console.log('[Auth] Prior session expired due to 2 hours of inactivity.');
+                    localStorage.removeItem('DIVINE_AUTH_SESSION');
+                    sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+                    return;
+                }
+
                 let saved = sessionStorage.getItem('DIVINE_AUTH_SESSION');
                 if (!saved) {
                     saved = localStorage.getItem('DIVINE_AUTH_SESSION');
@@ -773,6 +863,7 @@
                         return;
                     }
                     if (sess && sess.isAuthenticated) {
+                        recordUserActivity();
                         if (sess.role === 'developer') {
                             state.isAuthenticated = true;
                             state.currentRole = 'developer';
@@ -818,6 +909,7 @@
             try {
                 localStorage.removeItem('DIVINE_AUTH_SESSION');
                 sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+                localStorage.removeItem('DIVINE_LAST_ACTIVITY');
             } catch(e) {}
             renderAuthHeader();
             updateRoleUI();
@@ -7001,6 +7093,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             const savedCreds = getSavedCredentials();
             const safeSavedId = escapeAttr(savedCreds.identifier);
             const safeSavedPwd = escapeAttr(savedCreds.password);
+            const isRemembered = !!(safeSavedId || safeSavedPwd);
 
             return `
                 <div class="${isModal ? 'w-full' : 'w-full max-w-[400px] mx-auto bg-white dark:bg-slate-900 rounded-[36px] shadow-2xl p-7 sm:p-9 border border-slate-200/80 dark:border-slate-800'} space-y-6 fade-in">
@@ -7055,7 +7148,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         <!-- Remember Me & Forgot Password -->
                         <div class="flex items-center justify-between text-xs pt-1">
                             <label class="flex items-center gap-2 cursor-pointer select-none">
-                                <input type="checkbox" id="login-remember" class="w-4 h-4 rounded text-indigo-600 border-slate-300 dark:border-slate-600 dark:bg-slate-900 focus:ring-indigo-500 cursor-pointer">
+                                <input type="checkbox" id="login-remember" ${isRemembered ? 'checked' : ''} class="w-4 h-4 rounded text-indigo-600 border-slate-300 dark:border-slate-600 dark:bg-slate-900 focus:ring-indigo-500 cursor-pointer">
                                 <span class="text-[11px] text-slate-600 dark:text-slate-300 font-medium">Remember me</span>
                             </label>
                             <span class="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer" onclick="showToast('For password resets or login issues, please contact the institute office at +91 9555-6787-53', 'info')">
@@ -7116,8 +7209,15 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         state.currentRole = 'developer';
                         state.isDeveloper = true;
                         state.currentUser = { role: 'developer', name: 'Anil', identifier: 'Lead Dev' };
-                        try { localStorage.removeItem('DIVINE_SAVED_CREDS'); } catch (e) {}
-                        saveAuthSession(rememberMe, idVal, '');
+                        saveAuthSession(rememberMe, idVal, pwd);
+                        closeModal();
+                        updateRoleUI();
+                        renderSidebar();
+                        renderMainContent();
+                        showToast('Lead Dev sign-in successful.', 'success');
+                    })
+                    .withFailureHandler(function () { showToast('Developer sign-in could not be verified. Please try again.', 'error'); })
+                    .apiVerifyDeveloperLogin(idVal, pwd);
                         closeModal();
                         updateRoleUI();
                         renderSidebar();
@@ -8683,6 +8783,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             } catch (e) { console.warn('Supabase local config restore warning:', e); }
 
             try { loadAuthSession(); } catch (e) { console.warn('Auth session load warning:', e); }
+            try { initInactivityTracker(); } catch (e) { console.warn('Inactivity tracker warning:', e); }
             try { updateRoleUI(); } catch (e) { console.warn('Role UI update warning:', e); }
             try { renderSidebar(); } catch (e) { console.warn('Sidebar render warning:', e); }
             try { renderMainContent(); } catch (e) { console.warn('Main content render warning:', e); }

@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 localStorage.removeItem('DIVINE_AUTH_SESSION');
                 sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+                localStorage.removeItem('DIVINE_LAST_ACTIVITY');
             } catch(e) {}
             if (typeof COACHING_LOGO_BASE64 !== 'undefined') {
                 const logoContainer = document.getElementById('logout-logo-container');
