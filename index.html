@@ -924,7 +924,9 @@ window.DIVINE_PAGE_BACKENDS = {
                 'schedule': 'schedule',
                 'student_ids': 'studentIds',
                 'schedule_time': 'schedule',
-                'room_no': 'room'
+                'room_no': 'room',
+                'teacher_id': 'teacherId',
+                'teacher_email': 'teacherEmail'
             }
         },
         'students': {
@@ -1108,6 +1110,20 @@ window.DIVINE_PAGE_BACKENDS = {
             out.subject = out.subject || row.subjects || row.subject || 'All Subjects';
             out.teacher = out.teacher || row.lead_faculty || row.teacher || 'Faculty';
             out.schedule = out.schedule || row.schedule || 'Regular Schedule';
+            out.teacherId = out.teacherId || row.teacher_id || row.teacherId || null;
+            out.teacherEmail = out.teacherEmail || row.teacher_email || row.teacherEmail || null;
+            if (!out.teacherId) {
+                if (out.id === 'b1' || /rajesh/i.test(out.teacher)) {
+                    out.teacherId = 'tr1';
+                    out.teacherEmail = out.teacherEmail || 'rajesh.chahar@divineclasses.in';
+                } else if (out.id === 'b2' || /sunita/i.test(out.teacher)) {
+                    out.teacherId = 'tr2';
+                    out.teacherEmail = out.teacherEmail || 'dr.sunita@divineclasses.in';
+                } else if (out.id === 'b3' || /arvind/i.test(out.teacher)) {
+                    out.teacherId = 'tr3';
+                    out.teacherEmail = out.teacherEmail || 'arvind.verma@divineclasses.in';
+                }
+            }
             if (!Array.isArray(out.studentIds) || !out.studentIds.length) {
                 if (out.id === 'b1') out.studentIds = ['DC-101', 'DC-102', 'DC-103', 'DC-104', 'DC-105'];
                 else if (out.id === 'b2') out.studentIds = ['DC-106', 'DC-107', 'DC-108'];
@@ -2817,6 +2833,8 @@ window.DIVINE_PAGE_BACKENDS = {
                     schedule: 'Mon - Fri • 08:00 AM - 12:30 PM',
                     room: 'Lecture Hall 101 (Smart AC)',
                     teacher: 'Er. Rajesh Chahar (Ex-IITian)',
+                    teacherId: 'tr1',
+                    teacherEmail: 'rajesh.chahar@divineclasses.in',
                     studentIds: ['s1', 's2', 's3', 's4', 's10']
                 },
                 {
@@ -2826,6 +2844,8 @@ window.DIVINE_PAGE_BACKENDS = {
                     schedule: 'Mon - Sat • 01:30 PM - 06:00 PM',
                     room: 'Medical Hall 202',
                     teacher: 'Dr. Sunita Sharma (M.D. AIIMS)',
+                    teacherId: 'tr2',
+                    teacherEmail: 'dr.sunita@divineclasses.in',
                     studentIds: ['s5', 's6', 's7']
                 },
                 {
@@ -2835,6 +2855,8 @@ window.DIVINE_PAGE_BACKENDS = {
                     schedule: 'Tue, Thu, Sat • 04:30 PM - 07:00 PM',
                     room: 'Classroom 104',
                     teacher: 'Mr. Arvind Verma (M.Sc. Gold Medalist)',
+                    teacherId: 'tr3',
+                    teacherEmail: 'arvind.verma@divineclasses.in',
                     studentIds: ['s8', 's9']
                 }
             ],
@@ -4218,25 +4240,36 @@ window.DIVINE_PAGE_BACKENDS = {
             return { student: curStudent, batch: curBatch, batchId: batchId };
         }
 
+        function getCurrentTeacher() {
+            if (state.currentRole !== 'teacher') return null;
+            return (state.teachers || []).find(t =>
+                (state.activeTeacherId && String(t.id) === String(state.activeTeacherId)) ||
+                (state.currentUser && String(t.id) === String(state.currentUser.id)) ||
+                (state.currentUser && String(t.email || '').toLowerCase() === String(state.currentUser.identifier || '').toLowerCase())
+            ) || (state.teachers && state.teachers[0]) || null;
+        }
+
         /********************************************************************
          * VIEW: OVERVIEW DASHBOARD
          ********************************************************************/
         function renderDashboardView() {
             const isStudent = state.currentRole === 'student';
             const { student: curStudent, batch: curStudentBatch, batchId: curStudentBatchId } = getCurrentStudentAndBatch();
+            const curTeacher = state.currentRole === 'teacher' ? getCurrentTeacher() : null;
 
-            const activeStudents = state.students.filter(s => s.status !== 'Inactive');
+            const activeStudents = (state.students || []).filter(s => s && s.status !== 'Inactive');
             const totalStudents = isStudent ? (curStudentBatch ? ((curStudentBatch.studentIds || []).length || 1) : 1) : activeStudents.length;
-            const totalBatches = isStudent ? (curStudentBatch ? 1 : 0) : state.batches.length;
+            const totalBatches = isStudent ? (curStudentBatch ? 1 : 0) : (state.batches || []).length;
             const totalMaterials = isStudent
                 ? (state.materials || []).filter(m => !m.batchId || m.batchId === 'all' || m.batchId === 'general' || (curStudentBatchId && String(m.batchId) === String(curStudentBatchId))).length
-                : state.materials.length;
-            const pendingFeeStudents = activeStudents.filter(s => s.paidFee < s.totalFee).length;
-            const totalPendingAmount = activeStudents.reduce((acc, s) => acc + (s.totalFee - s.paidFee), 0);
-            const totalExpected = activeStudents.reduce((acc, s) => acc + s.totalFee, 0);
+                : (state.materials || []).length;
+            const pendingFeeStudents = activeStudents.filter(s => (s.paidFee || 0) < (s.totalFee || 0)).length;
+            const totalPendingAmount = activeStudents.reduce((acc, s) => acc + ((s.totalFee || 0) - (s.paidFee || 0)), 0);
+            const totalExpected = activeStudents.reduce((acc, s) => acc + (s.totalFee || 0), 0);
             const collectionPct = totalExpected > 0 ? Math.round(((totalExpected - totalPendingAmount) / totalExpected) * 100) : 0;
+            const offlineTestsCount = (state.offlineTests || []).length;
 
-            const stuBalance = curStudent ? (curStudent.totalFee - curStudent.paidFee) : 0;
+            const stuBalance = curStudent ? ((curStudent.totalFee || 0) - (curStudent.paidFee || 0)) : 0;
             const hasFeeReminder = isStudent && stuBalance > 0 && (state.notifications || []).some(n => !n.read && n.actionTab === 'fees' && (n.targetStudentId === curStudent.id || n.targetRoll === curStudent.roll));
 
             return `
@@ -4302,7 +4335,7 @@ window.DIVINE_PAGE_BACKENDS = {
                         <div onclick="navigateTo('marks')" class="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition cursor-pointer flex items-center justify-between gap-2 group">
                             <div class="min-w-0">
                                 <p class="text-[10px] sm:text-xs font-semibold text-slate-500 leading-tight">Offline Class Tests</p>
-                                <p class="text-lg sm:text-2xl font-bold text-slate-900 mt-1 font-heading leading-tight">${state.offlineTests.length} Conducted</p>
+                                <p class="text-lg sm:text-2xl font-bold text-slate-900 mt-1 font-heading leading-tight">${offlineTestsCount} Conducted</p>
                                 <p class="text-[9px] sm:text-xs text-amber-600 font-medium mt-1 leading-tight"><i class="fa-solid fa-chart-simple mr-1"></i>Live Marks Analytics</p>
                             </div>
                             <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-base sm:text-xl shrink-0 group-hover:bg-amber-600 group-hover:text-white transition">
@@ -4351,7 +4384,7 @@ window.DIVINE_PAGE_BACKENDS = {
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-slate-800">${escapeHtml(curStudent.name)} (${escapeHtml(curStudent.roll)})</p>
-                                <p class="text-[11px] text-slate-500 font-medium">Batch: <span class="font-semibold text-indigo-600">${escapeHtml(state.batches.find(b => b.id === curStudent.batchId)?.name || 'General Batch')}</span> • Attendance: <span class="font-bold text-emerald-600">${((typeof getStudentAttendanceData === 'function') ? getStudentAttendanceData(curStudent.id) : { percentage: 92 }).percentage}%</span></p>
+                                <p class="text-[11px] text-slate-500 font-medium">Batch: <span class="font-semibold text-indigo-600">${escapeHtml((state.batches || []).find(b => b.id === curStudent.batchId)?.name || 'General Batch')}</span> • Attendance: <span class="font-bold text-emerald-600">${((typeof getStudentAttendanceData === 'function') ? getStudentAttendanceData(curStudent.id) : { percentage: 92 }).percentage}%</span></p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -4360,6 +4393,29 @@ window.DIVINE_PAGE_BACKENDS = {
                             </button>
                             <button type="button" onclick="openStudentIdCard('${curStudent.id}')" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition cursor-pointer">
                                 <i class="fa-solid fa-id-card"></i> Student ID Card
+                            </button>
+                        </div>
+                    </div>` : ''}
+
+                    ${state.currentRole === 'teacher' && curTeacher ? `
+                    <div class="flex flex-wrap items-center justify-between gap-3 bg-amber-50/70 border border-amber-200/80 p-3 sm:p-4 rounded-2xl">
+                        <div class="flex items-center gap-3">
+                            ${curTeacher.photo
+                                ? `<img src="${escapeAttr(curTeacher.photo)}" alt="${escapeAttr(curTeacher.name)}" class="w-10 h-10 rounded-xl object-cover border border-amber-300 shadow-xs shrink-0">`
+                                : `<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                                    <i class="fa-solid fa-chalkboard-user"></i>
+                                </div>`}
+                            <div>
+                                <p class="text-xs font-bold text-slate-800">${escapeHtml(curTeacher.name)} <span class="ml-1 text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">Faculty Mentor</span></p>
+                                <p class="text-[11px] text-slate-500 font-medium">Subject: <span class="font-semibold text-indigo-600">${escapeHtml(curTeacher.subject || 'Faculty Mentor')}</span> • Exp: <span class="font-bold text-emerald-600">${escapeHtml(curTeacher.experience || '5+ Years')}</span> • <span class="text-slate-400">${escapeHtml(curTeacher.qualification || 'M.Sc., B.Ed.')}</span></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openTeacherIdCard('${curTeacher.id}')" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition cursor-pointer">
+                                <i class="fa-solid fa-id-card"></i> Faculty ID Card
+                            </button>
+                            <button type="button" onclick="navigateTo('teachers')" class="inline-flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3.5 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer">
+                                <i class="fa-solid fa-user-pen"></i> My Profile
                             </button>
                         </div>
                     </div>` : ''}
@@ -5575,11 +5631,13 @@ window.DIVINE_PAGE_BACKENDS = {
         }
 
         function openEditTeacherModal(teacherId) {
-            if (state.currentRole !== 'admin') {
-                showToast('Only Admin can edit faculty records.', 'error');
+            const isAdmin = state.currentRole === 'admin' || state.currentRole === 'developer';
+            const isSelfTeacher = state.currentRole === 'teacher' && String(state.activeTeacherId) === String(teacherId);
+            if (!isAdmin && !isSelfTeacher) {
+                showToast('Only administrators or the faculty member themselves can edit this profile.', 'error');
                 return;
             }
-            const tch = state.teachers.find(t => t.id === teacherId);
+            const tch = (state.teachers || []).find(t => t.id === teacherId);
             if (!tch) {
                 showToast('Teacher record not found.', 'error');
                 return;
@@ -5592,8 +5650,8 @@ window.DIVINE_PAGE_BACKENDS = {
                             ${escapeHtml(tch.initials || tch.name.slice(0, 2))}
                         </div>
                         <div>
-                            <h3 class="text-base font-bold text-slate-900 font-heading">Edit Faculty Record</h3>
-                            <p class="text-xs text-slate-500">Admin Master Edit • ${escapeHtml(tch.name)} (${escapeHtml(tch.subject)})</p>
+                            <h3 class="text-base font-bold text-slate-900 font-heading">${isAdmin ? 'Edit Faculty Record' : 'Edit My Faculty Profile'}</h3>
+                            <p class="text-xs text-slate-500">${isAdmin ? 'Admin Master Edit' : 'Faculty Self Service'} • ${escapeHtml(tch.name)} (${escapeHtml(tch.subject)})</p>
                         </div>
                     </div>
                     <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -5632,12 +5690,19 @@ window.DIVINE_PAGE_BACKENDS = {
                             <input type="text" id="edit-tch-phone" value="${escapeAttr(tch.phone || '+91 95556 78753')}" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-mono">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Access Status *</label>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Access Status</label>
+                            ${isAdmin ? `
                             <select id="edit-tch-status" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-indigo-500 font-semibold">
                                 <option value="Active" ${tch.status === 'Active' ? 'selected' : ''}>Active (Authorized Access)</option>
                                 <option value="Blocked" ${tch.status === 'Blocked' ? 'selected' : ''}>Blocked (Revoke Login)</option>
                                 <option value="Inactive" ${tch.status === 'Inactive' ? 'selected' : ''}>Inactive (Retired / Hidden)</option>
                             </select>
+                            ` : `
+                            <div class="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 font-semibold text-emerald-700 flex items-center gap-1.5">
+                                <i class="fa-solid fa-circle-check text-emerald-600"></i> ${escapeHtml(tch.status || 'Active')}
+                            </div>
+                            <input type="hidden" id="edit-tch-status" value="${escapeAttr(tch.status || 'Active')}">
+                            `}
                         </div>
                     </div>
 
@@ -5705,11 +5770,17 @@ window.DIVINE_PAGE_BACKENDS = {
 
         function handleSaveEditTeacher(e, teacherId) {
             e.preventDefault();
+            const isAdmin = state.currentRole === 'admin' || state.currentRole === 'developer';
+            const isSelfTeacher = state.currentRole === 'teacher' && String(state.activeTeacherId) === String(teacherId);
+            if (!isAdmin && !isSelfTeacher) {
+                showToast('Permission denied: You cannot edit this faculty profile.', 'error');
+                return;
+            }
             if (window.editTeacherPhotoProcessing) {
                 showToast('Please wait for the faculty photo to finish processing.', 'warning');
                 return;
             }
-            const tch = state.teachers.find(t => t.id === teacherId);
+            const tch = (state.teachers || []).find(t => t.id === teacherId);
             if (!tch) return;
 
             const name = document.getElementById('edit-tch-name').value.trim();
@@ -5718,7 +5789,8 @@ window.DIVINE_PAGE_BACKENDS = {
             const qualification = document.getElementById('edit-tch-qual').value.trim();
             const experience = document.getElementById('edit-tch-exp').value.trim();
             const phone = document.getElementById('edit-tch-phone').value.trim();
-            const status = document.getElementById('edit-tch-status').value;
+            const statusEl = document.getElementById('edit-tch-status');
+            const status = statusEl ? statusEl.value : (tch.status || 'Active');
             const specialization = document.getElementById('edit-tch-spec').value.trim();
             const bio = document.getElementById('edit-tch-bio').value.trim();
             const password = document.getElementById('edit-tch-pwd').value.trim();
@@ -5730,12 +5802,18 @@ window.DIVINE_PAGE_BACKENDS = {
             tch.qualification = qualification;
             tch.experience = experience;
             tch.phone = phone;
-            tch.status = status;
+            tch.status = isAdmin ? status : (tch.status || 'Active');
             tch.specialization = specialization;
             tch.bio = bio;
-            tch.password = password || 'teacher123';
+            tch.password = password || tch.password || 'teacher123';
             tch.photo = photo;
             tch.initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+            if (isSelfTeacher && state.currentUser) {
+                state.currentUser.name = name;
+                state.currentUser.identifier = email;
+                renderAuthHeader();
+            }
 
             saveStateLocally();
             if (typeof syncPendingDataToSupabase === 'function') {
@@ -5743,6 +5821,7 @@ window.DIVINE_PAGE_BACKENDS = {
             }
             closeModal();
             renderMainContent();
+            showToast('Faculty profile updated successfully.', 'success');
 
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
@@ -6579,6 +6658,100 @@ window.DIVINE_PAGE_BACKENDS = {
             window.print();
         }
 
+        function printTeacherIdCard() {
+            const card = document.getElementById('teacher-id-card');
+            const printableArea = document.getElementById('printable-area');
+            if (!card || !printableArea) {
+                window.print();
+                return;
+            }
+            printableArea.innerHTML = card.outerHTML;
+            const clearPrintableArea = () => {
+                printableArea.innerHTML = '';
+                window.removeEventListener('afterprint', clearPrintableArea);
+            };
+            window.addEventListener('afterprint', clearPrintableArea);
+            window.print();
+        }
+
+        function openTeacherIdCard(teacherId) {
+            const tch = (state.teachers || []).find(t => String(t.id) === String(teacherId)) ||
+                (state.currentRole === 'teacher' ? getCurrentTeacher() : (state.teachers && state.teachers[0]));
+            if (!tch) {
+                showToast('Faculty profile not found.', 'error');
+                return;
+            }
+
+            const cardHtml = `
+                <div id="teacher-id-card" class="teacher-id-card p-6 bg-white border-2 border-slate-300 rounded-2xl max-w-sm mx-auto text-slate-900 font-sans shadow-xl text-center">
+                    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 rounded-2xl mb-5 flex items-center justify-center gap-3 shadow-sm">
+                        <div class="w-14 h-14 rounded-xl bg-white p-1.5 border border-white/30 shrink-0 shadow-xs">
+                            <img src="${COACHING_LOGO_BASE64}" alt="Divine Classes logo" class="w-full h-full object-contain">
+                        </div>
+                        <div class="text-left">
+                            <h3 class="text-lg font-black tracking-tight font-heading leading-tight">DIVINE CLASSES</h3>
+                            <p class="text-[10px] text-amber-400 tracking-wide font-semibold">Faculty Identity Card</p>
+                        </div>
+                    </div>
+
+                    <!-- Teacher Photo or Initials Avatar -->
+                    <div class="relative w-32 h-32 mx-auto mb-4">
+                        ${tch.photo ? `
+                            <img src="${escapeAttr(tch.photo)}" alt="${escapeHtml(tch.name)}" class="w-32 h-32 rounded-full object-cover border-2 border-amber-500 shadow-md">
+                        ` : `
+                            <div class="w-32 h-32 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-amber-300 flex items-center justify-center text-white font-bold text-4xl shadow-inner">
+                                ${escapeHtml(tch.initials || tch.name.slice(0, 2))}
+                            </div>
+                        `}
+                    </div>
+
+                    <h4 class="text-xl font-bold text-slate-950 font-heading">${escapeHtml(tch.name)}</h4>
+                    <p class="text-sm font-bold text-indigo-700 mt-0.5">${escapeHtml(tch.subject)} Faculty</p>
+                    <span class="inline-block mt-1 px-3 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                        Senior Faculty Mentor
+                    </span>
+
+                    <div class="mt-4 pt-4 border-t border-slate-200 text-left space-y-2 text-xs">
+                        <div class="flex justify-between py-1 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Faculty ID:</span>
+                            <span class="font-bold text-slate-800 font-mono">${escapeHtml(tch.id ? tch.id.toUpperCase() : 'TR-FACULTY')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Qualification:</span>
+                            <span class="font-semibold text-slate-800">${escapeHtml(tch.qualification || 'M.Sc., B.Ed.')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Experience:</span>
+                            <span class="font-semibold text-slate-800">${escapeHtml(tch.experience || '5+ Years')}</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Specialization:</span>
+                            <span class="font-semibold text-slate-800">${escapeHtml(tch.specialization || 'IIT-JEE / NEET Specialist')}</span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span class="text-slate-500 font-medium">Email:</span>
+                            <span class="font-medium text-slate-800 font-mono text-[11px]">${escapeHtml(tch.email || '')}</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Authorized Faculty</span>
+                        <span class="font-bold text-slate-600">DIVINE CLASSES SEAL</span>
+                    </div>
+
+                    <div class="mt-5 flex items-center justify-center gap-2 no-print">
+                        <button onclick="printTeacherIdCard()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+                            <i class="fa-solid fa-print"></i> Print Faculty ID
+                        </button>
+                        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            openModal(cardHtml);
+        }
+
         /********************************************************************
          * REQUIREMENT 3: UPLOAD ASSIGNMENTS (PDF), WORKSHEETS, TEST PAPERS
          ********************************************************************/
@@ -7099,7 +7272,7 @@ window.DIVINE_PAGE_BACKENDS = {
                                     const pct = Math.round((entry.score / t.maxMarks) * 100);
                                     return `
                                         <div class="bg-white/10 backdrop-blur-xs rounded-xl p-4 border border-white/10">
-                                             <div class="flex items-center justify-between">
+                                            <div class="flex items-center justify-between">
                                                 <span class="text-xs font-bold text-indigo-200">${t.date} • ${t.subject}</span>
                                                 <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold">${pct}%</span>
                                             </div>
@@ -7755,12 +7928,19 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
          ********************************************************************/
         function renderTeachersView() {
             const visibleTeachers = (state.teachers || []).filter(t => t.status !== 'Inactive');
+            const isTeacher = state.currentRole === 'teacher';
+            const curTeacher = isTeacher ? getCurrentTeacher() : null;
+            const otherTeachers = isTeacher && curTeacher
+                ? visibleTeachers.filter(t => String(t.id) !== String(curTeacher.id))
+                : visibleTeachers;
+
             return `
                 <div class="fade-in space-y-6">
+                    <!-- Top Action / Header Bar -->
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                         <div>
-                            <h2 class="text-base font-bold text-slate-900 font-heading">Meet Our Mentor Faculty (${visibleTeachers.length})</h2>
-                            <p class="text-xs text-slate-500">${shouldShowReqLabels() ? 'Requirement #6: ' : ''}Complete teacher profiles, academic qualifications, and doubt-solving timings visible to all students.</p>
+                            <h2 class="text-base font-bold text-slate-900 font-heading">${isTeacher ? 'Faculty Portal • Teacher Profiles' : `Meet Our Mentor Faculty (${visibleTeachers.length})`}</h2>
+                            <p class="text-xs text-slate-500">${shouldShowReqLabels() ? 'Requirement #6: ' : ''}${isTeacher ? 'View and manage your own faculty profile, and see all active institute mentors.' : 'Complete teacher profiles, academic qualifications, and doubt-solving timings visible to all students.'}</p>
                         </div>
                         ${state.currentRole === 'admin' ? `
                         <button onclick="openAddTeacherModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition self-start sm:self-auto">
@@ -7769,8 +7949,52 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         ` : ''}
                     </div>
 
+                    ${isTeacher && curTeacher ? `
+                    <!-- Dedicated "My Faculty Profile" Card for Logged-In Teacher -->
+                    <div class="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-2 border-amber-400 dark:border-amber-500/40 rounded-2xl p-5 sm:p-6 shadow-sm">
+                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                            <div class="flex items-start sm:items-center gap-4">
+                                <div class="relative">
+                                    ${curTeacher.photo
+                                        ? `<img src="${escapeAttr(curTeacher.photo)}" alt="${escapeAttr(curTeacher.name)}" class="h-20 w-20 shrink-0 rounded-2xl object-cover border-2 border-amber-400 shadow-md">`
+                                        : `<div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 text-2xl font-bold text-white shadow-md">${escapeHtml(curTeacher.initials || curTeacher.name.slice(0, 2))}</div>`}
+                                </div>
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="text-xl font-extrabold text-slate-900 font-heading">${escapeHtml(curTeacher.name)}</h2>
+                                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-slate-950">My Faculty Profile</span>
+                                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">${escapeHtml(curTeacher.experience || '5+ Years')}</span>
+                                    </div>
+                                    <p class="text-xs font-bold text-indigo-600 mt-1"><i class="fa-solid fa-chalkboard-user mr-1"></i>Primary Subject: ${escapeHtml(curTeacher.subject || 'Faculty Mentor')}</p>
+                                    <p class="text-xs text-slate-600 mt-0.5"><i class="fa-solid fa-user-graduate mr-1 text-slate-400"></i>${escapeHtml(curTeacher.qualification || 'M.Sc., B.Ed.')} • <span class="text-slate-500">Spec: ${escapeHtml(curTeacher.specialization || 'IIT-JEE / NEET Specialist')}</span></p>
+                                    <p class="text-xs text-slate-700 mt-2 max-w-2xl leading-relaxed">${escapeHtml(curTeacher.bio || 'Dedicated faculty mentor at Divine Classes.')}</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2.5 self-stretch sm:self-auto shrink-0">
+                                <button onclick="openEditTeacherModal('${curTeacher.id}')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+                                    <i class="fa-solid fa-user-pen"></i> Edit My Profile
+                                </button>
+                                <button onclick="openTeacherPhotoModal('${curTeacher.id}')" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                                    <i class="fa-solid fa-camera"></i> Update Photo
+                                </button>
+                                <button onclick="openTeacherIdCard('${curTeacher.id}')" class="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs">
+                                    <i class="fa-solid fa-id-card"></i> Faculty ID Card
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Active Mentors Section -->
+                    ${isTeacher ? `
+                    <div class="pt-2">
+                        <h3 class="text-sm font-bold text-slate-800 font-heading">Active Faculty Mentors (${otherTeachers.length})</h3>
+                        <p class="text-xs text-slate-500">Meet fellow educators and mentors across Divine Classes coaching programs.</p>
+                    </div>
+                    ` : ''}
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${visibleTeachers.map(t => `
+                        ${otherTeachers.map(t => `
                             <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition flex flex-col justify-between">
                                 <div class="flex items-start gap-4">
                                     ${t.photo
@@ -7778,20 +8002,20 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                         : `<div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${t.avatarColor || 'from-indigo-600 to-blue-600'} text-xl font-bold text-white shadow-md">${escapeHtml(t.initials || '')}</div>`}
                                     <div class="flex-1">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
-                                            <h3 class="text-base font-bold text-slate-900 font-heading">${t.name}</h3>
-                                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">${t.experience}</span>
+                                            <h3 class="text-base font-bold text-slate-900 font-heading">${escapeHtml(t.name)}</h3>
+                                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">${escapeHtml(t.experience)}</span>
                                         </div>
-                                        <p class="text-xs font-semibold text-indigo-600 mt-0.5">${t.subject}</p>
-                                        <p class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-user-graduate mr-1.5 text-slate-400"></i>${t.qualification}</p>
+                                        <p class="text-xs font-semibold text-indigo-600 mt-0.5">${escapeHtml(t.subject)}</p>
+                                        <p class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-user-graduate mr-1.5 text-slate-400"></i>${escapeHtml(t.qualification)}</p>
                                     </div>
                                 </div>
 
                                 <div class="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs">
-                                    <p class="text-slate-600 leading-relaxed">${t.bio}</p>
+                                    <p class="text-slate-600 leading-relaxed">${escapeHtml(t.bio)}</p>
                                     <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3">
                                         <div>
                                             <span class="text-xs font-semibold text-slate-500 block">Specialization</span>
-                                            <span class="font-semibold text-slate-700">${t.specialization}</span>
+                                            <span class="font-semibold text-slate-700">${escapeHtml(t.specialization)}</span>
                                         </div>
                                         <div class="flex items-center gap-1.5 shrink-0">
                                             ${state.currentRole === 'admin' ? `
@@ -7800,14 +8024,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                                 <span>Edit</span>
                                             </button>
                                             ` : ''}
-                                            ${state.currentRole === 'teacher' && String(state.activeTeacherId) === String(t.id) ? `
-                                            <button onclick="openTeacherPhotoModal('${t.id}')" title="Update your faculty profile photo" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 border border-indigo-200 rounded-lg font-semibold text-xs transition flex items-center gap-1">
-                                                <i class="fa-solid fa-camera"></i><span>Update Photo</span>
-                                            </button>
-                                            ` : ''}
+                                            ${state.currentRole === 'student' ? `
                                             <button onclick="openBookDoubtSlotModal('${t.id}')" class="px-3 py-1.5 bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 border border-indigo-200 rounded-lg font-semibold text-xs transition">
                                                 <i class="fa-regular fa-calendar-check mr-1"></i>Book Doubt Slot
                                             </button>
+                                            ` : ''}
                                         </div>
                                     </div>
                                 </div>
@@ -10975,6 +11196,12 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         setTimeout(bootApp, 500);
     </script>
 
+
+    <script>
+        if (typeof bootApp === 'function') {
+            bootApp();
+        }
+    </script>
 
     <!-- Mobile Bottom Navigation Bar (Android Native App Experience) -->
     <div id="mobile-nav"

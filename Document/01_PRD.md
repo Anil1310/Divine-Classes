@@ -98,22 +98,21 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
   - Classes Attended
   - Real-time Attendance Percentage with visual status badges (Green >= 85%, Amber 70-84%, Red < 70%).
 
-### Module 4: Batch Isolation, Faculty Assignment & Student Enrollment
+### Module 4: Batch Management, Faculty Assignment & Student Enrollment
 - **FR-4.1**: Students must only see information pertaining to their enrolled batch (e.g., *JEE Advanced Target 2027 (Alpha Batch)*).
-- **FR-4.2**: **Teacher Batch Scoping & Resolution Protocol**:
-  - Teachers logged in with their faculty profile automatically view only the coaching batches assigned to them.
-  - Identification matches via `teacherId`, registered `teacherEmail`, or title-normalized name matching (e.g. `Er. Rajesh Chahar (Ex-IITian)` dynamically links to `Er. Rajesh Chahar`).
-  - Active teacher batches feature an emerald badge: `Faculty Portal • Assigned Batches`.
-- **FR-4.3**: **Teacher Student Enrollment into Assigned Batches**:
-  - Teachers can click `+ Add Student` on their assigned batch cards to open the Enrollment Modal with two distinct workflows:
-    - *Option 1 (Existing Directory)*: Select any registered institute student not yet enrolled in this batch and add them in 1-click.
-    - *Option 2 (New Admission)*: Enroll a brand-new student directly into their batch with auto-generated Roll Number, student details, contact info, and profile image.
+- **FR-4.2**: **Teacher Institute Batch Visibility**:
+  - Teachers logged in with their faculty profile can view all coaching batches across the institute to facilitate cross-batch mentoring and batch transfers.
+  - Batches led by the teacher display an emerald indicator: `My Assigned Batch`, while all batches remain accessible.
+- **FR-4.3**: **Teacher Student Enrollment into Any Batch**:
+  - Teachers can click `+ Add Student` on any batch card or the global `+ Add Student to Any Batch` action to open the Enrollment Modal with two distinct workflows:
+    - *Option 1 (Existing Directory)*: Select any registered institute student and enroll them into any selected batch with 1 click.
+    - *Option 2 (New Admission)*: Enroll a brand-new student directly into any target batch with auto-generated Roll Number, student details, contact info, and profile image.
 - **FR-4.4**: The Study Materials repository must enforce strict batch gating:
   - Material cards tagged with `batchId` must only render for students enrolled in that specific `batchId`.
   - Material download links for other batches must be completely blocked and inaccessible.
 - **FR-4.5**: Faculty members can upload PDFs, assignments, and Daily Practice Problems (DPPs) with subject, topic, and batch tags.
 
-### Module 5: Offline Academic Marks Tracker
+### Module 5: Offline Academic Marks Tracker & Bulk Grading
 - **FR-5.1**: Record offline minor, weekly, and grand test results including Test Title, Test Date (via HTML5 date picker), Target Batch ID, Maximum Marks, Obtained Score, and Mentor Remarks.
 - **FR-5.2**: The system must compute real-time analytics:
   - Subject-wise score breakdown and batch average vs. highest score.
@@ -123,7 +122,20 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
 - **FR-5.4**: Faculty bulk grading support allowing teachers to input scores for all students in a batch and commit in 1 click via **Save All Marks**, with immediate Google Sheets synchronization.
 - **FR-5.5**: Multi-batch filtering enabling faculty to seamlessly toggle between assigned batches or view all institute tests.
 
-### Module 6: Official Academic Report Card & Digital Verification
+### Module 6: Faculty Self-Profile & Mentor Directory Architecture
+- **FR-6.1**: **Teacher Self-Profile Parity**: When a teacher logs in, they see their own profile prominently:
+  - Dedicated "My Faculty Profile" banner at the top of the Teacher Profiles view.
+  - Dashboard profile card showing Faculty Name, Subject, Experience, Qualification, and one-click access to their official Faculty ID Card.
+- **FR-6.2**: **Faculty Self-Management Controls**: Logged-in teachers have dedicated actions to maintain their profile:
+  - *Edit My Profile*: Update academic qualifications, teaching experience, specialization, biography, and contact phone.
+  - *Update Photo*: Live camera capture or file upload with automatic client-side resizing.
+  - *Faculty Identity Card*: Official Divine Classes Faculty ID Card with photo, qualifications, faculty ID, and authorized institute seal.
+- **FR-6.3**: **Administrative Isolation & Data Security**:
+  - Administrative actions (editing other teachers, changing access status to Blocked/Inactive) are strictly hidden for non-admin teachers.
+  - The rest of the faculty roster is displayed as clean, read-only mentor cards just like in student login (showing photo, name, subject, qualification, experience, specialization, and bio).
+- **FR-6.4**: **Student Action Separation**: Student-specific controls (such as `Book Doubt Slot`) are exclusively shown to logged-in students, ensuring a clean peer interface for faculty.
+
+### Module 7: Official Academic Report Card & Digital Verification
 - **FR-6.1**: Produce an official Academic Progress Report Card with:
   - Circular high-resolution Divine Classes emblem logo (replacing generic icons).
   - Institute header with accreditation details and helpline.

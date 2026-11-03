@@ -76,17 +76,17 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 4. Upon login, the top notification banner greets you with an emerald **Faculty Portal** badge:
    > *"Teacher Mode Active: Welcome to your faculty workspace. You can manage your assigned batches, student attendance, assignments, and test marks."*
 
-### 3.2 Managing Assigned Batches & Adding Students
+### 3.2 Managing Institute Batches & Enrolling Students
 1. Navigate to **Batches & Students** from the sidebar.
-2. Only batches assigned to your faculty profile will be displayed (with a badge indicating `Faculty Portal • Assigned Batches`). For example, *Er. Rajesh Chahar* automatically sees *JEE Advanced Target 2027 (Alpha Batch)*.
-3. To add a student to your batch, click the **+ Add Student** button on the batch card:
+2. All institute coaching batches are visible, with batches led by your profile marked with an emerald indicator: `My Assigned Batch`.
+3. To add a student to any batch, click the **+ Add Student** button on that batch card or click the top **+ Add Student to Any Batch** button:
    - **Option 1: Select from Existing Institute Directory**
-     - Use the dropdown to choose any registered student not yet in this batch.
+     - Select target batch and choose any registered student not yet in that batch.
      - Click **Add Selected Student** to enroll them instantly.
    - **Option 2: Enroll Brand New Student**
      - Enter the student's **Full Name**, **Mobile Number**, and **Parent/Guardian Name**.
      - Optionally upload a profile photo (`.jpg`, `.png`, `.webp`).
-     - Click **Enroll & Add to Batch**. The student is assigned a unique Roll Number, added to your batch roster, and synced across all cloud databases.
+     - Click **Enroll & Add to Batch**. The student is assigned a unique Roll Number, enrolled into the batch, and synced across all cloud databases.
 
 ### 3.3 Taking Daily Class Attendance
 1. Click **Attendance** from the navigation sidebar.
@@ -116,6 +116,21 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 3. Choose the **Target Batch** (strictly scoped so other batches cannot access it).
 4. Enter Title, Subject, Topic, and paste the Google Drive or PDF link.
 5. Click **Publish Material**.
+
+### 3.6 Managing Your Faculty Profile & Identity Card
+1. Navigate to **Teachers** (or click **My Profile** on your Overview Dashboard).
+2. You will see your dedicated **"My Faculty Profile"** card highlighted at the top.
+3. **Edit Your Profile**:
+   - Click `Edit My Profile` to update your qualifications, teaching experience, specialization, biography, and contact phone.
+   - Click **Save Faculty Record** to commit changes to the cloud database.
+4. **Update Photo**:
+   - Click `Update Photo` to capture a live photo or upload a new faculty image.
+5. **View & Print Faculty ID Card**:
+   - Click `Faculty ID Card` to view your official Divine Classes Faculty Identity Card with photo, subject, qualification, faculty ID, and institute seal.
+   - Click `Print Faculty ID` to print a physical ID badge.
+6. **Active Faculty Mentors**:
+   - All other educators are displayed in a clean, read-only mentor grid just like in student view (photo, name, subject, qualifications, experience, bio, and specialization).
+   - Administrative edit controls and student-specific "Book Doubt Slot" buttons are automatically hidden.
 
 ---
 
