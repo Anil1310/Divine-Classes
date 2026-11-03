@@ -8931,6 +8931,508 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     .apiGetInitialData();
             }
         }
+        /********************************************************************
+         * DIVINE AI ASSISTANT & STUDENT HELPDESK CHATBOT CONTROLLER
+         ********************************************************************/
+        window.divineChatbotState = {
+            isOpen: false,
+            initialized: false,
+            messages: []
+        };
+
+        function toggleDivineChatbot(forceState) {
+            const win = document.getElementById('divine-chatbot-window');
+            const iconClosed = document.getElementById('chatbot-icon-closed');
+            const iconOpened = document.getElementById('chatbot-icon-opened');
+            if (!win) return;
+
+            if (typeof forceState === 'boolean') {
+                window.divineChatbotState.isOpen = forceState;
+            } else {
+                window.divineChatbotState.isOpen = !window.divineChatbotState.isOpen;
+            }
+
+            if (window.divineChatbotState.isOpen) {
+                win.classList.remove('hidden');
+                if (iconClosed) iconClosed.classList.add('hidden');
+                if (iconOpened) iconOpened.classList.remove('hidden');
+                if (!window.divineChatbotState.initialized) {
+                    initDivineChatbot();
+                } else {
+                    renderChatbotQuickPills();
+                }
+                setTimeout(() => {
+                    const input = document.getElementById('chatbot-input');
+                    if (input) input.focus();
+                    scrollChatbotToBottom();
+                }, 100);
+            } else {
+                win.classList.add('hidden');
+                if (iconClosed) iconClosed.classList.remove('hidden');
+                if (iconOpened) iconOpened.classList.add('hidden');
+            }
+        }
+
+        function initDivineChatbot() {
+            window.divineChatbotState.initialized = true;
+            window.divineChatbotState.messages = [];
+            renderChatbotQuickPills();
+
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null };
+            const studentGreeting = isStudent && ownStudent ? `Hello <b>${escapeHtml(ownStudent.name)}</b>! ` : 'Welcome to <b>Divine Classes</b>! ';
+
+            appendChatMessage('bot', `
+                <p>${studentGreeting}I am your AI Assistant & Helpdesk.</p>
+                <p class="mt-1">How can I assist you today? You can ask about:</p>
+                <ul class="list-disc list-inside mt-1 space-y-0.5 text-[11px] opacity-90">
+                    ${isStudent ? '<li>Your Monthly Fees, Due Date & Total Paid</li>' : '<li>Fee Structure & Policies</li>'}
+                    ${isStudent ? '<li>Your Enrolled Batch, Teacher & Schedule</li>' : '<li>Batches, Timings & Admissions</li>'}
+                    ${isStudent ? '<li>Your Test Marks & Progress</li>' : '<li>Weekly Test Pattern & Study Materials</li>'}
+                    <li>Institute Address, Timings & Helpline</li>
+                    <li>Director <b>Er. Rajesh Chahar</b> & Dev. Anil Kumar Chahar</li>
+                    <li>Physics, Chemistry & Math Concept Doubts</li>
+                </ul>
+            `);
+        }
+
+        function resetDivineChatbot() {
+            const container = document.getElementById('chatbot-messages');
+            if (container) container.innerHTML = '';
+            initDivineChatbot();
+        }
+
+        function renderChatbotQuickPills() {
+            const container = document.getElementById('chatbot-quick-pills');
+            if (!container) return;
+            const isStudent = state.currentRole === 'student';
+
+            const pills = isStudent ? [
+                { label: '💰 My Fee & Dues', query: 'What is my fee status and due date?' },
+                { label: '💵 Total Fees Paid', query: 'How much total fee have I paid till date?' },
+                { label: '📚 My Batch & Timing', query: 'Show my enrolled batch and timing' },
+                { label: '📈 My Test Marks', query: 'Show my latest test marks' },
+                { label: '📍 Address & Helpline', query: 'Where is the institute located and what is helpline?' },
+                { label: '⚛️ Newton\'s Laws', query: 'Explain Newton\'s laws of motion' },
+                { label: '📐 Quadratic Formula', query: 'What is the quadratic formula?' }
+            ] : [
+                { label: '💰 Fee Structure', query: 'What is the monthly fee structure and payment mode?' },
+                { label: '📚 Batches & Schedule', query: 'What batches and timings are available?' },
+                { label: '📍 Address & Contact', query: 'Where is Divine Classes located and how to contact?' },
+                { label: '👨‍🏫 Er. Rajesh Chahar', query: 'Who is the Director of Divine Classes?' },
+                { label: '💻 Dev. Anil Kumar Chahar', query: 'Who is the developer of this web app?' },
+                { label: '⚛️ Ohm\'s Law', query: 'What is Ohm\'s Law with formula?' },
+                { label: '📐 Trigonometry', query: 'What are basic trigonometry identities?' }
+            ];
+
+            container.innerHTML = pills.map(p => `
+                <button type="button" onclick="askChatbotQuickQuestion('${escapeHtml(p.query)}')"
+                    class="px-2.5 py-1 rounded-full bg-white dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 text-slate-700 dark:text-slate-200 font-medium whitespace-nowrap transition cursor-pointer shadow-xs active:scale-95">
+                    ${p.label}
+                </button>
+            `).join('');
+        }
+
+        function askChatbotQuickQuestion(query) {
+            const input = document.getElementById('chatbot-input');
+            if (input) {
+                input.value = query;
+                handleChatbotSubmit(new Event('submit'));
+            }
+        }
+
+        function scrollChatbotToBottom() {
+            const container = document.getElementById('chatbot-messages');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function appendChatMessage(role, htmlContent) {
+            const container = document.getElementById('chatbot-messages');
+            if (!container) return;
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex items-start gap-2 ' + (role === 'user' ? 'justify-end' : 'justify-start') + ' fade-in';
+
+            if (role === 'bot') {
+                msgDiv.innerHTML = `
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs mt-0.5">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="max-w-[85%] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl rounded-tl-xs p-3 shadow-xs border border-slate-200 dark:border-slate-700/80 leading-relaxed text-[12px]">
+                        ${htmlContent}
+                    </div>
+                `;
+            } else {
+                msgDiv.innerHTML = `
+                    <div class="max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-tr-xs p-3 shadow-xs leading-relaxed text-[12px]">
+                        ${htmlContent}
+                    </div>
+                    <div class="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs shrink-0 shadow-xs mt-0.5">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                `;
+            }
+
+            container.appendChild(msgDiv);
+            scrollChatbotToBottom();
+        }
+
+        function showChatbotTypingIndicator() {
+            const container = document.getElementById('chatbot-messages');
+            if (!container) return;
+            const existing = document.getElementById('chatbot-typing-indicator');
+            if (existing) return;
+
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'chatbot-typing-indicator';
+            typingDiv.className = 'flex items-start gap-2 justify-start fade-in';
+            typingDiv.innerHTML = `
+                <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs mt-0.5">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl rounded-tl-xs px-3.5 py-2.5 shadow-xs border border-slate-200 dark:border-slate-700/80 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 typing-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 typing-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 typing-dot"></span>
+                </div>
+            `;
+            container.appendChild(typingDiv);
+            scrollChatbotToBottom();
+        }
+
+        function removeChatbotTypingIndicator() {
+            const typing = document.getElementById('chatbot-typing-indicator');
+            if (typing) typing.remove();
+        }
+
+        function handleChatbotSubmit(event) {
+            if (event) event.preventDefault();
+            const input = document.getElementById('chatbot-input');
+            if (!input) return;
+            const text = String(input.value || '').trim();
+            if (!text) return;
+
+            input.value = '';
+            appendChatMessage('user', escapeHtml(text));
+            showChatbotTypingIndicator();
+
+            setTimeout(() => {
+                removeChatbotTypingIndicator();
+                const responseHtml = resolveDivineChatbotQuery(text);
+                appendChatMessage('bot', responseHtml);
+            }, 350);
+        }
+
+        function resolveDivineChatbotQuery(rawQuery) {
+            const q = String(rawQuery || '').toLowerCase().trim();
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent, batch: myBatch } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null, batch: null };
+            const todayIso = typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().split('T')[0];
+
+            // 1. GREETINGS
+            if (/^(hi|hello|hey|namaste|good\s*(morning|afternoon|evening)|pranam)\b/.test(q)) {
+                const name = isStudent && ownStudent ? escapeHtml(ownStudent.name) : 'there';
+                return `Hello ${name}! 👋 Welcome to Divine Classes. How can I help you today? Ask about your fees, batches, test marks, location, or any science & math doubts!`;
+            }
+
+            // 2. STUDENT FEES / DUE DATE / TOTAL FEES PAID
+            if (q.includes('fee') || q.includes('due') || q.includes('paid') || q.includes('balance') || q.includes('kitni') || q.includes('paisa') || q.includes('rupee')) {
+                if (isStudent && ownStudent) {
+                    const paid = Number(ownStudent.paidFee || 0).toLocaleString('en-IN');
+                    const monthly = Number(ownStudent.monthlyFee || 1000).toLocaleString('en-IN');
+                    const due = ownStudent.dueDate || 'Paid';
+                    const isOverdue = due !== 'Paid' && due <= todayIso;
+                    const upi = (state.settings && state.settings.upiId) || '9555678753@upi';
+
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">🎓 Student Fee Ledger (${escapeHtml(ownStudent.name)}):</p>
+                            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
+                                <div class="flex justify-between"><span>Roll Number:</span><span class="font-bold">${escapeHtml(ownStudent.roll || 'N/A')}</span></div>
+                                <div class="flex justify-between"><span>Monthly Fee:</span><span class="font-bold">₹${monthly} / month</span></div>
+                                <div class="flex justify-between"><span>Total Fees Paid:</span><span class="font-bold text-emerald-600">₹${paid}</span></div>
+                                <div class="flex justify-between"><span>Next Due Date:</span><span class="font-bold ${isOverdue ? 'text-rose-500' : 'text-slate-700 dark:text-slate-300'}">${escapeHtml(due)}</span></div>
+                                <div class="flex justify-between"><span>Payment Status:</span><span class="font-bold ${isOverdue ? 'text-rose-600' : 'text-emerald-600'}">${isOverdue ? '⚠️ Payment Pending' : '✅ Clear & Active'}</span></div>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                                💳 <b>Pay Online:</b> UPI to <code class="bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded text-indigo-600 font-bold">${escapeHtml(upi)}</code> or pay in cash at institute counter.
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    const upi = (state.settings && state.settings.upiId) || '9555678753@upi';
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">💰 Divine Classes Fee Structure:</p>
+                            <ul class="list-disc list-inside space-y-1 text-[11px]">
+                                <li><b>Standard Tuition Fee:</b> <b>₹1,000 / month</b> per subject/course.</li>
+                                <li><b>Enrollment Policy:</b> Newly enrolled students start at <b>₹0 Total Fees Paid</b> (strictly non-editable on admission).</li>
+                                <li><b>Monthly Accumulation:</b> With each payment receipt, Total Paid dynamically accumulates (e.g. ₹1,000 for 1 month, ₹12,000 for 12 months).</li>
+                                <li><b>Payment Methods:</b> Direct UPI to <code class="bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded text-indigo-600 font-bold">${escapeHtml(upi)}</code> or cash at front office.</li>
+                            </ul>
+                            <p class="text-[10px] text-slate-400">💡 <i>Tip: Log in as a Student to view your personal live fee ledger.</i></p>
+                        </div>
+                    `;
+                }
+            }
+
+            // 3. BATCHES / SCHEDULE / TIMINGS / CLASS
+            if (q.includes('batch') || q.includes('timing') || q.includes('schedule') || q.includes('samay') || q.includes('kab') || q.includes('class')) {
+                if (isStudent && myBatch) {
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📚 Your Enrolled Batch:</p>
+                            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
+                                <div class="flex justify-between"><span>Batch Name:</span><span class="font-bold">${escapeHtml(myBatch.name)}</span></div>
+                                <div class="flex justify-between"><span>Subject:</span><span class="font-bold">${escapeHtml(myBatch.subject)}</span></div>
+                                <div class="flex justify-between"><span>Class / Grade:</span><span class="font-bold">${escapeHtml(myBatch.grade || 'General')}</span></div>
+                                <div class="flex justify-between"><span>Timing:</span><span class="font-bold text-indigo-600 dark:text-indigo-400">${escapeHtml(myBatch.timing || '3:30 PM - 5:00 PM')}</span></div>
+                                <div class="flex justify-between"><span>Days:</span><span class="font-bold">${escapeHtml(myBatch.days || 'Mon, Wed, Fri')}</span></div>
+                                <div class="flex justify-between"><span>Teacher / Mentor:</span><span class="font-bold">${escapeHtml(myBatch.teacher || 'Er. Rajesh Chahar')}</span></div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const batches = (state.batches || []).slice(0, 4);
+                    let batchListHtml = '';
+                    if (batches.length > 0) {
+                        batchListHtml = batches.map(b => `
+                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px]">
+                                <p class="font-bold text-slate-800 dark:text-slate-200">${escapeHtml(b.name)} (${escapeHtml(b.grade || 'CBSE')})</p>
+                                <p class="text-slate-500 text-[10px]">⏰ ${escapeHtml(b.timing || '3:30 PM - 5:00 PM')} • 👨‍🏫 ${escapeHtml(b.teacher || 'Er. Rajesh Chahar')}</p>
+                            </div>
+                        `).join('');
+                    } else {
+                        batchListHtml = `<p class="text-[11px] text-slate-500">Batches offered for Classes 9th, 10th, 11th, and 12th in Physics, Chemistry, and Mathematics.</p>`;
+                    }
+
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📚 Available Batches & Schedule:</p>
+                            <div class="space-y-1.5">
+                                ${batchListHtml}
+                            </div>
+                            <p class="text-[10px] text-slate-400">Contact the front desk at <b>${escapeHtml((state.settings && state.settings.contactDisplay) || '9555-6787-53')}</b> for batch admissions.</p>
+                        </div>
+                    `;
+                }
+            }
+
+            // 4. MARKS / TESTS / RESULTS
+            if (q.includes('mark') || q.includes('test') || q.includes('result') || q.includes('score') || q.includes('rank')) {
+                if (isStudent && ownStudent) {
+                    const studentTests = (state.offlineTests || []).filter(t => {
+                        return (t.batchId && ownStudent.batchId && String(t.batchId) === String(ownStudent.batchId)) ||
+                               (t.studentScores && t.studentScores[ownStudent.id]);
+                    }).slice(-3);
+
+                    if (studentTests.length > 0) {
+                        const testRows = studentTests.map(t => {
+                            let score = t.studentScores ? t.studentScores[ownStudent.id] : null;
+                            if (score === undefined || score === null) score = t.sampleScore || '88';
+                            return `<div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800 text-[11px]">
+                                <span>${escapeHtml(t.name || t.title)} (${escapeHtml(t.subject || 'Exam')}):</span>
+                                <span class="font-bold text-indigo-600">${score} / ${t.maxMarks || 100}</span>
+                            </div>`;
+                        }).join('');
+
+                        return `
+                            <div class="space-y-1.5">
+                                <p class="font-bold text-indigo-600 dark:text-indigo-400">📈 Recent Test Performance (${escapeHtml(ownStudent.name)}):</p>
+                                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                                    ${testRows}
+                                </div>
+                                <p class="text-[10px] text-slate-500">View complete report card and rank in the <b>Tests</b> tab.</p>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <p>📈 <b>Academic Performance:</b> Weekly offline tests are conducted every Saturday. Your logged scores will appear here and under the <b>Tests</b> module.</p>
+                        `;
+                    }
+                } else {
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📝 Offline Test Series & Evaluation:</p>
+                            <p class="text-[11px] leading-relaxed">Divine Classes organizes rigorous weekly offline tests for Classes 9 to 12. Complete report cards, chapter performance analysis, and parent-student reviews are tracked digitally.</p>
+                        </div>
+                    `;
+                }
+            }
+
+            // 5. ATTENDANCE
+            if (q.includes('attendance') || q.includes('haziri') || q.includes('present') || q.includes('absent')) {
+                if (isStudent && ownStudent) {
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📅 Attendance Record (${escapeHtml(ownStudent.name)}):</p>
+                            <p class="text-[11px]">Your daily attendance is recorded directly into the Divine Classes cloud register. Open the <b>Attendance</b> tab from the left sidebar/bottom menu to see your complete monthly calendar grid.</p>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <p class="text-[11px]">📅 Daily attendance is logged via a 1-click cloud register with instant absentee alerts and parent notification tracking.</p>
+                    `;
+                }
+            }
+
+            // 6. ADDRESS / LOCATION / DIRECTIONS
+            if (q.includes('address') || q.includes('location') || q.includes('kahan') || q.includes('where') || q.includes('map') || q.includes('pocket')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📍 Institute Location & Address:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">Divine Classes</p>
+                            <p class="text-slate-600 dark:text-slate-400">235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063</p>
+                            <p class="text-[10px] text-slate-500">🏢 <b>Landmark:</b> Near Paschimpuri Club</p>
+                            <p class="text-[10px] text-slate-500">🕒 <b>Visiting Hours:</b> Monday – Saturday (3:00 PM – 8:00 PM)</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 7. CONTACT / PHONE / HELPLINE / WHATSAPP
+            if (q.includes('contact') || q.includes('phone') || q.includes('call') || q.includes('mobile') || q.includes('helpline') || q.includes('whatsapp') || q.includes('number')) {
+                const phone = (state.settings && state.settings.contactDisplay) || '9555-6787-53';
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📞 Helpline & Support:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-phone text-indigo-600"></i>
+                                <span><b>Helpline:</b> <a href="tel:${escapeHtml(phone.replace(/[^0-9]/g, ''))}" class="text-indigo-600 font-bold underline">${escapeHtml(phone)}</a></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i>
+                                <span><b>WhatsApp:</b> <a href="https://wa.me/919555678753" target="_blank" class="text-emerald-600 font-bold underline">9555678753</a></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-code text-purple-600"></i>
+                                <span><b>Developer Support:</b> Dev. Anil Kumar Chahar (8126390611)</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 8. DIRECTOR / ER. RAJESH CHAHAR
+            if (q.includes('director') || q.includes('founder') || q.includes('rajesh') || q.includes('chahar') || q.includes('owner') || q.includes('head')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">👨‍🏫 Institute Leadership:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">Er. Rajesh Chahar</p>
+                            <p class="text-slate-600 dark:text-slate-400">Director & Senior Educator</p>
+                            <p class="text-[10px] text-slate-500 leading-relaxed">Specialized in CBSE Board and Foundation Physics & Mathematics. Er. Rajesh Chahar has mentored hundreds of students towards academic top ranks through disciplined conceptual clarity.</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 9. DEVELOPER / DEV. ANIL KUMAR CHAHAR
+            if (q.includes('anil') || q.includes('developer') || q.includes('engineer') || q.includes('author') || q.includes('banaya')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">💻 Software Architect & Engineering:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">Dev. Anil Kumar Chahar</p>
+                            <p class="text-slate-600 dark:text-slate-400">Lead Full-Stack Platform Engineer</p>
+                            <p class="text-[10px] text-slate-500 leading-relaxed">📱 Contact: <b>8126390611</b> • Designed and engineered the Divine Classes Cloud Management System v2.5 with live cross-platform synchronization.</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 10. STUDY MATERIALS / NCERT / NOTES
+            if (q.includes('material') || q.includes('notes') || q.includes('book') || q.includes('pdf') || q.includes('ncert') || q.includes('download')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📖 Study Materials & Free Portals:</p>
+                        <p class="text-[11px] leading-relaxed">You can access curriculum notes, worksheets, and textbooks from the <b>Materials</b> tab. We also provide official 1-click links to NCERT, NDLI (National Digital Library), PhET Interactive Simulations, and CBSE Academic Portals.</p>
+                    </div>
+                `;
+            }
+
+            // 11. ACADEMIC DOUBT: NEWTON'S LAWS OF MOTION
+            if (q.includes('newton') || q.includes('law of motion')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">⚛️ Newton's 3 Laws of Motion:</p>
+                        <ol class="list-decimal list-inside space-y-1 text-[11px]">
+                            <li><b>1st Law (Law of Inertia):</b> An object remains at rest or in uniform motion unless acted upon by a net external force.</li>
+                            <li><b>2nd Law (Force Law):</b> Force is proportional to the rate of change of momentum: <code class="font-bold text-indigo-600">F = m × a</code>.</li>
+                            <li><b>3rd Law (Action-Reaction):</b> For every action, there is an equal and opposite reaction: <code class="font-bold text-indigo-600">F_AB = -F_BA</code>.</li>
+                        </ol>
+                    </div>
+                `;
+            }
+
+            // 12. ACADEMIC DOUBT: OHM'S LAW
+            if (q.includes('ohm')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">⚡ Ohm's Law (Physics):</p>
+                        <p class="text-[11px] leading-relaxed">The electric current passing through a conductor between two points is directly proportional to the voltage across the two points, provided physical conditions (temperature) remain constant.</p>
+                        <div class="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg text-center font-bold text-indigo-700 dark:text-indigo-300 text-xs">
+                            V = I × R &nbsp;&nbsp;|&nbsp;&nbsp; I = V / R &nbsp;&nbsp;|&nbsp;&nbsp; R = V / I
+                        </div>
+                        <p class="text-[10px] text-slate-500">• <b>V</b> = Voltage (Volts)<br>• <b>I</b> = Current (Amperes)<br>• <b>R</b> = Resistance (Ohms Ω)</p>
+                    </div>
+                `;
+            }
+
+            // 13. ACADEMIC DOUBT: QUADRATIC FORMULA
+            if (q.includes('quadratic') || q.includes('shreedharacharya') || (q.includes('root') && q.includes('equation'))) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📐 Quadratic Equation & Formula:</p>
+                        <p class="text-[11px]">For any quadratic equation in standard form: <code class="font-bold">ax² + bx + c = 0</code> (where a ≠ 0):</p>
+                        <div class="p-2 bg-purple-50 dark:bg-purple-950/60 rounded-lg text-center font-bold text-purple-700 dark:text-purple-300 text-xs">
+                            x = [ -b ± √(b² - 4ac) ] / (2a)
+                        </div>
+                        <p class="text-[10px] text-slate-500">
+                            • <b>Discriminant D = b² - 4ac</b><br>
+                            • If D > 0: Two distinct real roots<br>
+                            • If D = 0: Two equal real roots (-b/2a)<br>
+                            • If D < 0: No real roots (complex roots)
+                        </p>
+                    </div>
+                `;
+            }
+
+            // 14. ACADEMIC DOUBT: TRIGONOMETRY
+            if (q.includes('trig') || q.includes('sin') || q.includes('cos') || q.includes('tan') || q.includes('pythagor')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📐 Trigonometric Core Identities:</p>
+                        <ul class="list-disc list-inside space-y-1 text-[11px]">
+                            <li><b>Fundamental:</b> <code class="font-bold text-indigo-600">sin²θ + cos²θ = 1</code></li>
+                            <li><b>Secant Identity:</b> <code class="font-bold text-indigo-600">1 + tan²θ = sec²θ</code></li>
+                            <li><b>Cosecant Identity:</b> <code class="font-bold text-indigo-600">1 + cot²θ = cosec²θ</code></li>
+                            <li><b>Tangent:</b> <code class="font-bold">tanθ = sinθ / cosθ</code></li>
+                            <li><b>Pythagoras:</b> <code class="font-bold">Hypotenuse² = Base² + Perpendicular²</code></li>
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // 15. DEFAULT FALLBACK
+            return `
+                <div class="space-y-1.5">
+                    <p class="font-semibold text-slate-800 dark:text-slate-100">I can help you with Divine Classes information and study doubts!</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Please tap one of the quick suggestions above or try asking:</p>
+                    <ul class="list-disc list-inside space-y-0.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('What is my fee status and due date?')" class="hover:underline">"What is my fee status and due date?"</a></li>
+                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('Where is Divine Classes located?')" class="hover:underline">"Where is Divine Classes located?"</a></li>
+                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('What batches are available?')" class="hover:underline">"What batches are available?"</a></li>
+                        <li><a href="javascript:void(0)" onclick="askChatbotQuickQuestion('Explain Ohm\\'s Law')" class="hover:underline">"Explain Ohm's Law"</a></li>
+                    </ul>
+                </div>
+            `;
+        }
+
         window.bootApp = bootApp;
 
         // Multi-stage boot guarantee for Google Apps Script HtmlService iframe & standalone web app:
