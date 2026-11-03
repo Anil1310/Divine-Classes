@@ -276,8 +276,8 @@ ${renderUserAvatar(student.photo, student.name, 'student', 'w-8 h-8')}
 
 Make `Photo URL` the trailing column so managers can paste direct Drive links or view photos:
 
-- **`Students_Master` (12 Columns):**
-  `Roll No` | `Student Name` | `Login Password` | `Access Status` | `Parent Name` | `Contact Phone` | `Total Fee (INR)` | `Paid Fee (INR)` | `Pending Dues (INR)` | `Fee Due Date` | `Last Reminder Sent` | `Photo URL`
+- **`Students_Master` (13 Columns):**
+  `Roll No` | `Student Name` | `Login Password` | `Access Status` | `Parent Name` | `Contact Phone` | `Total Fee (INR)` | `Paid Fee (INR)` | `Pending Dues (INR)` | `Fee Due Date` | `Last Reminder Sent` | `Admission Date` | `Monthly Fee (INR)`
 - **`Teachers_Roster` (10 Columns):**
   `Teacher ID` | `Teacher Name` | `Subject` | `Login Email` | `Login Password` | `Access Status` | `Contact Phone` | `Qualification` | `Experience` | `Photo URL`
 

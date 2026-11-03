@@ -159,9 +159,9 @@ To provide Divine Classes with an intuitive, unified, tamper-evident Academic ER
   - *Direct Print*: CSS print rules hiding action buttons.
 
 ### Module 7: Tuition Fee Tracker & Instant UPI Receipts
-- **FR-7.1**: Maintain an audit ledger for course fees, installments paid, and balance due.
-- **FR-7.2**: Generate official, printable fee receipts with unique receipt numbers (`DC-REC-XXXXXX`), student details, mode (UPI/Cash), and authorized stamp.
-- **FR-7.3**: One-click WhatsApp fee payment reminders dispatched directly to parent contact numbers.
+- **FR-7.1**: Maintain a dynamic monthly tuition fee ledger. On student admission, Total Fees Paid is permanently initialized to ₹0 and strictly non-editable even for admin. As payments are recorded (e.g. ₹1,000 for 1 month or ₹12,000 for 12 months), Total Fees Paid accumulates dynamically, and the student's next fee due date automatically advances by the exact number of months paid.
+- **FR-7.2**: Generate official, printable fee receipts with unique receipt numbers (`DC-REC-XXXXXX`), monthly tuition fee, payment amount received, cumulative Total Fees Paid till date, next fee due date, and payment mode (UPI/Cash).
+- **FR-7.3**: One-click WhatsApp fee payment reminders dispatched directly to parent contact numbers when a monthly tuition payment is due.
 
 ### Module 8: Settings, Database Sync & Configuration Console
 - **FR-8.1**: Provide editing of Institute Name, Admin Name, Contact Numbers, Address, and Helplines.

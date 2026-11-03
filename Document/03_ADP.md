@@ -231,17 +231,19 @@ REQUIREMENTS:
 ### PROMPT 09: Tuition Fee Management & Instant UPI Receipts
 ```text
 SYSTEM ROLE: Financial Systems & Billing Engineer
-GOAL: Build a comprehensive coaching fee tracking and receipt generation module.
+GOAL: Build a comprehensive monthly tuition fee tracking, payment accumulation, and receipt generation module.
 
 REQUIREMENTS:
-1. Financial Ledger:
-   - Track Total Course Fee, Paid Amount, and Balance Due per student.
+1. Financial Ledger & Dynamic Monthly Tuition:
+   - On student admission, Total Fees Paid is initialized to ₹0 and strictly non-editable even for admin.
+   - Track Monthly Fee (e.g. ₹1,000/mo) and cumulative Total Fees Paid per student.
+   - When a payment is recorded (e.g. ₹1,000 for 1 month, or ₹12,000 for 12 months), Total Fees Paid updates dynamically and the student's Fee Due Date advances by the exact number of months paid.
    - Maintain payment history log with timestamps, mode (UPI/Cash), and reference IDs.
 2. Official Fee Receipt:
    - Generate instant, printable fee receipts with unique Receipt No (e.g. DC-REC-XXXXXX), 
-     coaching logo, parent details, installment details, and authorized signature.
+     coaching logo, parent details, monthly tuition rate, amount received, cumulative total paid, next fee due date, and authorized signature.
 3. Automated WhatsApp Fee Reminders:
-   - One-click trigger sending polite, itemized payment reminders to parents.
+   - One-click trigger sending polite, itemized monthly payment reminders to parents when fee is due.
 ```
 
 ---

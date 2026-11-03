@@ -203,15 +203,21 @@ At the bottom of the report card modal, click any of the action buttons:
 
 ## 6. Fee Management & UPI Receipts
 
-### 6.1 Recording a Payment:
-1. As Admin, open **Fee Management**.
-2. Click **Record Payment** on the student's row.
-3. Choose Payment Mode: `UPI`, `Cash`, `Bank Transfer`, or `Cheque`.
-4. Enter the Transaction/UTR number.
+### 6.1 Enrolling a Student & Initial Fee:
+1. When adding a new student, **Total Fees Paid (₹)** is automatically set to **`0`** and is strictly non-editable even for admin.
+2. Specify the **Monthly Fee (₹)** (e.g. ₹1,000) and **Admission Date**. The initial fee due date defaults to next month.
 
-### 6.2 Generating Receipt:
-- Click **Print / View Receipt** on any student row.
-- The receipt includes the coaching logo, student roll number, breakdown of course fees, total paid, balance due, and authorized signatory.
+### 6.2 Recording a Monthly or Advance Payment:
+1. As Admin, open **Fee Management**.
+2. Click **Payment** on the student's row.
+3. The payment amount defaults to the student's monthly fee (e.g. ₹1,000). You can enter 1 month (₹1,000) or multiple months (e.g. ₹12,000 for 12 months).
+4. Choose Payment Mode: `UPI / QR`, `Cash Receipt`, `Bank NEFT / IMPS`, or `Cheque`.
+5. Enter the Transaction/UTR or receipt reference.
+6. Click **Record & Generate Receipt**. Total Fees Paid updates dynamically (e.g. 0 → 1,000 → 12,000) and the student's fee due date automatically advances by the number of months paid.
+
+### 6.3 Generating Receipt:
+- Click **Receipt** on any student row.
+- The receipt includes the coaching logo, student roll number, parent name, monthly tuition fee, payment amount received, cumulative Total Fees Paid till date, next fee due date, and authorized signatory.
 
 ---
 

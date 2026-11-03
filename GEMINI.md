@@ -74,3 +74,18 @@ Applies identically across Web Browsers and Mobile APK (WebView):
 - **Independence of Credentials vs. Session**:
   - Auto-logout or manual logout closes the active session (`DIVINE_AUTH_SESSION`), but keeps the 10-day remembered credentials intact. This allows the user to immediately log back in with their remembered credentials until the 10-day limit expires.
 
+---
+
+## 8. Dynamic Monthly Tuition Fees & Non-Editable Total Paid Field
+- **Non-Editable Total Fees Paid**:
+  - In student enrollment ("Add New Student" modal), the obsolete "Total Course Fee" input is completely removed.
+  - Replaced with **"Total Fees Paid (₹)"**, permanently initialized to **`0`** and strictly **non-editable by anyone, even for admin** (`readonly disabled cursor-not-allowed`).
+  - In student edit modals, "Total Fees Paid (₹)" remains strictly read-only and displays the student's cumulative payments till date.
+- **Dynamic Payment Accumulation & Due Date Advancement**:
+  - Tuition is paid on a monthly basis (default ₹1,000 / month, or any student-configured monthly rate).
+  - Recording fee payments (e.g. ₹1,000 for 1 month, or ₹12,000 for 12 months) automatically accumulates into `paidFee` (Total Fees Paid).
+  - Every recorded monthly payment advances the student's next fee due date forward by the exact number of months paid (`months = Math.floor(payment / monthlyFee)`).
+- **Fees Ledger & Receipts**:
+  - Ledger table header, mobile summary drawers, printed fee receipts, and CSV exports prominently highlight **"Total Paid (₹)"**, **"Monthly Fee (₹)"**, and real-time **"Fee Due Date"** status.
+
+

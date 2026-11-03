@@ -44,17 +44,17 @@ function getDefaultSeedData() {
       }
     ],
     students: [
-      { id: 's1', roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', totalFee: 48000, paidFee: 32000, dueDate: '2026-10-25', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
-      { id: 's2', roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's3', roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', totalFee: 48000, paidFee: 16000, dueDate: '2026-10-18', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's4', roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's5', roll: 'DC-201', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', totalFee: 52000, paidFee: 26000, dueDate: '2026-10-20', lastReminder: '5 days ago', password: 'password123', status: 'Active' },
-      { id: 's6', roll: 'DC-202', name: 'Ananya Singh', phone: '+91 96543 21098', parentName: 'Virendra Singh', totalFee: 52000, paidFee: 52000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's7', roll: 'DC-203', name: 'Devansh Joshi', phone: '+91 95551 12233', parentName: 'Prakash Joshi', totalFee: 52000, paidFee: 36000, dueDate: '2026-10-28', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's8', roll: 'DC-301', name: 'Ishita Das', phone: '+91 94443 32211', parentName: 'Subhash Das', totalFee: 30000, paidFee: 22000, dueDate: '2026-10-22', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's9', roll: 'DC-302', name: 'Yashvardhan Chauhan', phone: '+91 93123 45678', parentName: 'Manoj Chauhan', totalFee: 30000, paidFee: 30000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's10', roll: 'DC-110', name: 'Anil Kumar Chahar', phone: '+91 95556 78753', parentName: 'Rajesh Chahar', totalFee: 50000, paidFee: 25000, dueDate: '2026-10-30', lastReminder: '1 day ago', password: 'password123', status: 'Active' },
-      { id: 's11', roll: 'DC-105', name: 'Radhika Chahar', phone: '+91 95556 78754', parentName: 'Anil Chahar', totalFee: 48000, paidFee: 48000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' }
+      { id: 's1', roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', totalFee: 48000, paidFee: 32000, monthlyFee: 1000, dueDate: '2026-10-25', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
+      { id: 's2', roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', totalFee: 48000, paidFee: 48000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
+      { id: 's3', roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', totalFee: 48000, paidFee: 16000, monthlyFee: 1000, dueDate: '2026-10-18', lastReminder: 'Never', password: 'password123', status: 'Active' },
+      { id: 's4', roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', totalFee: 48000, paidFee: 48000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
+      { id: 's5', roll: 'DC-201', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', totalFee: 52000, paidFee: 26000, monthlyFee: 1000, dueDate: '2026-10-20', lastReminder: '5 days ago', password: 'password123', status: 'Active' },
+      { id: 's6', roll: 'DC-202', name: 'Ananya Singh', phone: '+91 96543 21098', parentName: 'Virendra Singh', totalFee: 52000, paidFee: 52000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
+      { id: 's7', roll: 'DC-203', name: 'Devansh Joshi', phone: '+91 95551 12233', parentName: 'Prakash Joshi', totalFee: 52000, paidFee: 36000, monthlyFee: 1000, dueDate: '2026-10-28', lastReminder: 'Never', password: 'password123', status: 'Active' },
+      { id: 's8', roll: 'DC-301', name: 'Ishita Das', phone: '+91 94443 32211', parentName: 'Subhash Das', totalFee: 30000, paidFee: 22000, monthlyFee: 1000, dueDate: '2026-10-22', lastReminder: 'Never', password: 'password123', status: 'Active' },
+      { id: 's9', roll: 'DC-302', name: 'Yashvardhan Chauhan', phone: '+91 93123 45678', parentName: 'Manoj Chauhan', totalFee: 30000, paidFee: 30000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
+      { id: 's10', roll: 'DC-110', name: 'Anil Kumar Chahar', phone: '+91 95556 78753', parentName: 'Rajesh Chahar', totalFee: 50000, paidFee: 25000, monthlyFee: 1000, dueDate: '2026-10-30', lastReminder: '1 day ago', password: 'password123', status: 'Active' },
+      { id: 's11', roll: 'DC-105', name: 'Radhika Chahar', phone: '+91 95556 78754', parentName: 'Anil Chahar', totalFee: 48000, paidFee: 48000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' }
     ],
     materials: [
       {

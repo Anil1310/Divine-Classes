@@ -91,7 +91,7 @@ def recreate_fresh_database():
     return True
 
 
-def insert_fresh_student(name, roll, phone, parent_name="Parent", batch_id="b1", total_fee=48000, paid_fee=12000):
+def insert_fresh_student(name, roll, phone, parent_name="Parent", batch_id="b1", total_fee=0, paid_fee=0, monthly_fee=1000):
     """Inserts a fresh student record into public.students."""
     conn = get_connection()
     cur = conn.cursor()
@@ -100,10 +100,10 @@ def insert_fresh_student(name, roll, phone, parent_name="Parent", batch_id="b1",
 
     insert_sql = """
         INSERT INTO public.students (
-            id, roll, name, phone, parent_name, total_fee, paid_fee, 
+            id, roll, name, phone, parent_name, total_fee, paid_fee, monthly_fee,
             status, batch_id, password, created_at, updated_at
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, 'Active', %s, 'password123', NOW(), NOW()
+            %s, %s, %s, %s, %s, %s, %s, %s, 'Active', %s, 'password123', NOW(), NOW()
         )
         ON CONFLICT (roll) DO UPDATE SET
             name = EXCLUDED.name,
@@ -111,12 +111,13 @@ def insert_fresh_student(name, roll, phone, parent_name="Parent", batch_id="b1",
             parent_name = EXCLUDED.parent_name,
             total_fee = EXCLUDED.total_fee,
             paid_fee = EXCLUDED.paid_fee,
+            monthly_fee = EXCLUDED.monthly_fee,
             batch_id = EXCLUDED.batch_id,
             updated_at = NOW()
         RETURNING id, roll, name, batch_id;
     """
 
-    cur.execute(insert_sql, (student_id, roll, name, phone, parent_name, total_fee, paid_fee, batch_id))
+    cur.execute(insert_sql, (student_id, roll, name, phone, parent_name, total_fee, paid_fee, monthly_fee, batch_id))
     result = cur.fetchone()
     print(f"✅ Fresh Student Inserted: ID={result[0]}, Roll={result[1]}, Name='{result[2]}', Batch='{result[3]}'")
 
