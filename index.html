@@ -12013,6 +12013,12 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function toggleGeminiSettingsDrawer(forceState) {
             const drawer = document.getElementById('gemini-config-drawer');
+            const isDev = state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
+            if (!isDev) {
+                showToast('Gemini AI configuration is restricted to Developer mode.', 'warning');
+                if (drawer) drawer.classList.add('hidden');
+                return;
+            }
             if (!drawer) return;
             const isCurrentlyHidden = drawer.classList.contains('hidden');
             const targetShow = (typeof forceState === 'boolean') ? forceState : isCurrentlyHidden;
@@ -12046,6 +12052,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         }
 
         function saveGeminiSettingsFromDrawer() {
+            const isDev = state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
+            if (!isDev) {
+                showToast('Only Developer can save Gemini AI configuration.', 'error');
+                return;
+            }
             const keyInput = document.getElementById('gemini-api-key-input');
             const modelSel = document.getElementById('gemini-model-select');
             const modeSel = document.getElementById('gemini-mode-select');
@@ -12162,41 +12173,118 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return window.SpeechRecognition || window.webkitSpeechRecognition || null;
         }
 
+        function showMicrophonePermissionHelpModal() {
+            if (typeof openModal !== 'function') return;
+            const isHttps = window.location.protocol === 'https:';
+            const html = `
+                <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-microphone-slash"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold">Microphone Access is Blocked</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Your browser has blocked microphone access for Divine Classes.</p>
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info"></i> How to Allow Microphone Access:
+                        </p>
+                        <ol class="list-decimal list-inside space-y-2 text-slate-600 dark:text-slate-300">
+                            <li><strong>Look at your browser's address bar</strong> at the top of this window.</li>
+                            <li>Click on the <strong>Tune / Settings / Padlock icon (🔒 or 🎚️)</strong> on the left side of the address.</li>
+                            <li>Find <strong>Microphone</strong> in the permissions menu and change it to <strong>"Allow"</strong>.</li>
+                            ${!isHttps && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? '<li class="text-amber-600 font-semibold">Note: Speech recognition requires HTTPS secure connection or localhost.</li>' : ''}
+                            <li>Once allowed, click <strong>"Try Again"</strong> below to start speaking!</li>
+                        </ol>
+                    </div>
+                    <div class="flex gap-2 justify-end pt-2">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">
+                            Close
+                        </button>
+                        <button type="button" onclick="closeModal(); setTimeout(toggleChatbotVoiceRecognition, 300);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-microphone"></i> Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+            openModal(html);
+        }
+
         function toggleChatbotVoiceRecognition() {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) {
-                showToast('Voice recognition is not supported in this browser. Please use Google Chrome, Edge, or an Android browser with microphone access.', 'warning');
+                showToast('Voice recognition requires Google Chrome, Microsoft Edge, Safari, or an Android browser with microphone access.', 'warning');
                 return;
             }
 
-            if (window.divineChatbotState.isListening) {
+            if (window.divineChatbotState && window.divineChatbotState.isListening) {
                 stopChatbotVoiceRecognition();
                 return;
             }
 
-            startChatbotVoiceRecognition();
+            // Proactively request browser microphone permission via getUserMedia if available
+            if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        try {
+                            stream.getTracks().forEach(function(t) { t.stop(); });
+                        } catch(e){}
+                        startChatbotVoiceRecognition();
+                    })
+                    .catch(function(err) {
+                        console.warn('[Microphone Permission Error]', err);
+                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                            showToast('Microphone access was denied. Please allow microphone permissions in your browser address bar.', 'error');
+                            showMicrophonePermissionHelpModal();
+                        } else {
+                            startChatbotVoiceRecognition();
+                        }
+                    });
+            } else {
+                startChatbotVoiceRecognition();
+            }
         }
 
         function startChatbotVoiceRecognition() {
             const SpeechRec = getSpeechRecognition();
             if (!SpeechRec) return;
 
+            if (window.divineChatbotState && window.divineChatbotState.recognition) {
+                try { window.divineChatbotState.recognition.stop(); } catch(e){}
+                window.divineChatbotState.recognition = null;
+            }
+
             try {
                 const recognition = new SpeechRec();
                 recognition.continuous = false;
                 recognition.interimResults = true;
+                recognition.maxAlternatives = 1;
                 recognition.lang = 'en-IN'; // Optimized for Indian English & Hindi terms
 
-                const input = document.getElementById('chatbot-input');
+                const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
                 const banner = document.getElementById('chatbot-voice-banner');
-                const micIcon = document.getElementById('chatbot-mic-icon');
-                const micBtn = document.getElementById('chatbot-voice-btn');
+                const micIcon = document.getElementById('chatbot-mic-icon') || document.getElementById('dedicated-mic-icon');
+                const micBtn = document.getElementById('chatbot-voice-btn') || document.getElementById('dedicated-chatbot-voice-btn');
 
                 recognition.onstart = function() {
-                    window.divineChatbotState.isListening = true;
+                    if (window.divineChatbotState) {
+                        window.divineChatbotState.isListening = true;
+                    }
                     if (banner) banner.classList.remove('hidden');
-                    if (micIcon) micIcon.className = 'fa-solid fa-stop text-rose-600 animate-pulse text-xs';
-                    if (micBtn) micBtn.classList.add('bg-rose-100', 'text-rose-600', 'dark:bg-rose-950');
+                    if (micIcon) {
+                        micIcon.className = 'fa-solid fa-stop text-white text-xs animate-pulse';
+                    }
+                    if (micBtn) {
+                        micBtn.classList.add('bg-rose-600', 'text-white', 'ring-4', 'ring-rose-300', 'animate-pulse');
+                        micBtn.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300');
+                    }
+                    if (input) {
+                        input.placeholder = '🎙️ Listening... Speak now clearly...';
+                        input.classList.add('ring-2', 'ring-rose-500', 'bg-rose-50/20');
+                    }
+                    showToast('🎙️ Microphone active! Speak your doubt or student details...', 'info');
                 };
 
                 recognition.onresult = function(event) {
@@ -12204,15 +12292,22 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     for (let i = event.resultIndex; i < event.results.length; i++) {
                         transcript += event.results[i][0].transcript;
                     }
-                    if (input) {
+                    if (input && transcript) {
                         input.value = transcript;
                     }
                 };
 
                 recognition.onerror = function(event) {
                     console.warn('[Voice Recognition Error]', event.error);
-                    if (event.error === 'not-allowed') {
-                        showToast('Microphone access blocked. Please allow microphone permissions.', 'error');
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        showToast('Microphone access blocked. Click the lock/settings icon in your browser address bar to allow microphone.', 'error');
+                        showMicrophonePermissionHelpModal();
+                    } else if (event.error === 'no-speech') {
+                        showToast('No speech detected. Please speak closer to the microphone.', 'info');
+                    } else if (event.error === 'network') {
+                        showToast('Voice recognition network error. Please check your internet connection.', 'error');
+                    } else {
+                        showToast('Voice error: ' + event.error, 'warning');
                     }
                     stopChatbotVoiceRecognition();
                 };
@@ -12221,29 +12316,50 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     stopChatbotVoiceRecognition();
                     const text = input ? String(input.value || '').trim() : '';
                     if (text) {
-                        handleChatbotSubmit(new Event('submit'));
+                        const floatingForm = document.getElementById('chatbot-form');
+                        const isDedicated = !floatingForm || floatingForm.offsetParent === null;
+                        if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
+                            handleDedicatedChatbotSubmit(new Event('submit'));
+                        } else if (typeof handleChatbotSubmit === 'function') {
+                            handleChatbotSubmit(new Event('submit'));
+                        }
                     }
                 };
 
-                window.divineChatbotState.recognition = recognition;
+                if (window.divineChatbotState) {
+                    window.divineChatbotState.recognition = recognition;
+                }
                 recognition.start();
             } catch(err) {
                 console.error('[Voice Start Error]', err);
+                showToast('Could not start microphone: ' + err.message, 'error');
                 stopChatbotVoiceRecognition();
             }
         }
 
         function stopChatbotVoiceRecognition() {
-            window.divineChatbotState.isListening = false;
+            if (window.divineChatbotState) {
+                window.divineChatbotState.isListening = false;
+            }
+            const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
             const banner = document.getElementById('chatbot-voice-banner');
-            const micIcon = document.getElementById('chatbot-mic-icon');
-            const micBtn = document.getElementById('chatbot-voice-btn');
+            const micIcon = document.getElementById('chatbot-mic-icon') || document.getElementById('dedicated-mic-icon');
+            const micBtn = document.getElementById('chatbot-voice-btn') || document.getElementById('dedicated-chatbot-voice-btn');
 
             if (banner) banner.classList.add('hidden');
-            if (micIcon) micIcon.className = 'fa-solid fa-microphone text-xs';
-            if (micBtn) micBtn.classList.remove('bg-rose-100', 'text-rose-600', 'dark:bg-rose-950');
+            if (micIcon) {
+                micIcon.className = 'fa-solid fa-microphone text-xs';
+            }
+            if (micBtn) {
+                micBtn.classList.remove('bg-rose-600', 'text-white', 'ring-4', 'ring-rose-300', 'animate-pulse', 'bg-rose-100', 'text-rose-600', 'dark:bg-rose-950');
+                micBtn.classList.add('bg-slate-100', 'text-slate-600', 'dark:bg-slate-800', 'dark:text-slate-300');
+            }
+            if (input) {
+                input.placeholder = "Ask anything or speak 'Add student Rahul...'";
+                input.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-50/20');
+            }
 
-            if (window.divineChatbotState.recognition) {
+            if (window.divineChatbotState && window.divineChatbotState.recognition) {
                 try {
                     window.divineChatbotState.recognition.stop();
                 } catch(e){}
@@ -12288,7 +12404,12 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 };
 
                 recognition.onerror = function(event) {
-                    showToast('Voice error: ' + event.error, 'error');
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
+                        showMicrophonePermissionHelpModal();
+                    } else {
+                        showToast('Voice error: ' + event.error, 'error');
+                    }
                 };
 
                 recognition.onend = function() {
@@ -12749,10 +12870,20 @@ Guidelines:
         }
 
         function askChatbotQuickQuestion(query) {
-            const input = document.getElementById('chatbot-input');
+            if (query && query.includes('Rahul Sharma') && query.includes('Add student')) {
+                toggleChatbotVoiceRecognition();
+                return;
+            }
+            const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
             if (input) {
                 input.value = query;
-                handleChatbotSubmit(new Event('submit'));
+                const floatingForm = document.getElementById('chatbot-form');
+                const isDedicated = !floatingForm || floatingForm.offsetParent === null;
+                if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
+                    handleDedicatedChatbotSubmit(new Event('submit'));
+                } else if (typeof handleChatbotSubmit === 'function') {
+                    handleChatbotSubmit(new Event('submit'));
+                }
             }
         }
 
@@ -13128,8 +13259,8 @@ Guidelines:
                             </div>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <button type="button" onclick="toggleGeminiSettingsDrawer()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
-                                <i class="fa-solid fa-key text-amber-300"></i>
+                            <button id="dedicated-gemini-config-btn" type="button" onclick="toggleGeminiSettingsDrawer()" class="dev-only-link px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer" style="display:none;">
+                                <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
                                 <span>Gemini Key</span>
                             </button>
                             <button type="button" onclick="resetDivineChatbot()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
@@ -13203,7 +13334,7 @@ Guidelines:
 
                             <!-- Bottom Form -->
                             <form onsubmit="handleDedicatedChatbotSubmit(event)" class="p-3 sm:p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0">
-                                <button type="button" onclick="toggleChatbotVoiceRecognition()" title="Speak orally to ask doubts or add students" class="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-xs cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700">
+                                <button type="button" id="dedicated-chatbot-voice-btn" onclick="toggleChatbotVoiceRecognition()" title="Speak orally to ask doubts or add students" class="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-xs cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700">
                                     <i id="dedicated-mic-icon" class="fa-solid fa-microphone text-sm"></i>
                                 </button>
                                 <input type="text" id="dedicated-chatbot-input" placeholder="Ask any academic doubt or say 'Add student Rahul, phone 9876543210...'" class="flex-1 px-4 py-2.5 bg-white dark:bg-slate-800 dark:text-slate-100 rounded-2xl text-xs border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:outline-none transition shadow-inner" autocomplete="off">
@@ -13337,7 +13468,7 @@ Guidelines:
                 </div>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="toggleGeminiSettingsDrawer()" title="Gemini AI Subscription & Key Config" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-amber-300 hover:text-white text-xs transition">
+                <button id="chatbot-gemini-config-btn" onclick="toggleGeminiSettingsDrawer()" title="Gemini AI Subscription & Key Config" class="dev-only-link w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-amber-300 hover:text-white text-xs transition" style="display:none;">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
                 <button onclick="resetDivineChatbot()" title="Clear chat history" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-white/80 hover:text-white text-xs transition">

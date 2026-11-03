@@ -57,11 +57,11 @@ function renderChatbotDedicatedView() {
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <button type="button" onclick="toggleGeminiSettingsDrawer()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition">
-            <i class="fa-solid fa-key text-amber-300"></i>
+          <button id="dedicated-gemini-config-btn" type="button" onclick="toggleGeminiSettingsDrawer()" class="dev-only-link px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer" style="display:none;">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
             <span>Gemini Key</span>
           </button>
-          <button type="button" onclick="resetDivineChatbot()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition">
+          <button type="button" onclick="resetDivineChatbot()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
             <i class="fa-solid fa-rotate-right"></i>
             <span>Clear</span>
           </button>
@@ -132,7 +132,7 @@ function renderChatbotDedicatedView() {
 
           <!-- Bottom Form -->
           <form onsubmit="handleDedicatedChatbotSubmit(event)" class="p-3 sm:p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0">
-            <button type="button" onclick="toggleChatbotVoiceRecognition()" title="Speak orally to ask doubts or add students" class="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-xs cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700">
+            <button type="button" id="dedicated-chatbot-voice-btn" onclick="toggleChatbotVoiceRecognition()" title="Speak orally to ask doubts or add students" class="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-xs cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700">
               <i id="dedicated-mic-icon" class="fa-solid fa-microphone text-sm"></i>
             </button>
             <input type="text" id="dedicated-chatbot-input" placeholder="Ask any academic doubt or say 'Add student Rahul, phone 9876543210...'" class="flex-1 px-4 py-2.5 bg-white dark:bg-slate-800 dark:text-slate-100 rounded-2xl text-xs border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:outline-none transition shadow-inner" autocomplete="off">
