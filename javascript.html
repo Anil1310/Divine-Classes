@@ -8892,7 +8892,19 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         // Initialize Application
         function bootApp() {
-            if (window._appBooted) return;
+            const container = document.getElementById('main-content');
+            if (!container) {
+                // DOM is still rendering, retry shortly
+                setTimeout(bootApp, 50);
+                return;
+            }
+            if (window._appBooted) {
+                // If initial loader is still present, paint the content immediately
+                if (document.getElementById('initial-page-loader')) {
+                    try { renderMainContent(); } catch (e) { console.warn(e); }
+                }
+                return;
+            }
             window._appBooted = true;
             try {
                 window.addEventListener('offline', function () {
