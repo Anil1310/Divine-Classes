@@ -12307,7 +12307,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 'function finishSpeech(){if(res&&window.opener){window.opener.postMessage({type:"DIVINE_VOICE_RESULT",transcript:res,target:"' + (targetType||'chatbot') + '"},"*");}window.close();}',
                 '<' + '/script' + '>',
                 '</body></html>'
-            ].join('\\n');
+            ].join('\n');
 
             popup.document.open();
             popup.document.write(html);
