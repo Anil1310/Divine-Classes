@@ -449,18 +449,44 @@
 
     /* Instant Unauthenticated Portal Styles (prevents loader hang / UI flash) */
     html.dc-unauth #sidebar,
+    body.dc-unauth #sidebar,
+    .dc-unauth #sidebar,
+    body:not(.dc-authenticated) #sidebar,
     html.dc-unauth #desktop-header,
-        html.dc-unauth #app-header,
+    body.dc-unauth #desktop-header,
+    .dc-unauth #desktop-header,
+    body:not(.dc-authenticated) #desktop-header,
+    html.dc-unauth #app-header,
+    body.dc-unauth #app-header,
+    .dc-unauth #app-header,
+    body:not(.dc-authenticated) #app-header,
     html.dc-unauth #primary-menu-bar,
+    body.dc-unauth #primary-menu-bar,
+    .dc-unauth #primary-menu-bar,
+    body:not(.dc-authenticated) #primary-menu-bar,
     html.dc-unauth #role-banner,
+    body.dc-unauth #role-banner,
+    .dc-unauth #role-banner,
+    body:not(.dc-authenticated) #role-banner,
     html.dc-unauth #mobile-nav,
-    html.dc-unauth #sidebar-backdrop {
+    body.dc-unauth #mobile-nav,
+    .dc-unauth #mobile-nav,
+    body:not(.dc-authenticated) #mobile-nav,
+    html.dc-unauth #sidebar-backdrop,
+    body.dc-unauth #sidebar-backdrop,
+    .dc-unauth #sidebar-backdrop,
+    body:not(.dc-authenticated) #sidebar-backdrop {
         display: none !important;
     }
-    html.dc-unauth body {
+    html.dc-unauth body,
+    body.dc-unauth,
+    body:not(.dc-authenticated) {
         background-color: #0b1021 !important;
     }
-    html.dc-unauth #main-content {
+    html.dc-unauth #main-content,
+    body.dc-unauth #main-content,
+    .dc-unauth #main-content,
+    body:not(.dc-authenticated) #main-content {
         width: 100% !important;
         min-height: 100vh !important;
         background-color: #0b1021 !important;
@@ -489,8 +515,7 @@
     </script>
 </head>
 
-<body
-    class="text-slate-800 antialiased selection:bg-indigo-600 selection:text-white bg-slate-50 h-screen overflow-hidden">
+<body class="text-slate-800 antialiased selection:bg-indigo-600 selection:text-white dc-unauth bg-[#0b1021] h-screen overflow-hidden">
 
     <!-- Toast Notification Container -->
     <div id="toast-container"
@@ -514,8 +539,7 @@
             class="fixed inset-0 bg-slate-950/60 z-30 lg:hidden hidden backdrop-blur-2xs transition-opacity"></div>
 
         <!-- Sidebar Navigation -->
-        <aside id="sidebar"
-            class="fixed inset-y-0 left-0 z-40 w-[256px] max-w-[78vw] lg:w-72 lg:max-w-none bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:inset-0 shrink-0 border-r border-slate-800 shadow-2xl lg:shadow-none">
+        <aside id="sidebar" style="display: none;" class="fixed inset-y-0 left-0 z-40 w-[256px] max-w-[78vw] lg:w-72 lg:max-w-none bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:inset-0 shrink-0 border-r border-slate-800 shadow-2xl lg:shadow-none">
             <!-- Brand Logo -->
             <div class="flex items-center justify-between px-5 h-16 bg-slate-950 border-b border-slate-800">
                 <div class="flex items-center gap-3">
@@ -615,7 +639,7 @@
         <!-- Main Content Wrapper -->
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
             <!-- Top Header with Role Switcher & Live Database Sync -->
-            <header id="app-header" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
+            <header id="app-header" style="display: none;" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
                 <div class="px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3">
                     <!-- Left: Hamburger & Page Title -->
                     <div id="header-brand-block" class="flex items-center gap-3 min-w-0">
@@ -683,20 +707,18 @@
                 </div>
 
                 <!-- Dynamic Role Info Banner -->
-                <div id="role-banner"
-                    class="bg-indigo-50/80 border-t border-indigo-100 px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900">
+                <div id="role-banner" style="display: none;" class="bg-indigo-50/80 border-t border-indigo-100 px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900">
                     <!-- Injected by JS -->
                 </div>
             </header>
 
             <!-- Desktop primary menu bar; on mobile the sidebar and bottom menu are used -->
-            <nav id="primary-menu-bar" aria-label="Primary navigation"
-                class="hidden lg:flex items-center gap-1 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 overflow-x-auto">
+            <nav id="primary-menu-bar" style="display: none;" aria-label="Primary navigation" class="hidden lg:flex items-center gap-1 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 overflow-x-auto">
                 <div id="primary-menu-links" class="flex items-center gap-1 min-w-max"></div>
             </nav>
 
             <!-- Scrollable Main Workspace -->
-            <main id="main-content" class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <main id="main-content" class="w-full min-h-screen bg-[#0b1021] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
                 <div class="w-full min-h-[92vh] flex flex-col items-center justify-center py-6 sm:py-10 px-4">
                     
                 <div class="w-full max-w-[400px] mx-auto bg-white dark:bg-slate-900 rounded-[36px] shadow-2xl p-7 sm:p-9 border border-slate-200/80 dark:border-slate-800 space-y-6 fade-in">
@@ -12046,7 +12068,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             // If Supabase is already enabled from localStorage, load immediately (don't wait for Apps Script)
             if (state.settings && state.settings.supabaseEnabled === true && state.settings.supabaseUrl && state.settings.supabaseKey) {
                 console.log('[Supabase] Early load from localStorage config');
-                loadDataFromSupabase().then(function() {
+                ((typeof loadDataFromSupabase === 'function' ? loadDataFromSupabase : window.loadDataFromSupabase) || function(){return Promise.resolve()})().then(function() {
                     window._supabaseBootLoaded = true;
                     saveStateLocally();
                     if (typeof savePersistentSettingsToLocal === 'function') {
@@ -12137,7 +12159,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                             // If Supabase is enabled, load data from Supabase as primary source
                             console.log('[Supabase] After Apps Script load: enabled =', state.settings.supabaseEnabled, '| url =', state.settings.supabaseUrl ? 'set' : 'missing');
                             if (state.settings.supabaseEnabled === true && state.settings.supabaseUrl && state.settings.supabaseKey) {
-                                loadDataFromSupabase().then(function() {
+                                ((typeof loadDataFromSupabase === 'function' ? loadDataFromSupabase : window.loadDataFromSupabase) || function(){return Promise.resolve()})().then(function() {
                                     saveStateLocally();
                                     if (typeof savePersistentSettingsToLocal === 'function') {
                                         savePersistentSettingsToLocal();
@@ -12164,7 +12186,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 // data. Without this branch the web app only pushed on changes
                 // and never loaded what was already stored in Supabase.
                 console.log('[Supabase] Standalone boot — loading primary cloud data');
-                loadDataFromSupabase().then(function () {
+                ((typeof loadDataFromSupabase === 'function' ? loadDataFromSupabase : window.loadDataFromSupabase) || function(){return Promise.resolve()})().then(function () {
                     saveStateLocally(true);
                     if (typeof savePersistentSettingsToLocal === 'function') {
                         savePersistentSettingsToLocal();
