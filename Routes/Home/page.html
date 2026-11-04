@@ -35,11 +35,12 @@
     <?!= include('css'); ?>
     <script>
         try {
-            var _dcAuth = localStorage.getItem('DIVINE_AUTH_SESSION');
+            var _dcAuth = localStorage.getItem('DIVINE_AUTH_SESSION') || sessionStorage.getItem('DIVINE_AUTH_SESSION');
             if (_dcAuth) {
                 var _dcParsed = JSON.parse(_dcAuth);
                 if (_dcParsed && _dcParsed.isAuthenticated) {
                     document.documentElement.classList.remove('dc-unauth');
+                    document.documentElement.classList.add('dc-authenticated');
                 }
             }
         } catch(e) {}
@@ -50,6 +51,24 @@
 </head>
 
 <body class="text-slate-800 antialiased selection:bg-indigo-600 selection:text-white dc-unauth bg-[#0b1021] h-screen overflow-hidden">
+    <script>
+        try {
+            if (document.documentElement.classList.contains('dc-authenticated')) {
+                document.body.classList.remove('dc-unauth', 'bg-[#0b1021]');
+                document.body.classList.add('bg-slate-50', 'dc-authenticated');
+                var _sb = document.getElementById('sidebar');
+                if (_sb) _sb.style.display = '';
+                var _hdr = document.getElementById('app-header');
+                if (_hdr) _hdr.style.display = '';
+                var _dhdr = document.getElementById('desktop-header');
+                if (_dhdr) _dhdr.style.display = '';
+                var _pm = document.getElementById('primary-menu-bar');
+                if (_pm) _pm.style.display = '';
+                var _rb = document.getElementById('role-banner');
+                if (_rb) _rb.style.display = '';
+            }
+        } catch(e) {}
+    </script>
 
     <!-- Toast Notification Container -->
     <div id="toast-container"
