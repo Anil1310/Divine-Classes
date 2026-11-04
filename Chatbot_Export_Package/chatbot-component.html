@@ -1,0 +1,240 @@
+<!-- Divine AI Assistant Floating Button -->
+    <button id="divine-chatbot-btn" onclick="toggleDivineChatbot()" 
+        class="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[60] w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-xl hover:shadow-indigo-500/40 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group"
+        title="Divine AI Assistant & Doubts Helpdesk" aria-label="Open Divine AI Assistant">
+        <span class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 flex items-center justify-center">
+            <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+        </span>
+        <i id="chatbot-icon-closed" class="fa-solid fa-robot text-xl group-hover:rotate-12 transition-transform"></i>
+        <i id="chatbot-icon-opened" class="fa-solid fa-xmark text-xl hidden"></i>
+    </button>
+
+    <!-- Divine AI Assistant Chat Window -->
+    <div id="divine-chatbot-window"
+        class="hidden fixed bottom-24 sm:bottom-22 right-3 sm:right-6 w-[calc(100vw-24px)] sm:w-[410px] h-[550px] max-h-[82vh] z-[70] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden fade-in transition-all duration-300">
+        <!-- Chatbot Header -->
+        <div class="px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-sm">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-white/15 backdrop-blur-xs border border-white/20 flex items-center justify-center text-white text-base">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold leading-tight flex items-center gap-1.5">
+                        <span>Divine Assistant</span>
+                        <span id="gemini-active-badge" class="hidden text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-900 items-center gap-1">
+                            <i class="fa-solid fa-wand-magic-sparkles text-[8px]"></i> Gemini Pro
+                        </span>
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Online"></span>
+                    </h3>
+                    <p id="chatbot-status-desc" class="text-[10px] text-indigo-100">Institute Helpdesk & Doubts</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1">
+                <button id="chatbot-gemini-config-btn" onclick="toggleGeminiSettingsDrawer()" title="AI Models & Subscription Keys (Gemini & ChatGPT)" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-amber-300 hover:text-white text-xs transition cursor-pointer">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </button>
+                <button onclick="resetDivineChatbot()" title="Clear chat history" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-white/80 hover:text-white text-xs transition">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button onclick="toggleDivineChatbot(false)" title="Close chat" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-white text-xs transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Gemini & ChatGPT AI Subscription & Key Drawer (Inline Drawer) -->
+        <div id="gemini-config-drawer" class="hidden bg-slate-100 dark:bg-slate-800/95 border-b border-slate-200 dark:border-slate-700/80 p-3.5 space-y-3 shrink-0 text-xs fade-in">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                    <span>AI Model & Subscription Setup</span>
+                </div>
+                <button type="button" onclick="toggleGeminiSettingsDrawer(false)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+
+            <div class="p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> <b>100% Free Auto-Connect:</b> All users auto-connect for free. If you have your own <b>Gemini Pro</b> or <b>ChatGPT</b> subscription, choose your provider and save your key below. Saved keys persist permanently and are <b>never asked again on login!</b>
+            </div>
+
+            <!-- Provider Selection Tabs -->
+            <div class="flex items-center gap-1.5 p-1 bg-slate-200 dark:bg-slate-900 rounded-xl">
+                <button type="button" onclick="switchAiProviderTab('gemini')" id="ai-tab-gemini" class="flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shadow-xs cursor-pointer">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                    <span>Google Gemini</span>
+                </button>
+                <button type="button" onclick="switchAiProviderTab('openai')" id="ai-tab-openai" class="flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                    <i class="fa-solid fa-robot text-emerald-500"></i>
+                    <span>ChatGPT (OpenAI)</span>
+                </button>
+            </div>
+
+            <!-- Gemini Panel -->
+            <div id="ai-panel-gemini" class="space-y-2.5">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300">Gemini API Key (Free or Pro)</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Get Gemini Key
+                        </a>
+                    </div>
+                    <div class="relative">
+                        <input type="password" id="gemini-api-key-input" placeholder="AIzaSy... (leave blank for free auto-connect)"
+                            class="w-full px-3 py-1.5 pr-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none focus:border-indigo-500">
+                        <button type="button" onclick="toggleApiKeyVisibility('gemini-api-key-input', 'gemini-key-eye-icon')" class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+                            <i id="gemini-key-eye-icon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Gemini Model</label>
+                    <select id="gemini-model-select" class="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none">
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Auto / Fast & Smart)</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning & Pro Subscription)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- OpenAI / ChatGPT Panel -->
+            <div id="ai-panel-openai" class="hidden space-y-2.5">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300">ChatGPT / OpenAI API Key</label>
+                        <a href="https://platform.openai.com/api-keys" target="_blank" class="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Get ChatGPT Key
+                        </a>
+                    </div>
+                    <div class="relative">
+                        <input type="password" id="openai-api-key-input" placeholder="sk-... (leave blank for free auto-connect)"
+                            class="w-full px-3 py-1.5 pr-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none focus:border-indigo-500">
+                        <button type="button" onclick="toggleApiKeyVisibility('openai-api-key-input', 'openai-key-eye-icon')" class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+                            <i id="openai-key-eye-icon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">ChatGPT Model</label>
+                    <select id="openai-model-select" class="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none">
+                        <option value="gpt-4o-mini">GPT-4o Mini (Fast & Smart)</option>
+                        <option value="gpt-4o">GPT-4o (Most Intelligent Flagship)</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="flex items-center justify-between pt-1 gap-2">
+                <button type="button" onclick="resetToFreeAutoAi()" class="text-[11px] text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 underline cursor-pointer">
+                    Reset to Free Auto
+                </button>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="testCurrentAiConnection(this)" class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg text-[11px] transition cursor-pointer">
+                        Test Connection
+                    </button>
+                    <button type="button" onclick="saveActiveAiSettingsFromDrawer()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[11px] transition shadow-xs cursor-pointer">
+                        Save & Remember
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Suggestions Horizontal Bar -->
+        <div id="chatbot-quick-pills" class="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800/80 flex items-center gap-1.5 overflow-x-auto text-[11px] no-scrollbar shrink-0">
+            <!-- Dynamic pills rendered via JS -->
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div id="chatbot-messages" class="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/40 text-xs">
+            <!-- Messages injected here -->
+        </div>
+
+        <!-- Live Voice Listening Status Banner -->
+        <div id="chatbot-voice-banner" class="hidden px-3.5 py-2 bg-rose-50 dark:bg-rose-950/50 border-t border-rose-200 dark:border-rose-900/60 flex items-center justify-between text-xs text-rose-700 dark:text-rose-300 shrink-0">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-microphone text-rose-600 animate-pulse"></i> Listening... Speak now</span>
+            </div>
+            <button type="button" onclick="stopChatbotVoiceRecognition()" class="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/60 px-2 py-0.5 rounded-md hover:bg-rose-200">
+                Stop
+            </button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="chatbot-form" onsubmit="handleChatbotSubmit(event)" class="p-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 flex items-center gap-1.5">
+            <button type="button" id="chatbot-voice-btn" onclick="toggleChatbotVoiceRecognition()"
+                title="Speak orally to ask questions or add students" aria-label="Voice Input"
+                class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-xs cursor-pointer shrink-0">
+                <i id="chatbot-mic-icon" class="fa-solid fa-microphone text-xs"></i>
+            </button>
+            <input type="text" id="chatbot-input" placeholder="Ask anything or speak 'Add student Rahul...'"
+                class="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 dark:text-slate-100 rounded-xl text-xs border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition"
+                autocomplete="off">
+            <button type="submit" id="chatbot-send-btn"
+                class="w-9 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition shadow-xs disabled:opacity-50 cursor-pointer shrink-0">
+                <i class="fa-solid fa-paper-plane text-xs"></i>
+            </button>
+        </form>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar (Android Native App Experience) -->
+    <div id="mobile-nav"
+        class="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around text-slate-400"
+        style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);">
+        <button onclick="navigateTo('dashboard')" id="mob-nav-dashboard"
+            class="flex flex-col items-center justify-center p-1 rounded-xl text-[9px] font-semibold transition text-indigo-400">
+            <i class="fa-solid fa-chart-pie text-base mb-0.5"></i>
+            <span>Home</span>
+        </button>
+        <button onclick="navigateTo('batches')" id="mob-nav-batches"
+            class="flex flex-col items-center justify-center p-1 rounded-xl text-[9px] font-semibold transition hover:text-white">
+            <i class="fa-solid fa-users-rectangle text-base mb-0.5"></i>
+            <span>Batches</span>
+        </button>
+        <button onclick="navigateTo('attendance')" id="mob-nav-attendance"
+            class="flex flex-col items-center justify-center p-1 rounded-xl text-[9px] font-semibold transition hover:text-white">
+            <i class="fa-solid fa-calendar-check text-base mb-0.5"></i>
+            <span>Attendance</span>
+        </button>
+        <button onclick="navigateTo(state.currentRole === 'admin' ? 'fees' : 'materials')" id="mob-nav-action"
+            class="flex flex-col items-center justify-center p-1 rounded-xl text-[9px] font-semibold transition hover:text-white">
+            <i class="fa-solid fa-indian-rupee-sign text-base mb-0.5" id="mob-nav-action-icon"></i>
+            <span id="mob-nav-action-label">Fees</span>
+        </button>
+        <button onclick="navigateTo('marks')" id="mob-nav-marks"
+            class="flex flex-col items-center justify-center p-1 rounded-xl text-[9px] font-semibold transition hover:text-white">
+            <i class="fa-solid fa-chart-line text-base mb-0.5"></i>
+            <span>Tests</span>
+        </button>
+        <button onclick="toggleMobileSidebar()"
+            class="flex flex-col items-center justify-center p-1 rounded-xl text-[9px] font-semibold transition hover:text-white">
+            <i class="fa-solid fa-bars text-base mb-0.5"></i>
+            <span>Menu</span>
+        </button>
+    </div>
+
+    <script>
+        /* Keep the header clear on phones by placing its existing controls in the sidebar. */
+        (() => {
+            const mobileSlot = document.getElementById('sidebar-mobile-actions');
+            const mobileLogout = document.getElementById('sidebar-mobile-logout');
+            if (!mobileSlot || !mobileLogout) return;
+
+            const placeControls = () => {
+                if (window.matchMedia('(max-width: 639px)').matches) {
+                    mobileSlot.classList.remove('hidden');
+                    mobileLogout.classList.toggle('hidden', !document.querySelector('#auth-header-container button[onclick="handleLogout()"]'));
+                    mobileLogout.classList.toggle('flex', !mobileLogout.classList.contains('hidden'));
+                } else {
+                    mobileSlot.classList.add('hidden');
+                }
+            };
+
+            placeControls();
+            window.addEventListener('resize', placeControls);
+            const authContainer = document.getElementById('auth-header-container');
+            if (authContainer) new MutationObserver(placeControls).observe(authContainer, { childList: true, subtree: true });
+        })();
+    </script>

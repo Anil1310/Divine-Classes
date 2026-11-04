@@ -1,0 +1,2266 @@
+<script>
+// Safe State Guard - Prevents breaking when imported into other projects
+if (typeof window !== 'undefined') {
+    if (typeof window.state === 'undefined') {
+        window.state = {
+            currentRole: 'developer',
+            isDeveloper: true,
+            currentUser: { role: 'developer', name: 'Dev. Anil Kumar Chahar', identifier: 'Lead Dev' },
+            settings: { chatbotEnabled: true, geminiApiKey: '' },
+            students: [],
+            batches: [],
+            teachers: [],
+            offlineTests: []
+        };
+    }
+    if (typeof state === 'undefined') {
+        var state = window.state;
+    }
+}
+
+/********************************************************************
+         * DIVINE AI ASSISTANT, MULTI-PROVIDER AI & ORAL VOICE ADMISSION
+         ********************************************************************/
+        function isChatbotMasterEnabled() {
+            try {
+                const localVal = localStorage.getItem('DIVINE_CHATBOT_ENABLED');
+                if (localVal !== null && localVal !== undefined && localVal !== '') {
+                    return localVal === 'true' || localVal === true;
+                }
+            } catch(e) {}
+            if (state && state.settings && state.settings.chatbotEnabled !== undefined) {
+                return state.settings.chatbotEnabled === true || state.settings.chatbotEnabled === 'true';
+            }
+            return true; // Default ON
+        }
+
+        function isRoleChatbotConfigured(role) {
+            if (!role) role = state.currentRole;
+            if (role === 'developer') return true; // Lead Developer always has chatbot access
+            const key = role === 'admin' ? 'chatbotAdminEnabled' :
+                        role === 'teacher' ? 'chatbotTeacherEnabled' :
+                        role === 'student' ? 'chatbotStudentEnabled' : null;
+            if (!key) return true;
+            try {
+                const localVal = localStorage.getItem('DIVINE_CHATBOT_' + role.toUpperCase() + '_ENABLED');
+                if (localVal !== null && localVal !== undefined && localVal !== '') {
+                    return localVal === 'true' || localVal === true;
+                }
+            } catch(e) {}
+            if (state && state.settings && state.settings[key] !== undefined) {
+                return state.settings[key] === true || state.settings[key] === 'true';
+            }
+            return true; // Default ON
+        }
+
+        function isChatbotEnabled(role) {
+            if (!role) role = (state && state.currentRole) ? state.currentRole : 'student';
+            if (role === 'developer') return true; // Developer always retains access
+            if (!isChatbotMasterEnabled()) return false;
+            // On unauthenticated / login screen, chatbot is always available for inquiries & admissions
+            if (typeof state !== 'undefined' && !state.isAuthenticated) {
+                return true;
+            }
+            return isRoleChatbotConfigured(role);
+        }
+
+        function updateChatbotVisibility() {
+            const enabled = isChatbotEnabled(state.currentRole);
+            const btn = document.getElementById('divine-chatbot-btn');
+            const win = document.getElementById('divine-chatbot-window');
+            if (btn) {
+                if (enabled) {
+                    btn.style.display = '';
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.style.display = 'none';
+                    btn.classList.add('hidden');
+                }
+            }
+            if (win) {
+                if (!enabled) {
+                    win.style.display = 'none';
+                    win.classList.add('hidden');
+                    if (window.divineChatbotState) {
+                        window.divineChatbotState.isOpen = false;
+                        if (window.divineChatbotState.isListening && typeof stopChatbotVoiceRecognition === 'function') {
+                            stopChatbotVoiceRecognition();
+                        }
+                    }
+                    const iconClosed = document.getElementById('chatbot-icon-closed');
+                    const iconOpened = document.getElementById('chatbot-icon-opened');
+                    if (iconClosed) iconClosed.classList.remove('hidden');
+                    if (iconOpened) iconOpened.classList.add('hidden');
+                } else {
+                    win.style.display = '';
+                }
+            }
+        }
+
+        window.divineChatbotState = {
+            isOpen: false,
+            initialized: false,
+            messages: [],
+            isListening: false,
+            recognition: null
+        };
+
+        // Multi-Provider AI Settings & Persistence
+        function getAiProvider() {
+            try {
+                return localStorage.getItem('DIVINE_AI_PROVIDER') || 'gemini';
+            } catch(e) {
+                return 'gemini';
+            }
+        }
+
+        function getGeminiApiKey() {
+            try {
+                return localStorage.getItem('DIVINE_GEMINI_API_KEY') ||
+                    localStorage.getItem('DIVINE_DEV_GEMINI_KEY') ||
+                    (state.settings && state.settings.geminiApiKey) || '';
+            } catch(e) {
+                return (state.settings && state.settings.geminiApiKey) || '';
+            }
+        }
+
+        function getGeminiModel() {
+            try {
+                const isLeadDev = (state.currentRole === 'developer') ||
+                    (state.currentUser && (state.currentUser.email === 'anil.chahar170@gmail.com' || state.currentUser.id === 'anil.chahar170@gmail.com'));
+                if (isLeadDev) {
+                    return localStorage.getItem('DIVINE_GEMINI_MODEL') || 'gemini-2.5-pro';
+                }
+                return localStorage.getItem('DIVINE_GEMINI_MODEL') ||
+                    (state.settings && state.settings.geminiModel) || 'gemini-2.5-flash';
+            } catch(e) {
+                return 'gemini-2.5-flash';
+            }
+        }
+
+        function getOpenAiApiKey() {
+            try {
+                return localStorage.getItem('DIVINE_OPENAI_API_KEY') ||
+                    (state.settings && state.settings.openaiApiKey) || '';
+            } catch(e) {
+                return (state.settings && state.settings.openaiApiKey) || '';
+            }
+        }
+
+        function getOpenAiModel() {
+            try {
+                return localStorage.getItem('DIVINE_OPENAI_MODEL') ||
+                    (state.settings && state.settings.openaiModel) || 'gpt-4o-mini';
+            } catch(e) {
+                return 'gpt-4o-mini';
+            }
+        }
+
+        function isAiCustomKeyConfigured() {
+            const p = getAiProvider();
+            return p === 'openai' ? !!getOpenAiApiKey() : !!getGeminiApiKey();
+        }
+
+        function isGeminiAutoConnected() {
+            return isAiCustomKeyConfigured();
+        }
+
+        function updateGeminiBadgeStatus() {
+            const badge = document.getElementById('gemini-active-badge');
+            const desc = document.getElementById('chatbot-status-desc');
+            const provider = getAiProvider();
+            const hasCustom = isAiCustomKeyConfigured();
+            const isLeadDev = (state.currentRole === 'developer') ||
+                (state.currentUser && (state.currentUser.email === 'anil.chahar170@gmail.com' || state.currentUser.id === 'anil.chahar170@gmail.com'));
+
+            let badgeHtml = '';
+            let statusText = 'Free Auto AI • Ready';
+
+            if (isLeadDev) {
+                badgeHtml = '<i class="fa-solid fa-bolt text-[8px] text-purple-300"></i> Gemini 2.5 Pro (Dev Auto)';
+                statusText = '🚀 Lead Dev Auto-Connected • Gemini Pro';
+            } else if (hasCustom && provider === 'openai') {
+                const model = getOpenAiModel();
+                badgeHtml = `<i class="fa-solid fa-robot text-[8px] text-emerald-300"></i> ${escapeHtml(model)}`;
+                statusText = `Custom Subscription • ${model}`;
+            } else if (hasCustom && provider === 'gemini') {
+                const model = getGeminiModel();
+                badgeHtml = `<i class="fa-solid fa-wand-magic-sparkles text-[8px] text-amber-300"></i> ${escapeHtml(model.replace('gemini-', ''))}`;
+                statusText = `Custom Subscription • ${model}`;
+            } else {
+                badgeHtml = '<i class="fa-solid fa-circle-check text-[8px] text-emerald-300"></i> Free Auto AI';
+                statusText = '100% Free Auto-Connect Active';
+            }
+
+            if (badge) {
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+                badge.innerHTML = badgeHtml;
+            }
+            if (desc) {
+                desc.textContent = statusText;
+            }
+        }
+
+        function toggleGeminiSettingsDrawer(forceState) {
+            const drawer = document.getElementById('gemini-config-drawer');
+            if (!drawer) return;
+            const isCurrentlyHidden = drawer.classList.contains('hidden');
+            const targetShow = (typeof forceState === 'boolean') ? forceState : isCurrentlyHidden;
+
+            if (targetShow) {
+                drawer.classList.remove('hidden');
+                const provider = getAiProvider();
+                switchAiProviderTab(provider);
+
+                const geminiKeyInput = document.getElementById('gemini-api-key-input');
+                const geminiModelSel = document.getElementById('gemini-model-select');
+                if (geminiKeyInput) geminiKeyInput.value = getGeminiApiKey();
+                if (geminiModelSel) geminiModelSel.value = getGeminiModel();
+
+                const openAiKeyInput = document.getElementById('openai-api-key-input');
+                const openAiModelSel = document.getElementById('openai-model-select');
+                if (openAiKeyInput) openAiKeyInput.value = getOpenAiApiKey();
+                if (openAiModelSel) openAiModelSel.value = getOpenAiModel();
+            } else {
+                drawer.classList.add('hidden');
+            }
+        }
+
+        function switchAiProviderTab(provider) {
+            try {
+                localStorage.setItem('DIVINE_AI_PROVIDER', provider);
+            } catch(e){}
+
+            const tabGemini = document.getElementById('ai-tab-gemini');
+            const tabOpenAi = document.getElementById('ai-tab-openai');
+            const panelGemini = document.getElementById('ai-panel-gemini');
+            const panelOpenAi = document.getElementById('ai-panel-openai');
+
+            if (provider === 'openai') {
+                if (tabGemini) {
+                    tabGemini.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+                }
+                if (tabOpenAi) {
+                    tabOpenAi.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-300 shadow-xs cursor-pointer';
+                }
+                if (panelGemini) panelGemini.classList.add('hidden');
+                if (panelOpenAi) panelOpenAi.classList.remove('hidden');
+            } else {
+                if (tabGemini) {
+                    tabGemini.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shadow-xs cursor-pointer';
+                }
+                if (tabOpenAi) {
+                    tabOpenAi.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+                }
+                if (panelGemini) panelGemini.classList.remove('hidden');
+                if (panelOpenAi) panelOpenAi.classList.add('hidden');
+            }
+        }
+
+        function toggleApiKeyVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye';
+            }
+        }
+
+        function toggleGeminiKeyVisibility() {
+            toggleApiKeyVisibility('gemini-api-key-input', 'gemini-key-eye-icon');
+        }
+
+        function resetToFreeAutoAi() {
+            try {
+                localStorage.removeItem('DIVINE_GEMINI_API_KEY');
+                localStorage.removeItem('DIVINE_OPENAI_API_KEY');
+                localStorage.setItem('DIVINE_AI_PROVIDER', 'gemini');
+                localStorage.setItem('DIVINE_GEMINI_MODEL', 'gemini-2.5-flash');
+            } catch(e){}
+
+            const geminiKeyInput = document.getElementById('gemini-api-key-input');
+            const openAiKeyInput = document.getElementById('openai-api-key-input');
+            if (geminiKeyInput) geminiKeyInput.value = '';
+            if (openAiKeyInput) openAiKeyInput.value = '';
+
+            toggleGeminiSettingsDrawer(false);
+            updateGeminiBadgeStatus();
+            showToast('✓ Reset to Free Auto AI mode successfully! Never asks for key.', 'info');
+            appendChatMessage('bot', `
+                <div class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200">
+                    <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-600"></i> Free Auto AI Active</p>
+                    <p class="mt-0.5">Chatbot will answer all queries and academic doubts automatically for free with zero setup.</p>
+                </div>
+            `);
+        }
+
+        function saveActiveAiSettingsFromDrawer() {
+            const provider = getAiProvider();
+            const geminiKeyInput = document.getElementById('gemini-api-key-input');
+            const geminiModelSel = document.getElementById('gemini-model-select');
+            const openAiKeyInput = document.getElementById('openai-api-key-input');
+            const openAiModelSel = document.getElementById('openai-model-select');
+
+            const geminiKey = geminiKeyInput ? geminiKeyInput.value.trim() : '';
+            const geminiModel = geminiModelSel ? geminiModelSel.value : 'gemini-2.5-flash';
+            const openAiKey = openAiKeyInput ? openAiKeyInput.value.trim() : '';
+            const openAiModel = openAiModelSel ? openAiModelSel.value : 'gpt-4o-mini';
+
+            try {
+                if (geminiKey) {
+                    localStorage.setItem('DIVINE_GEMINI_API_KEY', geminiKey);
+                    if (state.currentRole === 'developer') localStorage.setItem('DIVINE_DEV_GEMINI_KEY', geminiKey);
+                } else {
+                    localStorage.removeItem('DIVINE_GEMINI_API_KEY');
+                }
+                localStorage.setItem('DIVINE_GEMINI_MODEL', geminiModel);
+
+                if (openAiKey) {
+                    localStorage.setItem('DIVINE_OPENAI_API_KEY', openAiKey);
+                } else {
+                    localStorage.removeItem('DIVINE_OPENAI_API_KEY');
+                }
+                localStorage.setItem('DIVINE_OPENAI_MODEL', openAiModel);
+                localStorage.setItem('DIVINE_AI_PROVIDER', provider);
+            } catch(e){}
+
+            if (!state.settings) state.settings = {};
+            if (geminiKey) state.settings.geminiApiKey = geminiKey;
+            if (openAiKey) state.settings.openaiApiKey = openAiKey;
+            saveStateLocally();
+            if (typeof savePersistentSettingsToLocal === 'function') {
+                savePersistentSettingsToLocal();
+            }
+
+            toggleGeminiSettingsDrawer(false);
+            updateGeminiBadgeStatus();
+            renderChatbotQuickPills();
+
+            const chosenModel = provider === 'openai' ? openAiModel : geminiModel;
+            const chosenKey = provider === 'openai' ? openAiKey : geminiKey;
+
+            if (chosenKey) {
+                showToast(`✓ ${provider === 'openai' ? 'ChatGPT' : 'Gemini'} (${chosenModel}) saved and remembered permanently!`, 'success');
+                appendChatMessage('bot', `
+                    <div class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[11px] text-indigo-900 dark:text-indigo-200">
+                        <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-500"></i> ${provider === 'openai' ? 'OpenAI ChatGPT' : 'Google Gemini'} Subscription Saved!</p>
+                        <p class="mt-0.5">Model active: <b>${escapeHtml(chosenModel)}</b>. This key is saved permanently in your browser and will <b>never be asked again on login</b>.</p>
+                    </div>
+                `);
+            } else {
+                showToast('Operating in Free Auto AI mode. All features active!', 'info');
+            }
+        }
+
+        function saveGeminiSettingsFromDrawer() {
+            saveActiveAiSettingsFromDrawer();
+        }
+
+        async function testCurrentAiConnection(btn) {
+            const provider = getAiProvider();
+            if (provider === 'openai') {
+                await testOpenAiConnection(btn);
+            } else {
+                await testGeminiConnection(btn);
+            }
+        }
+
+        async function testGeminiConnection(btn) {
+            const keyInput = document.getElementById('gemini-api-key-input');
+            const key = keyInput ? keyInput.value.trim() : getGeminiApiKey();
+            const model = document.getElementById('gemini-model-select')?.value || getGeminiModel();
+
+            if (!key) {
+                showToast('Free Auto Mode is active. No custom Gemini key needed!', 'info');
+                return;
+            }
+
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Testing Gemini...';
+            }
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Hello! Reply with 'OK' only." }] }]
+                    })
+                });
+
+                if (res.ok) {
+                    showToast(`✓ Gemini API Connected Successfully! (${model})`, 'success');
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    const msg = errJson.error?.message || `HTTP ${res.status}`;
+                    showToast(`Gemini API Error: ${msg}`, 'error');
+                }
+            } catch(e) {
+                showToast(`Connection failed: ${e.message}`, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            }
+        }
+
+        async function testOpenAiConnection(btn) {
+            const keyInput = document.getElementById('openai-api-key-input');
+            const key = keyInput ? keyInput.value.trim() : getOpenAiApiKey();
+            const model = document.getElementById('openai-model-select')?.value || getOpenAiModel();
+
+            if (!key) {
+                showToast('Free Auto Mode is active. No custom ChatGPT key needed!', 'info');
+                return;
+            }
+
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Testing ChatGPT...';
+            }
+
+            try {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + key
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{ role: 'user', content: 'Say OK' }],
+                        max_tokens: 5
+                    })
+                });
+
+                if (res.ok) {
+                    showToast(`✓ ChatGPT Connected Successfully! (${model})`, 'success');
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    const msg = errJson.error?.message || `HTTP ${res.status}`;
+                    showToast(`ChatGPT API Error: ${msg}`, 'error');
+                }
+            } catch(e) {
+                showToast(`Connection failed: ${e.message}`, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            }
+        }
+
+        function getSpeechRecognition() {
+            return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+        }
+
+        /**
+         * Resolve which chatbot surface is currently on screen so transcripts and
+         * mic state land on the visible input (dedicated page vs floating drawer).
+         */
+        function getChatbotVoiceUi() {
+            const dedicatedInput = document.getElementById('dedicated-chatbot-input');
+            const drawerInput = document.getElementById('chatbot-input');
+            const dedicatedVisible = !!(dedicatedInput && dedicatedInput.offsetParent !== null);
+            const drawerVisible = !!(drawerInput && drawerInput.offsetParent !== null);
+            const useDedicated = dedicatedVisible && !drawerVisible;
+            return {
+                mode: useDedicated ? 'dedicated' : 'drawer',
+                input: useDedicated ? dedicatedInput : (drawerInput || dedicatedInput),
+                banner: document.getElementById(useDedicated ? 'dedicated-voice-banner' : 'chatbot-voice-banner'),
+                micIcon: document.getElementById(useDedicated ? 'dedicated-mic-icon' : 'chatbot-mic-icon'),
+                micBtn: document.getElementById(useDedicated ? 'dedicated-chatbot-voice-btn' : 'chatbot-voice-btn')
+            };
+        }
+
+        function submitChatbotVoiceTranscript() {
+            try {
+                const dedicatedInput = document.getElementById('dedicated-chatbot-input');
+                const useDedicated = !!(dedicatedInput && dedicatedInput.offsetParent !== null) &&
+                    !(document.getElementById('chatbot-input') && document.getElementById('chatbot-input').offsetParent !== null);
+                if (useDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
+                    handleDedicatedChatbotSubmit(new Event('submit'));
+                } else if (typeof handleChatbotSubmit === 'function') {
+                    handleChatbotSubmit(new Event('submit'));
+                }
+            } catch (err) {
+                console.error('[Voice Submit Error]', err);
+            }
+        }
+
+        /**
+         * Ask the browser for microphone access explicitly. SpeechRecognition does
+         * not always trigger the permission prompt (and never inside sandboxed
+         * frames), so we request the mic ourselves on the user's click.
+         */
+        function requestMicrophonePermission() {
+            return new Promise(function(resolve, reject) {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    // Older browsers: let SpeechRecognition surface its own error.
+                    resolve(false);
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) {}
+                    resolve(true);
+                }).catch(function(err) {
+                    reject(err);
+                });
+            });
+        }
+
+        function isMicrophonePermissionError(err) {
+            const name = (err && err.name) || '';
+            return name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError';
+        }
+
+        /**
+         * Google Apps Script serves web apps inside an iframe whose Permissions
+         * Policy disables the microphone entirely. No prompt can ever appear
+         * there, so detect it and offer a path that actually works instead of
+         * showing "allow the microphone" steps that cannot succeed.
+         */
+        function isMicrophonePolicyBlocked() {
+            try {
+                const policy = document.featurePolicy || document.permissionsPolicy;
+                if (policy && typeof policy.allowsFeature === 'function') {
+                    return policy.allowsFeature('microphone') === false;
+                }
+            } catch (e) {}
+            return false;
+        }
+
+        function isAppsScriptHost() {
+            const host = window.location.hostname || '';
+            return window.self !== window.top ||
+                host.indexOf('googleusercontent.com') !== -1 ||
+                host.indexOf('script.google.com') !== -1;
+        }
+
+        function openVoiceDictationWindow(target) {
+            target = target || 'chatbot';
+            const w = 440;
+            const h = 480;
+            const left = Math.max(0, Math.round((screen.width - w) / 2));
+            const top = Math.max(0, Math.round((screen.height - h) / 2));
+            const host = window.location.hostname || '';
+            const isAppsScriptFrame = window.self !== window.top ||
+                host.includes('googleusercontent.com') ||
+                host.includes('script.google.com') ||
+                host === 'docs.google.com';
+            // Same-origin voice.html works on GitHub Pages, Vercel, local preview and
+            // any custom domain. Apps Script iframes have no such file, so fall back
+            // to the public GitHub Pages copy.
+            const voiceUrl = isAppsScriptFrame
+                ? ('https://anil1310.github.io/Divine-Classes/voice.html?target=' + encodeURIComponent(target))
+                : new URL('voice.html?target=' + encodeURIComponent(target), window.location.href).href;
+
+            const popup = window.open(voiceUrl, 'DivineVoicePopup', `width=${w},height=${h},top=${top},left=${left},status=0,toolbar=0,menubar=0,location=0`);
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+                showToast('Popup was blocked. Allow popups for this site, then tap the mic again.', 'warning');
+            } else {
+                popup.focus();
+                showToast('🎙️ Dictation window opened! Speak now...', 'info');
+            }
+        }
+
+        function handleIncomingVoiceDictation(text, target) {
+            text = String(text || '').trim();
+            if (!text) return;
+
+            if (target === 'add_student') {
+                const parsed = typeof extractStudentDetailsFromSpeech === 'function' ? extractStudentDetailsFromSpeech(text) : null;
+                if (parsed && typeof applyParsedDetailsToModal === 'function') {
+                    applyParsedDetailsToModal(parsed);
+                    showToast('Student details populated from speech dictation!', 'success');
+                } else {
+                    showToast('Captured: ' + text, 'info');
+                }
+                return;
+            }
+
+            // Target is chatbot
+            const ui = getChatbotVoiceUi();
+            if (ui.input) {
+                ui.input.value = text;
+                ui.input.dispatchEvent(new Event('input', { bubbles: true }));
+                submitChatbotVoiceTranscript();
+            }
+        }
+
+        // Cross-window message listener for voice dictation popup
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'DIVINE_CHATBOT_VOICE') {
+                handleIncomingVoiceDictation(event.data.text, event.data.target || 'chatbot');
+            }
+        });
+
+        // Also check localStorage on focus as a resilient fallback
+        window.addEventListener('focus', function() {
+            try {
+                const raw = localStorage.getItem('DIVINE_LAST_VOICE_DICTATION');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (data && data.text && (Date.now() - data.timestamp < 15000)) {
+                        localStorage.removeItem('DIVINE_LAST_VOICE_DICTATION');
+                        handleIncomingVoiceDictation(data.text, data.target || 'chatbot');
+                    }
+                }
+            } catch(e){}
+        });
+
+        function grantMicAndRetry(targetContext) {
+            requestMicrophonePermission().then(function() {
+                showToast('Microphone granted! Starting voice input...', 'success');
+                if (typeof closeModal === 'function') closeModal();
+                setTimeout(function() {
+                    if (targetContext === 'add_student') {
+                        startModalVoiceFill();
+                    } else {
+                        startChatbotVoiceRecognition();
+                    }
+                }, 250);
+            }).catch(function(err) {
+                console.warn('[Microphone Grant Failed]', err && err.name);
+                showToast('Still blocked. Open the padlock/tune icon in the address bar → Microphone → Allow, then reload the page.', 'error');
+            });
+        }
+
+        function showMicrophonePermissionHelpModal(targetContext) {
+            if (typeof openModal !== 'function') return;
+            const ua = navigator.userAgent || '';
+            const isEdge = /Edg\//i.test(ua);
+            const isChrome = /Chrome\//i.test(ua) && !isEdge;
+            const isAndroid = /Android/i.test(ua);
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const browserName = isEdge ? 'Microsoft Edge' : (isChrome ? 'Google Chrome' : 'Your Browser');
+            const isGoogleAppsScriptIframe = window.self !== window.top || window.location.hostname.includes('googleusercontent.com') || window.location.hostname.includes('script.google.com');
+
+            const html = `
+                <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100 max-w-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-microphone-slash"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold">Microphone Voice Input Solution</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Platform: <span class="font-semibold text-indigo-600 dark:text-indigo-400">${isAndroid ? '📱 Android Mobile APK' : (isMac ? '🍎 macOS (' + browserName + ')' : browserName)}</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    ${isGoogleAppsScriptIframe ? `
+                    <div class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-3 text-xs leading-relaxed">
+                        <div class="font-bold text-indigo-800 dark:text-indigo-300 flex items-center gap-1.5 text-sm">
+                            <i class="fa-solid fa-microphone text-rose-500"></i>
+                            <span>Google Apps Script Microphone Solution</span>
+                        </div>
+                        <p class="text-slate-700 dark:text-slate-300">
+                            Your microphone is correctly toggled <strong>ON</strong> in macOS and <strong>${browserName}</strong>! Because Google's iframe container restricts direct audio hardware, you can speak orally using either option below:
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                            <button type="button" onclick="closeModal(); openVoiceDictationWindow('${targetContext || 'chatbot'}');" class="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer transition">
+                                <i class="fa-solid fa-microphone"></i> 🎙️ Launch Dictation Popup
+                            </button>
+                            <a href="https://anil1310.github.io/Divine-Classes/" target="_blank" class="flex-1 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 text-center cursor-pointer transition">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open App with Mic (GitHub)
+                            </a>
+                        </div>
+                        <div class="pt-2 border-t border-indigo-200 dark:border-indigo-800/60 text-[11px] text-slate-500 dark:text-slate-400">
+                            💡 <strong>Tip:</strong> The Launch Dictation Popup lets you speak into your microphone and automatically types and submits your query into this exact window!
+                        </div>
+                    </div>
+                    ` : isAndroid ? `
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
+                        <div class="space-y-1.5">
+                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <span>📱 In Android Phone Settings (Mobile APK):</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-1.5 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Open your phone's <strong>Settings</strong> app &gt; <strong>Apps</strong> (or <em>Manage Apps</em>).</li>
+                                <li>Find and tap <strong>Divine Classes</strong> (this app).</li>
+                                <li>Tap <strong>Permissions</strong> &gt; <strong>Microphone</strong>.</li>
+                                <li>Select <strong>"Allow only while using the app"</strong>.</li>
+                                <li>Return here and tap <strong>"Try Again"</strong> below!</li>
+                            </ul>
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs leading-relaxed">
+                        <div class="space-y-1.5">
+                            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <span>1️⃣ In ${browserName} (Address Bar):</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 ml-1">
+                                <li>Look at the top URL bar of ${browserName}.</li>
+                                <li>Click the <strong>Tune / Sliders (🎚️)</strong> or <strong>Padlock (🔒)</strong> icon on the left of the address.</li>
+                                <li>Ensure <strong>Microphone</strong> is toggled to <strong>"Allow" / ON</strong>.</li>
+                            </ul>
+                        </div>
+
+                        ${isMac ? `
+                        <div class="pt-2.5 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
+                            <div class="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                <span>2️⃣ In Mac System Settings:</span>
+                            </div>
+                            <p class="text-slate-600 dark:text-slate-300">Ensure ${browserName} is toggled ON under <strong>System Settings &gt; Privacy & Security &gt; Microphone</strong>.</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                    `}
+
+                    <div class="flex flex-wrap gap-2 justify-end pt-2">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">
+                            Close
+                        </button>
+                        <button type="button" onclick="grantMicAndRetry('${targetContext || 'chatbot'}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer">
+                            <i class="fa-solid fa-microphone"></i> Allow Microphone
+                        </button>
+                        <button type="button" onclick="closeModal(); setTimeout(function(){ if ('${targetContext || 'chatbot'}' === 'add_student') { startModalVoiceFill(); } else { toggleChatbotVoiceRecognition(); } }, 250);" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-rotate-right"></i> Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        /**
+         * Shown when the browser/WebView has no SpeechRecognition engine
+         * (common inside packaged Android .APK WebViews). Gives a working
+         * path instead of a dead button.
+         */
+        function showVoiceUnavailableModal(targetContext) {
+            if (typeof openModal !== 'function') {
+                showToast('Voice input is not supported here. Use Chrome or Safari, or tap the mic key on your keyboard.', 'warning');
+                return;
+            }
+            const policyBlocked = isMicrophonePolicyBlocked();
+            const html = `
+                <div class="space-y-4 p-1 text-slate-800 dark:text-slate-100 max-w-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-microphone-slash"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold">Speak to Add a Student</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">${policyBlocked ? 'This page is served by Google Apps Script, which blocks microphone access for every app it hosts. Pick an option below to speak anyway.' : 'This app view cannot access the speech engine directly. Pick any option below — all of them work.'}</p>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs leading-relaxed">
+                        <div class="font-bold text-indigo-600 dark:text-indigo-400">1️⃣ Keyboard voice typing (works in APK)</div>
+                        <p class="text-slate-600 dark:text-slate-300">Tap the field below, then tap the 🎤 microphone key on your Android keyboard and say:</p>
+                        <p class="p-2 bg-white dark:bg-slate-900 rounded-lg font-mono text-[10px] text-slate-700 dark:text-slate-300">Add student Rahul Sharma, father Ramesh Sharma, phone 9876543210, monthly fee 1000</p>
+                        <button type="button" onclick="focusVoiceTemplateInput()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-keyboard"></i> Open Field & Use Keyboard Mic
+                        </button>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs leading-relaxed">
+                        <div class="font-bold text-rose-600 dark:text-rose-400">2️⃣ Open in Chrome (full voice input)</div>
+                        <p class="text-slate-600 dark:text-slate-300">Chrome supports live speech recognition. Open this same app there and tap the mic.</p>
+                        <a href="https://anil1310.github.io/Divine-Classes/" target="_blank" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Divine Classes in Chrome
+                        </a>
+                    </div>
+
+                    <div class="flex justify-end pt-1">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer">Close</button>
+                    </div>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function focusVoiceTemplateInput() {
+            if (typeof closeModal === 'function') closeModal();
+            const ui = getChatbotVoiceUi();
+            if (!ui.input) return;
+            if (!ui.input.value.trim()) {
+                ui.input.value = 'Add student ';
+            }
+            try {
+                ui.input.focus();
+                ui.input.setSelectionRange(ui.input.value.length, ui.input.value.length);
+            } catch (e) {}
+            showToast('Now tap the 🎤 key on your keyboard and speak the student details.', 'info');
+        }
+
+        function toggleChatbotVoiceRecognition() {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec || isMicrophonePolicyBlocked()) {
+                showVoiceUnavailableModal('chatbot');
+                return;
+            }
+
+            if (window.divineChatbotState && window.divineChatbotState.isListening) {
+                stopChatbotVoiceRecognition();
+                return;
+            }
+
+            startChatbotVoiceRecognition();
+        }
+
+        function startChatbotVoiceRecognition(langOverride) {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec || isMicrophonePolicyBlocked()) {
+                showVoiceUnavailableModal('chatbot');
+                return;
+            }
+
+            if (window.divineChatbotState && window.divineChatbotState.recognition) {
+                try { window.divineChatbotState.recognition.stop(); } catch(e){}
+                window.divineChatbotState.recognition = null;
+            }
+
+            const ui = getChatbotVoiceUi();
+            if (ui.micIcon) ui.micIcon.className = 'fa-solid fa-spinner fa-spin text-xs';
+            if (ui.banner) ui.banner.classList.remove('hidden');
+
+            // Start the speech engine immediately inside the click handler so the
+            // browser keeps the user gesture (required by Safari/iOS). Then ask for
+            // the mic in parallel: some browsers only show the permission prompt
+            // through getUserMedia.
+            beginChatbotSpeechRecognition(langOverride);
+
+            requestMicrophonePermission().catch(function(err) {
+                console.warn('[Microphone Permission]', err && err.name, err && err.message);
+                const listening = !!(window.divineChatbotState && window.divineChatbotState.isListening);
+                if (listening) return; // recognition already has the mic
+                if (ui.micIcon) ui.micIcon.className = 'fa-solid fa-microphone text-xs';
+                if (ui.banner) ui.banner.classList.add('hidden');
+                if (isMicrophonePermissionError(err)) {
+                    showToast('Microphone access blocked. Tap "Allow Microphone" to grant it again.', 'error');
+                    showMicrophonePermissionHelpModal('chatbot');
+                } else if (err && err.name === 'NotFoundError') {
+                    showToast('No microphone detected. Connect a microphone and try again.', 'error');
+                }
+            });
+        }
+
+        function beginChatbotSpeechRecognition(langOverride) {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec) return;
+
+            try {
+                const recognition = new SpeechRec();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.maxAlternatives = 1;
+                recognition.lang = langOverride || 'en-IN'; // Optimized for Indian English & Hindi terms
+
+                const ui = getChatbotVoiceUi();
+                const input = ui.input;
+                const banner = ui.banner;
+                const micIcon = ui.micIcon;
+                const micBtn = ui.micBtn;
+                let finished = false;
+                let hadError = false;
+
+                recognition.onstart = function() {
+                    if (window.divineChatbotState) {
+                        window.divineChatbotState.isListening = true;
+                    }
+                    if (banner) banner.classList.remove('hidden');
+                    if (micIcon) {
+                        micIcon.className = 'fa-solid fa-stop text-white text-xs animate-pulse';
+                    }
+                    if (micBtn) {
+                        micBtn.classList.add('bg-rose-600', 'text-white', 'ring-4', 'ring-rose-300', 'animate-pulse');
+                        micBtn.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300', 'bg-white');
+                    }
+                    if (input) {
+                        input.placeholder = '🎙️ Listening... Speak now clearly...';
+                        input.classList.add('ring-2', 'ring-rose-500', 'bg-rose-50/20');
+                        try { input.focus(); } catch (e) {}
+                    }
+                    showToast('🎙️ Microphone active! Say e.g. "Add student Rahul, phone 9876543210"', 'info');
+                };
+
+                recognition.onresult = function(event) {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    if (transcript) {
+                        const liveUi = getChatbotVoiceUi();
+                        if (liveUi.input) {
+                            liveUi.input.value = transcript;
+                            liveUi.input.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    }
+                };
+
+                recognition.onerror = function(event) {
+                    console.warn('[Voice Recognition Error]', event.error);
+                    hadError = true;
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        showToast('Microphone access blocked. Please allow microphone in your browser settings.', 'error');
+                        showMicrophonePermissionHelpModal('chatbot');
+                    } else if (event.error === 'language-not-supported' && (!langOverride || langOverride !== 'en-US')) {
+                        console.log('Language en-IN not supported in this browser, falling back to en-US');
+                        stopChatbotVoiceRecognition();
+                        setTimeout(function() {
+                            startChatbotVoiceRecognition('en-US');
+                        }, 200);
+                        return;
+                    } else if (event.error === 'audio-capture') {
+                        showToast('No microphone was found. Connect a mic and try again.', 'error');
+                    } else if (event.error === 'no-speech') {
+                        showToast('No speech detected. Please speak closer to the microphone.', 'info');
+                    } else if (event.error === 'network') {
+                        showToast('Voice recognition network error. Please check your internet connection.', 'error');
+                    } else if (event.error !== 'aborted') {
+                        showToast('Voice error: ' + event.error, 'warning');
+                    }
+                    stopChatbotVoiceRecognition();
+                };
+
+                recognition.onend = function() {
+                    if (finished) return;
+                    finished = true;
+                    const spoken = getChatbotVoiceUi().input;
+                    const text = spoken ? String(spoken.value || '').trim() : '';
+                    stopChatbotVoiceRecognition();
+                    if (text && !hadError) {
+                        submitChatbotVoiceTranscript();
+                    }
+                };
+
+                if (window.divineChatbotState) {
+                    window.divineChatbotState.recognition = recognition;
+                }
+                recognition.start();
+            } catch(err) {
+                console.error('[Voice Start Error]', err);
+                showToast('Could not start microphone: ' + err.message, 'error');
+                stopChatbotVoiceRecognition();
+            }
+        }
+
+        function stopChatbotVoiceRecognition() {
+            if (window.divineChatbotState) {
+                window.divineChatbotState.isListening = false;
+            }
+            const ui = getChatbotVoiceUi();
+            const input = ui.input;
+            const banner = ui.banner;
+            const micIcon = ui.micIcon;
+            const micBtn = ui.micBtn;
+
+            if (banner) banner.classList.add('hidden');
+            if (micIcon) {
+                micIcon.className = 'fa-solid fa-microphone text-xs';
+            }
+            if (micBtn) {
+                micBtn.classList.remove('bg-rose-600', 'text-white', 'ring-4', 'ring-rose-300', 'animate-pulse', 'bg-rose-100', 'text-rose-600', 'dark:bg-rose-950');
+                micBtn.classList.add('bg-slate-100', 'text-slate-600', 'dark:bg-slate-800', 'dark:text-slate-300');
+            }
+            if (input) {
+                input.placeholder = ui.mode === 'dedicated'
+                    ? "Ask any academic doubt or say 'Add student Rahul, phone 9876543210...'"
+                    : "Ask anything or speak 'Add student Rahul...'";
+                input.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-50/20');
+            }
+
+            if (window.divineChatbotState && window.divineChatbotState.recognition) {
+                const rec = window.divineChatbotState.recognition;
+                window.divineChatbotState.recognition = null;
+                try {
+                    rec.stop();
+                } catch(e){}
+            }
+        }
+
+        /********************************************************************
+         * ORAL VOICE FORM FILL INSIDE "ADD STUDENT" MODAL
+         ********************************************************************/
+        function startModalVoiceFill() {
+            const SpeechRec = getSpeechRecognition();
+            if (!SpeechRec || isMicrophonePolicyBlocked()) {
+                showVoiceUnavailableModal('add_student');
+                return;
+            }
+
+            const btn = document.getElementById('modal-voice-fill-btn');
+            const btnText = document.getElementById('modal-voice-btn-text');
+            const hint = document.getElementById('modal-voice-hint');
+
+            function resetButton(label, messageHtml) {
+                if (btn) btn.className = 'px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0';
+                if (btnText) btnText.textContent = label || 'Speak';
+                if (hint && messageHtml) hint.innerHTML = messageHtml;
+            }
+
+            if (btn) btn.className = 'px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer animate-pulse shrink-0';
+            if (btnText) btnText.textContent = 'Starting...';
+
+            // Start inside the click gesture, then probe permission in parallel.
+            runRecognition();
+            requestMicrophonePermission().catch(function(err) {
+                if (!isMicrophonePermissionError(err)) return;
+                resetButton('Speak', 'Microphone blocked — tap "Allow Microphone" and try again.');
+                showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
+                showMicrophonePermissionHelpModal('add_student');
+            });
+
+            function runRecognition() {
+            try {
+                const recognition = new SpeechRec();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-IN';
+                let spokenText = '';
+                let hadError = false;
+
+                recognition.onstart = function() {
+                    if (btn) btn.className = 'px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer animate-pulse shrink-0';
+                    if (btnText) btnText.textContent = 'Listening...';
+                    if (hint) hint.innerHTML = '<span class="text-rose-600 font-bold animate-pulse">🎙️ Speak now: Name, Father, Phone, Fee...</span>';
+                };
+
+                recognition.onresult = function(event) {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    if (transcript) spokenText = transcript;
+                    if (hint && transcript) {
+                        hint.innerHTML = `<i>"${escapeHtml(transcript)}"</i>`;
+                    }
+                };
+
+                recognition.onerror = function(event) {
+                    hadError = true;
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        showToast('Microphone access blocked. Please allow microphone permissions in your browser address bar.', 'error');
+                        showMicrophonePermissionHelpModal('add_student');
+                    } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
+                        showToast('Voice error: ' + event.error, 'error');
+                    }
+                };
+
+                recognition.onend = function() {
+                    resetButton('Speak');
+                    if (hadError) return;
+                    const rawSpoken = spokenText.trim();
+                    if (rawSpoken) {
+                        const parsed = extractStudentDetailsFromSpeech(rawSpoken);
+                        if (parsed) {
+                            applyParsedDetailsToModal(parsed);
+                            showToast('Student details extracted from speech!', 'success');
+                        }
+                    }
+                };
+
+                recognition.start();
+            } catch(e) {
+                resetButton('Speak');
+                showToast('Could not start microphone: ' + e.message, 'error');
+            }
+            }
+        }
+
+        function applyParsedDetailsToModal(parsed) {
+            if (!parsed) return;
+            const nameInput = document.getElementById('new-stu-name');
+            const parentInput = document.getElementById('new-stu-parent');
+            const phoneInput = document.getElementById('new-stu-phone');
+            const feeInput = document.getElementById('new-stu-monthly-fee');
+            const batchSelect = document.getElementById('modal-target-batch-id');
+
+            if (nameInput && parsed.name) nameInput.value = parsed.name;
+            if (parentInput && parsed.parent) parentInput.value = parsed.parent;
+            if (phoneInput && parsed.phone) phoneInput.value = parsed.phone;
+            if (feeInput && parsed.monthlyFee) feeInput.value = parsed.monthlyFee;
+            if (batchSelect && parsed.batchId) batchSelect.value = parsed.batchId;
+        }
+
+        /********************************************************************
+         * ORAL SPEECH ENTITY EXTRACTOR (NLP FOR STUDENT DETAILS)
+         ********************************************************************/
+        function extractStudentDetailsFromSpeech(rawText) {
+            const text = String(rawText || '').trim();
+            if (!text) return null;
+
+            const res = {
+                name: '',
+                parent: '',
+                phone: '',
+                monthlyFee: 1000,
+                paidFee: 0,
+                batchId: '',
+                batchName: '',
+                admissionDate: typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().split('T')[0]
+            };
+
+            // 1. Phone number (10 digits)
+            const phoneMatch = text.match(/(?:\+?91[\s-]?)?([6-9]\d{4}[\s-]?\d{5}|\d{10})/);
+            if (phoneMatch) {
+                res.phone = phoneMatch[1].replace(/[\s-]/g, '');
+            }
+
+            // 2. Monthly Fee
+            const feeMatch = text.match(/(?:fee|fees|fees\s*kitni|monthly|rupee|rupees|rs)\s*(?:is|hai)?\s*₹?\s*(\d{3,5})/i);
+            if (feeMatch) {
+                res.monthlyFee = parseInt(feeMatch[1], 10);
+            }
+
+            // 3. Parent / Father Name
+            const parentMatch = text.match(/(?:father|parent|guardian|pitaji|papa)\s*(?:name|naam)?\s*(?:is|hai)?\s*([a-zA-Z\s]+?)(?:,\s*|\s+(?:phone|mobile|fee|monthly|class|batch|roll|admission|\d)|$)/i);
+            if (parentMatch) {
+                res.parent = parentMatch[1].trim();
+            }
+
+            // 4. Student Name — prefer "add student <Name>" so a trailing word
+            // like "Student" inside the name is not truncated.
+            const stopWords = 'father|parent|guardian|pitaji|papa|phone|mobile|fee|fees|monthly|class|batch|roll|admission|date|address';
+            const nameCore = '([A-Za-z\\u0900-\\u097F][A-Za-z\\u0900-\\u097F\\s.\'-]+)';
+            const nameStop = new RegExp('\\s*(?:,|\\b(?:' + stopWords + ')\\b|\\d|$)', 'i');
+            let nameMatch = text.match(new RegExp('(?:add|enroll|enrol|register|admit|create)\\s+(?:a\\s+|an\\s+|the\\s+|new\\s+|naya\\s+|naye\\s+)?(?:student|admission)\\s+(?:named\\s+|name\\s+|naam\\s+)?' + nameCore, 'i'));
+            if (!nameMatch) {
+                nameMatch = text.match(new RegExp('(?:name|naam)\\s*(?:is|hai)?\\s*' + nameCore, 'i'));
+            }
+            if (!nameMatch) {
+                nameMatch = text.match(new RegExp('(?:student)\\s+(?:named\\s+|name\\s+|naam\\s+)?' + nameCore, 'i'));
+            }
+            if (nameMatch) {
+                // Trim trailing stop words captured by the lazy quantifier.
+                res.name = String(nameMatch[1] || '').split(nameStop)[0].trim();
+            }
+
+            if (res.name) {
+                res.name = res.name.replace(/^(?:add|enroll|enrol|register|admit|create|student|name|naam|is|hai)\s+/gi, '').trim();
+                res.name = res.name.replace(/[,\s]+$/g, '');
+                res.name = res.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+            }
+            if (res.parent) {
+                res.parent = res.parent.replace(/^(?:father|parent|guardian|pitaji|papa|name|naam|is|hai)\s+/gi, '').trim();
+                res.parent = res.parent.replace(/[,\s]+$/g, '');
+                res.parent = res.parent.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+            }
+
+            // 5. Match Batch
+            const batches = state.batches || [];
+            let matchedBatch = null;
+            if (batches.length > 0) {
+                const lower = text.toLowerCase();
+                matchedBatch = batches.find(b => {
+                    const bName = (b.name || '').toLowerCase();
+                    const bGrade = (b.grade || '').toLowerCase();
+                    const bSubject = (b.subject || '').toLowerCase();
+                    return lower.includes(bName) || (bGrade && lower.includes(bGrade)) || (bSubject && lower.includes(bSubject));
+                }) || batches[0];
+            }
+            if (matchedBatch) {
+                res.batchId = matchedBatch.id;
+                res.batchName = matchedBatch.name;
+            }
+
+            return res;
+        }
+
+        function isVoiceEnrollmentCommand(text) {
+            const lower = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (!lower) return false;
+            return /(add|enroll|enrol|register|admit|create|new|insert)\s+(a\s+|an\s+|the\s+|new\s+|naya\s+|naye\s+)?(student|admission|bachcha|bacche|vidyarthi)/i.test(lower) ||
+                /(student|admission|vidyarthi)\s+(ko\s+)?(add|enroll|enrol|register|admit|jodo|jod)/i.test(lower) ||
+                /(naya|naye|nayi)\s+(student|admission)/i.test(lower) ||
+                /^(add|enroll|enrol)\s+[a-z]/i.test(lower);
+        }
+
+        function renderVoiceEnrollmentCard(details) {
+            const encoded = encodeURIComponent(JSON.stringify(details)).replace(/'/g, '%27');
+            return `
+                <div class="space-y-2.5 p-3 rounded-2xl bg-indigo-50/80 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/80 text-xs">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 font-bold text-indigo-700 dark:text-indigo-300">
+                            <i class="fa-solid fa-microphone-lines text-indigo-600"></i>
+                            <span>Oral Admission Details Parsed</span>
+                        </div>
+                        <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">Voice Ready</span>
+                    </div>
+                    <div class="space-y-1 bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px]">
+                        <div class="flex justify-between"><span>Student Name:</span><span class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(details.name || 'Not specified')}</span></div>
+                        <div class="flex justify-between"><span>Parent Name:</span><span class="font-bold">${escapeHtml(details.parent || 'Guardian')}</span></div>
+                        <div class="flex justify-between"><span>Contact Phone:</span><span class="font-bold">${escapeHtml(details.phone || 'N/A')}</span></div>
+                        <div class="flex justify-between"><span>Target Batch:</span><span class="font-bold text-indigo-600 dark:text-indigo-400">${escapeHtml(details.batchName || 'General Batch')}</span></div>
+                        <div class="flex justify-between"><span>Monthly Fee:</span><span class="font-bold">₹${details.monthlyFee || 1000} / month</span></div>
+                        <div class="flex justify-between"><span>Total Fees Paid:</span><span class="font-bold text-slate-500">₹0 (Non-editable initial)</span></div>
+                    </div>
+                    <div class="flex gap-2 pt-0.5">
+                        <button type="button" onclick="confirmVoiceStudentEnrollment('${encoded}')" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-check"></i> Confirm & Enroll
+                        </button>
+                        <button type="button" onclick="openAddStudentModalWithPrefill('${encoded}')" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-xs transition cursor-pointer">
+                            Edit Form
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function confirmVoiceStudentEnrollment(encodedDetails) {
+            const details = JSON.parse(decodeURIComponent(encodedDetails));
+            if (!details.name) {
+                showToast('Student name is required for enrollment.', 'error');
+                return;
+            }
+
+            const canManage = state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher';
+            if (!canManage) {
+                showToast('Permission denied: You must be signed in as Admin, Developer, or Teacher to enroll students.', 'error');
+                return;
+            }
+
+            let maxRollNum = 100;
+            (state.students || []).forEach(s => {
+                const num = parseInt(String(s.roll || '').replace(/\D/g, ''), 10);
+                if (!isNaN(num) && num > maxRollNum) maxRollNum = num;
+            });
+            const nextRoll = `DC-${maxRollNum + 1}`;
+            const studentId = 's_' + Date.now();
+            const admissionDate = details.admissionDate || localTodayIso();
+            const targetBatchId = details.batchId || (state.batches[0] ? state.batches[0].id : 'b1');
+            const targetBatch = (state.batches || []).find(b => b.id === targetBatchId);
+
+            // Keep the same field names the rest of the app reads
+            // (parentName, totalFee, batch.studentIds, etc.).
+            const newStudent = {
+                id: studentId,
+                name: details.name,
+                parentName: details.parent || 'Parent',
+                phone: details.phone || '9555678753',
+                roll: nextRoll,
+                batchId: targetBatchId,
+                totalFee: 0,
+                paidFee: 0, // strictly 0 on enrollment
+                monthlyFee: Number(details.monthlyFee) || 1000,
+                monthlyPaidThisCycle: 0,
+                dueDate: calculateNextMonthlyDueDate(admissionDate),
+                admissionDate: admissionDate,
+                lastReminder: 'Never',
+                status: 'Active',
+                password: 'password123',
+                photo: ''
+            };
+
+            if (!state.students) state.students = [];
+            state.students.push(newStudent);
+            if (targetBatch) {
+                if (!Array.isArray(targetBatch.studentIds)) targetBatch.studentIds = [];
+                if (!targetBatch.studentIds.includes(studentId)) targetBatch.studentIds.push(studentId);
+            }
+            saveStateLocally();
+
+            if (typeof syncPendingDataToSupabase === 'function' && state.settings && state.settings.supabaseEnabled) {
+                syncPendingDataToSupabase().catch(() => {});
+            }
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.apiSyncAllData(state);
+            }
+
+            renderSidebar();
+            if (state.activeTab === 'batches' || state.activeTab === 'fees') {
+                renderMainContentPreservingScroll();
+            }
+
+            showToast(`🎉 ${newStudent.name} enrolled with Roll ${nextRoll}!`, 'success');
+            appendChatMessage('bot', `
+                <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200 space-y-1">
+                    <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-600"></i> Student Successfully Enrolled!</p>
+                    <p><b>${escapeHtml(newStudent.name)}</b> has been enrolled into <b>${escapeHtml(details.batchName || (targetBatch && targetBatch.name) || 'Batch')}</b> with Roll Number <b>${nextRoll}</b>.</p>
+                    <p class="text-[10px] text-emerald-600 dark:text-emerald-400">Total Fees Paid initialized to ₹0. Next fee due on ${escapeHtml(newStudent.dueDate)}.</p>
+                </div>
+            `);
+
+            speakChatbotResponse(`${newStudent.name} has been enrolled successfully with roll number ${nextRoll}.`);
+        }
+
+        function openAddStudentModalWithPrefill(encodedDetails) {
+            const details = JSON.parse(decodeURIComponent(encodedDetails));
+            const batchId = details.batchId || (state.batches[0] ? state.batches[0].id : 'b1');
+            openAddStudentToBatchModal(batchId);
+            setTimeout(() => {
+                applyParsedDetailsToModal(details);
+            }, 100);
+        }
+
+        /********************************************************************
+         * TEXT-TO-SPEECH (TTS) ORAL AUDIO PLAYBACK
+         ********************************************************************/
+        function speakChatbotResponse(rawText) {
+            if (!('speechSynthesis' in window)) return;
+            try {
+                window.speechSynthesis.cancel();
+                const div = document.createElement('div');
+                div.innerHTML = rawText;
+                const text = div.textContent || div.innerText || '';
+                const utterance = new SpeechSynthesisUtterance(text.slice(0, 300));
+                utterance.lang = 'en-IN';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            } catch(e){}
+        }
+
+        function formatGeminiMarkdown(text) {
+            if (!text) return '';
+            let html = String(text);
+
+            html = html
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Code blocks
+            html = html.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/gi, function(match, lang, code) {
+                return `<pre class="my-2 p-2.5 rounded-xl bg-slate-900 text-indigo-300 font-mono text-[11px] overflow-x-auto border border-slate-800"><code>${code.trim()}</code></pre>`;
+            });
+
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 font-mono text-indigo-600 dark:text-indigo-400 font-bold">$1</code>');
+
+            // Bold
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<b class="font-bold text-slate-900 dark:text-slate-100">$1</b>');
+
+            // Italic
+            html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+
+            // Headings
+            html = html.replace(/^### (.*$)/gim, '<h4 class="font-bold text-xs text-indigo-600 dark:text-indigo-400 mt-2 mb-1">$1</h4>');
+            html = html.replace(/^## (.*$)/gim, '<h3 class="font-bold text-sm text-indigo-600 dark:text-indigo-400 mt-2.5 mb-1">$1</h3>');
+            html = html.replace(/^# (.*$)/gim, '<h2 class="font-extrabold text-sm text-indigo-700 dark:text-indigo-300 mt-3 mb-1.5">$1</h2>');
+
+            // Bullet points
+            html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<li class="ml-4 list-disc">$1</li>');
+
+            // Line breaks
+            html = html.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+
+            return html;
+        }
+
+        async function callOpenAiApi(userPrompt) {
+            const apiKey = getOpenAiApiKey();
+            const model = getOpenAiModel();
+            if (!apiKey) return { success: false, error: 'NO_KEY' };
+
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent, batch: myBatch } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null, batch: null };
+            let studentContext = '';
+            if (isStudent && ownStudent) {
+                studentContext = `Student Profile: ${ownStudent.name}, Roll: ${ownStudent.roll}, Batch: ${myBatch ? myBatch.name : 'CBSE Batch'}, Monthly Fee: ₹${ownStudent.monthlyFee || 1000}, Total Paid: ₹${ownStudent.paidFee || 0}`;
+            }
+
+            const systemPrompt = "You are the advanced official AI Academic Tutor and Institute Assistant for Divine Classes.\n" +
+                "Location: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063\n" +
+                "Director: Er. Rajesh Chahar | Lead Architect: Dev. Anil Kumar Chahar (8126390611)\n" +
+                "Current User Role: " + state.currentRole + "\n" +
+                (studentContext ? ("Current Student Context: " + studentContext + "\n") : "") +
+                "Explain physics and math step-by-step with formulas and clear calculations. Answer academic queries clearly.";
+
+            const messages = [{ role: 'system', content: systemPrompt }];
+            const history = (window.divineChatbotState.messages || []).slice(-6);
+            history.forEach(m => {
+                messages.push({
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: m.text
+                });
+            });
+            messages.push({ role: 'user', content: userPrompt });
+
+            try {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + apiKey
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: messages,
+                        temperature: 0.7,
+                        max_tokens: 2048
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    return { success: false, error: err.error?.message || ('HTTP ' + res.status) };
+                }
+                const data = await res.json();
+                if (data.choices && data.choices.length > 0) {
+                    return { success: true, reply: data.choices[0].message.content, model: model };
+                }
+                return { success: false, error: 'Empty OpenAI response' };
+            } catch(e) {
+                if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.apiAskOpenAi) {
+                    return new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(err => resolve({ success: false, error: err.message }))
+                            .apiAskOpenAi(userPrompt, history, { apiKey: apiKey, model: model, studentSummary: studentContext });
+                    });
+                }
+                return { success: false, error: e.message };
+            }
+        }
+
+        async function callAiModel(userPrompt) {
+            const provider = getAiProvider();
+            const openAiKey = getOpenAiApiKey();
+            const geminiKey = getGeminiApiKey();
+
+            // 1. If OpenAI selected and key present
+            if (provider === 'openai' && openAiKey) {
+                const openAiRes = await callOpenAiApi(userPrompt);
+                if (openAiRes.success) return openAiRes;
+            }
+
+            // 2. If Gemini selected or key present
+            if (geminiKey) {
+                const geminiRes = await callGeminiAiApi(userPrompt);
+                if (geminiRes.success) return { success: true, reply: geminiRes.reply, model: getGeminiModel() };
+            }
+
+            // 3. If OpenAI key present fallback
+            if (openAiKey) {
+                const openAiRes = await callOpenAiApi(userPrompt);
+                if (openAiRes.success) return openAiRes;
+            }
+
+            // 4. Free Auto-Connect via Google Apps Script Backend Proxy
+            if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.apiAskGeminiAi) {
+                try {
+                    const backendRes = await new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(err => resolve({ success: false, error: err.message }))
+                            .apiAskGeminiAi(userPrompt, (window.divineChatbotState.messages || []).slice(-6), {});
+                    });
+                    if (backendRes && backendRes.success) {
+                        return { success: true, reply: backendRes.reply, model: 'Gemini Auto' };
+                    }
+                } catch(e){}
+            }
+
+            // 5. Intelligent Fallback: Built-in Academic & Student Knowledge Engine
+            const localReply = resolveDivineChatbotQuery(userPrompt);
+            return { success: true, reply: localReply, model: 'Free Auto AI', isLocal: true };
+        }
+
+        async function callGeminiAiApi(userPrompt) {
+            const apiKey = getGeminiApiKey();
+            const model = getGeminiModel();
+            if (!apiKey) return { success: false, error: 'NO_KEY' };
+
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent, batch: myBatch } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null, batch: null };
+            let studentContext = '';
+            if (isStudent && ownStudent) {
+                studentContext = `Student Profile:\n- Name: ${ownStudent.name}\n- Roll: ${ownStudent.roll}\n- Batch: ${myBatch ? myBatch.name : 'CBSE Batch'}\n- Monthly Fee: ₹${ownStudent.monthlyFee || 1000}\n- Total Fees Paid: ₹${ownStudent.paidFee || 0}\n- Fee Due Date: ${ownStudent.dueDate || 'Paid'}`;
+            }
+
+            const systemInstruction = `You are the official AI Academic Tutor and Institute Assistant for Divine Classes.
+Institute Information:
+- Institute: Divine Classes
+- Address: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063 (Near Paschimpuri Club)
+- Director & Head Educator: Er. Rajesh Chahar (Senior Physics & Mathematics Faculty)
+- Lead Software Architect: Dev. Anil Kumar Chahar (Phone: 8126390611)
+- Standard Tuition Fee: ₹1,000 / month per course
+- Role of current user: ${state.currentRole}
+${studentContext}
+
+Guidelines:
+- Answer ANY academic doubt across Physics, Chemistry, Mathematics, Biology, Computer Science, and General Knowledge.
+- Break down numerical problems step-by-step with formulas and clear calculations.
+- If asked to generate a test or quiz, generate questions with clear answers and explanations.
+- If asked about institute batches, fees, or leadership, use the provided accurate details.
+- Format responses cleanly with bold headings, lists, and code blocks where applicable. Keep responses structured and pedagogical.`;
+
+            const history = (window.divineChatbotState.messages || []).slice(-6).map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: [{ text: m.text }]
+            }));
+            history.push({
+                role: 'user',
+                parts: [{ text: userPrompt }]
+            });
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: history,
+                        systemInstruction: {
+                            parts: [{ text: systemInstruction }]
+                        },
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 2048
+                        }
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    return { success: false, error: errData.error?.message || `HTTP ${res.status}` };
+                }
+
+                const data = await res.json();
+                if (data.candidates && data.candidates.length > 0) {
+                    const reply = data.candidates[0].content.parts.map(p => p.text).join('\n');
+                    return { success: true, reply: reply };
+                }
+                return { success: false, error: 'Empty response from Gemini API' };
+            } catch(e) {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    return new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(err => resolve({ success: false, error: err.message }))
+                            .apiAskGeminiAi(userPrompt, history, { apiKey: apiKey, model: model, studentSummary: studentContext });
+                    });
+                }
+                return { success: false, error: e.message };
+            }
+        }
+
+        function toggleDivineChatbot(forceState) {
+            if (!isChatbotEnabled()) {
+                const btn = document.getElementById('divine-chatbot-btn');
+                const win = document.getElementById('divine-chatbot-window');
+                if (btn) { btn.style.display = 'none'; btn.classList.add('hidden'); }
+                if (win) { win.style.display = 'none'; win.classList.add('hidden'); }
+                return;
+            }
+            const win = document.getElementById('divine-chatbot-window');
+            const iconClosed = document.getElementById('chatbot-icon-closed');
+            const iconOpened = document.getElementById('chatbot-icon-opened');
+            if (!win) return;
+
+            if (typeof forceState === 'boolean') {
+                window.divineChatbotState.isOpen = forceState;
+            } else {
+                window.divineChatbotState.isOpen = !window.divineChatbotState.isOpen;
+            }
+
+            if (window.divineChatbotState.isOpen) {
+                win.classList.remove('hidden');
+                if (iconClosed) iconClosed.classList.add('hidden');
+                if (iconOpened) iconOpened.classList.remove('hidden');
+                if (!window.divineChatbotState.initialized) {
+                    initDivineChatbot();
+                } else {
+                    renderChatbotQuickPills();
+                    updateGeminiBadgeStatus();
+                }
+                setTimeout(() => {
+                    const input = document.getElementById('chatbot-input');
+                    if (input) input.focus();
+                    scrollChatbotToBottom();
+                }, 100);
+            } else {
+                win.classList.add('hidden');
+                if (iconClosed) iconClosed.classList.remove('hidden');
+                if (iconOpened) iconOpened.classList.add('hidden');
+            }
+        }
+
+        
+        function autoConnectUserAiKeys() {
+            try {
+                const isLeadDev = (state.currentRole === 'developer') ||
+                    (state.currentUser && (
+                        (state.currentUser.email && state.currentUser.email.toLowerCase() === 'anil.chahar170@gmail.com') ||
+                        (state.currentUser.identifier && state.currentUser.identifier.toLowerCase().includes('anil.chahar170@gmail.com')) ||
+                        (state.currentUser.name && state.currentUser.name.includes('Anil'))
+                    ));
+
+                const savedGeminiKey = localStorage.getItem('DIVINE_GEMINI_API_KEY') ||
+                    localStorage.getItem('DIVINE_DEV_GEMINI_KEY') ||
+                    (state.settings && state.settings.geminiApiKey) || '';
+
+                const savedOpenAiKey = localStorage.getItem('DIVINE_OPENAI_API_KEY') ||
+                    (state.settings && state.settings.openaiApiKey) || '';
+
+                const provider = localStorage.getItem('DIVINE_AI_PROVIDER') || (savedOpenAiKey && !savedGeminiKey ? 'openai' : 'gemini');
+
+                if (isLeadDev) {
+                    // Lead Dev Anil Chahar always connects directly to Gemini 2.5 Pro
+                    if (savedGeminiKey) {
+                        localStorage.setItem('DIVINE_DEV_GEMINI_KEY', savedGeminiKey);
+                        localStorage.setItem('DIVINE_GEMINI_API_KEY', savedGeminiKey);
+                    }
+                    localStorage.setItem('DIVINE_AI_PROVIDER', 'gemini');
+                    localStorage.setItem('DIVINE_GEMINI_MODEL', 'gemini-2.5-pro');
+                    localStorage.setItem('DIVINE_AI_MODEL', 'gemini-2.5-pro');
+                    console.log('[AI Auto-Connect] Lead Developer Anil auto-connected to Gemini 2.5 Pro');
+                } else {
+                    // Admin, Teacher, and Student roles
+                    if (savedGeminiKey) {
+                        localStorage.setItem('DIVINE_GEMINI_API_KEY', savedGeminiKey);
+                    }
+                    if (savedOpenAiKey) {
+                        localStorage.setItem('DIVINE_OPENAI_API_KEY', savedOpenAiKey);
+                    }
+                    localStorage.setItem('DIVINE_AI_PROVIDER', provider);
+                    console.log(`[AI Auto-Connect] Role '${state.currentRole}' auto-connected to ${provider} AI`);
+                }
+
+                // Ensure drawer never pops up unexpectedly on login
+                toggleGeminiSettingsDrawer(false);
+                updateGeminiBadgeStatus();
+            } catch(e) {
+                console.warn('[AI Auto-Connect] Notice:', e);
+            }
+        }
+        function autoConnectDeveloperGeminiPro() {
+            return autoConnectUserAiKeys();
+        }
+
+        function initDivineChatbot() {
+            window.divineChatbotState.initialized = true;
+            window.divineChatbotState.messages = [];
+            renderChatbotQuickPills();
+            updateGeminiBadgeStatus();
+
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null };
+            const studentGreeting = isStudent && ownStudent ? `Hello <b>${escapeHtml(ownStudent.name)}</b>! ` : 'Welcome to <b>Divine Classes</b>! ';
+            const geminiConnected = isGeminiAutoConnected();
+
+            appendChatMessage('bot', `
+                <div class="space-y-1">
+                    <p>${studentGreeting}I am your AI Assistant & Voice Helpdesk.</p>
+                    <p class="text-[11px] opacity-90">${geminiConnected ? '✨ <b>Gemini AI is Auto-Connected!</b> You can ask anything or tap 🎙️ to speak.' : 'You can ask anything or tap 🎙️ to orally speak.'}</p>
+                    <ul class="list-disc list-inside mt-1 space-y-0.5 text-[11px] opacity-90">
+                        <li><b>Oral Student Admission:</b> Speak <i>"Add student Rahul, phone 9876543210, batch Class 10"</i></li>
+                        ${isStudent ? '<li>Your Monthly Fees, Due Date & Total Paid</li>' : '<li>Fee Structure & Policies</li>'}
+                        ${isStudent ? '<li>Your Enrolled Batch, Teacher & Schedule</li>' : '<li>Batches, Timings & Admissions</li>'}
+                        <li>Physics, Chemistry & Math Concept Doubts & Quiz</li>
+                        <li>Institute Address, Timings & Director <b>Er. Rajesh Chahar</b></li>
+                    </ul>
+                </div>
+            `);
+        }
+
+        function resetDivineChatbot() {
+            const container = document.getElementById('chatbot-messages');
+            if (container) container.innerHTML = '';
+            initDivineChatbot();
+        }
+
+        function renderChatbotQuickPills() {
+            const container = document.getElementById('chatbot-quick-pills');
+            if (!container) return;
+            const isStudent = state.currentRole === 'student';
+            const isTeacherOrAdmin = state.currentRole === 'admin' || state.currentRole === 'developer' || state.currentRole === 'teacher';
+            const isGoogleAppsScriptIframe = window.self !== window.top || window.location.hostname.includes('googleusercontent.com') || window.location.hostname.includes('script.google.com');
+
+            const pills = [];
+            if (isGoogleAppsScriptIframe) {
+                pills.push({ label: '🎙️ Dictation Window', query: '__VOICE_POPUP__' });
+            }
+            if (isTeacherOrAdmin) {
+                pills.push({ label: '🎙️ Speak: Add Student', query: 'Add student Rahul Sharma phone 9876543210 batch Class 10' });
+            }
+            if (isStudent) {
+                pills.push({ label: '💰 My Fee & Dues', query: 'What is my fee status and due date?' });
+                pills.push({ label: '💵 Total Fees Paid', query: 'How much total fee have I paid till date?' });
+                pills.push({ label: '📚 My Batch & Timing', query: 'Show my enrolled batch and timing' });
+                pills.push({ label: '📈 My Test Marks', query: 'Show my latest test marks' });
+            } else {
+                pills.push({ label: '💰 Fee Structure', query: 'What is the monthly fee structure and payment mode?' });
+                pills.push({ label: '📚 Batches & Schedule', query: 'What batches and timings are available?' });
+                pills.push({ label: '📍 Address & Contact', query: 'Where is Divine Classes located and how to contact?' });
+                pills.push({ label: '👨‍🏫 Er. Rajesh Chahar', query: 'Who is the Director of Divine Classes?' });
+            }
+            pills.push({ label: '⚛️ Newton\'s Laws', query: 'Explain Newton\'s laws of motion with formulas' });
+            pills.push({ label: '⚡ Ohm\'s Law', query: 'What is Ohm\'s Law with formula and units?' });
+            pills.push({ label: '📐 Quadratic Formula', query: 'What is the quadratic formula?' });
+
+            container.innerHTML = pills.map(p => `
+                <button type="button" onclick="askChatbotQuickQuestion('${escapeHtml(p.query)}')"
+                    class="px-2.5 py-1 rounded-full bg-white dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 text-slate-700 dark:text-slate-200 font-medium whitespace-nowrap transition cursor-pointer shadow-xs active:scale-95">
+                    ${p.label}
+                </button>
+            `).join('');
+        }
+
+        function askChatbotQuickQuestion(query) {
+            if (query === '__VOICE_POPUP__') {
+                openVoiceDictationWindow('chatbot');
+                return;
+            }
+            if (query && query.includes('Rahul Sharma') && query.includes('Add student')) {
+                toggleChatbotVoiceRecognition();
+                return;
+            }
+            const input = document.getElementById('chatbot-input') || document.getElementById('dedicated-chatbot-input');
+            if (input) {
+                input.value = query;
+                const floatingForm = document.getElementById('chatbot-form');
+                const isDedicated = !floatingForm || floatingForm.offsetParent === null;
+                if (isDedicated && typeof handleDedicatedChatbotSubmit === 'function') {
+                    handleDedicatedChatbotSubmit(new Event('submit'));
+                } else if (typeof handleChatbotSubmit === 'function') {
+                    handleChatbotSubmit(new Event('submit'));
+                }
+            }
+        }
+
+        function scrollChatbotToBottom() {
+            const container = document.getElementById('chatbot-messages');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        /**
+         * Returns the chat stream that is actually visible: the full-page
+         * chatbot on the AI Assistant tab, otherwise the floating drawer.
+         */
+        function getChatbotMessagesContainer() {
+            const dedicated = document.getElementById('dedicated-chatbot-messages');
+            const drawer = document.getElementById('chatbot-messages');
+            const dedicatedVisible = !!(dedicated && dedicated.offsetParent !== null);
+            const drawerVisible = !!(drawer && drawer.offsetParent !== null);
+            if (dedicatedVisible && !drawerVisible) return dedicated;
+            return drawer || dedicated;
+        }
+
+        function appendChatMessage(role, htmlContent) {
+            const container = getChatbotMessagesContainer();
+            if (!container) return;
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex items-start gap-2 ' + (role === 'user' ? 'justify-end' : 'justify-start') + ' fade-in';
+
+            if (role === 'bot') {
+                msgDiv.innerHTML = `
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs mt-0.5">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="max-w-[85%] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl rounded-tl-xs p-3 shadow-xs border border-slate-200 dark:border-slate-700/80 leading-relaxed text-[12px]">
+                        ${htmlContent}
+                    </div>
+                `;
+            } else {
+                msgDiv.innerHTML = `
+                    <div class="max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-tr-xs p-3 shadow-xs leading-relaxed text-[12px]">
+                        ${htmlContent}
+                    </div>
+                    <div class="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs shrink-0 shadow-xs mt-0.5">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                `;
+            }
+
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+
+            // Track in state
+            if (!window.divineChatbotState.messages) window.divineChatbotState.messages = [];
+            window.divineChatbotState.messages.push({
+                role: role,
+                text: typeof htmlContent === 'string' ? htmlContent.replace(/<[^>]*>/g, '') : ''
+            });
+        }
+
+        function showChatbotTypingIndicator() {
+            const container = getChatbotMessagesContainer();
+            if (!container) return;
+            const existing = document.getElementById('chatbot-typing-indicator');
+            if (existing) return;
+
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'chatbot-typing-indicator';
+            typingDiv.className = 'flex items-start gap-2 justify-start fade-in';
+            typingDiv.innerHTML = `
+                <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs mt-0.5">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl rounded-tl-xs px-3.5 py-2.5 shadow-xs border border-slate-200 dark:border-slate-700/80 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 typing-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 typing-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 typing-dot"></span>
+                </div>
+            `;
+            container.appendChild(typingDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeChatbotTypingIndicator() {
+            const typing = document.getElementById('chatbot-typing-indicator');
+            if (typing) typing.remove();
+        }
+
+        async function handleChatbotSubmit(event) {
+            if (event) event.preventDefault();
+            const input = document.getElementById('chatbot-input');
+            if (!input) return;
+            const text = String(input.value || '').trim();
+            if (!text) return;
+
+            input.value = '';
+            appendChatMessage('user', escapeHtml(text));
+            showChatbotTypingIndicator();
+
+            // 1. Check if user is giving an oral/text command to enroll a student
+            if (isVoiceEnrollmentCommand(text)) {
+                setTimeout(() => {
+                    removeChatbotTypingIndicator();
+                    const details = extractStudentDetailsFromSpeech(text);
+                    if (details && (details.name || details.phone)) {
+                        appendChatMessage('bot', renderVoiceEnrollmentCard(details));
+                    } else {
+                        appendChatMessage('bot', `
+                            <div class="space-y-1">
+                                <p class="font-bold text-indigo-600 dark:text-indigo-400">🎙️ Oral Student Admission:</p>
+                                <p class="text-[11px]">Please speak or write the student details in this format:</p>
+                                <p class="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg font-mono text-[10px] text-slate-700 dark:text-slate-300">
+                                    "Add student Rahul Sharma, father Ramesh Sharma, phone 9876543210, batch Class 10 Board Booster, monthly fee 1000"
+                                </p>
+                            </div>
+                        `);
+                    }
+                }, 350);
+                return;
+            }
+
+            // 2. Auto-connect to Gemini, ChatGPT, or Free Auto AI (ZERO key prompt friction!)
+            try {
+                const aiResult = await callAiModel(text);
+                removeChatbotTypingIndicator();
+                if (aiResult.success) {
+                    if (aiResult.isLocal) {
+                        appendChatMessage('bot', aiResult.reply);
+                    } else {
+                        const formatted = formatGeminiMarkdown(aiResult.reply);
+                        const modelLabel = aiResult.model || 'Free Auto AI';
+                        appendChatMessage('bot', `
+                            <div class="space-y-1.5">
+                                ${formatted}
+                                <div class="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[10px] text-amber-500 font-semibold">
+                                    <span class="flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> Answered by ${escapeHtml(modelLabel)}</span>
+                                    <button type="button" onclick="speakChatbotResponse(this.closest('.space-y-1.5').innerText)" title="Listen to answer" class="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer">
+                                        <i class="fa-solid fa-volume-high text-[10px]"></i> Speak
+                                    </button>
+                                </div>
+                            </div>
+                        `);
+                    }
+                    return;
+                }
+            } catch(err) {
+                console.warn('[AI Model Exception]', err);
+            }
+
+            // 3. Fallback to Local Knowledge Engine
+            setTimeout(() => {
+                removeChatbotTypingIndicator();
+                const responseHtml = resolveDivineChatbotQuery(text);
+                appendChatMessage('bot', responseHtml);
+            }, 250);
+        }
+
+        function resolveDivineChatbotQuery(rawQuery) {
+            const q = String(rawQuery || '').toLowerCase().trim();
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent, batch: myBatch } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null, batch: null };
+            const todayIso = typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().split('T')[0];
+
+            // 1. GREETINGS
+            if (/^(hi|hello|hey|namaste|good\s*(morning|afternoon|evening)|pranam)\b/.test(q)) {
+                const name = isStudent && ownStudent ? escapeHtml(ownStudent.name) : 'there';
+                return `Hello ${name}! 👋 Welcome to Divine Classes. How can I help you today? Ask about your fees, batches, test marks, location, or speak orally to add students!`;
+            }
+
+            // 2. STUDENT FEES / DUE DATE / TOTAL FEES PAID
+            if (q.includes('fee') || q.includes('due') || q.includes('paid') || q.includes('balance') || q.includes('kitni') || q.includes('paisa') || q.includes('rupee')) {
+                if (isStudent && ownStudent) {
+                    const paid = Number(ownStudent.paidFee || 0).toLocaleString('en-IN');
+                    const monthly = Number(ownStudent.monthlyFee || 1000).toLocaleString('en-IN');
+                    const due = ownStudent.dueDate || 'Paid';
+                    const isOverdue = due !== 'Paid' && due <= todayIso;
+                    const upi = (state.settings && state.settings.upiId) || '9555678753@upi';
+
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">🎓 Student Fee Ledger (${escapeHtml(ownStudent.name)}):</p>
+                            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
+                                <div class="flex justify-between"><span>Roll Number:</span><span class="font-bold">${escapeHtml(ownStudent.roll || 'N/A')}</span></div>
+                                <div class="flex justify-between"><span>Monthly Fee:</span><span class="font-bold">₹${monthly} / month</span></div>
+                                <div class="flex justify-between"><span>Total Fees Paid:</span><span class="font-bold text-emerald-600">₹${paid}</span></div>
+                                <div class="flex justify-between"><span>Next Due Date:</span><span class="font-bold ${isOverdue ? 'text-rose-500' : 'text-slate-700 dark:text-slate-300'}">${escapeHtml(due)}</span></div>
+                                <div class="flex justify-between"><span>Payment Status:</span><span class="font-bold ${isOverdue ? 'text-rose-600' : 'text-emerald-600'}">${isOverdue ? '⚠️ Payment Pending' : '✅ Clear & Active'}</span></div>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                                💳 <b>Pay Online:</b> UPI to <code class="bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded text-indigo-600 font-bold">${escapeHtml(upi)}</code> or pay in cash at institute counter.
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    const upi = (state.settings && state.settings.upiId) || '9555678753@upi';
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">💰 Divine Classes Fee Structure:</p>
+                            <ul class="list-disc list-inside space-y-1 text-[11px]">
+                                <li><b>Standard Tuition Fee:</b> <b>₹1,000 / month</b> per subject/course.</li>
+                                <li><b>Enrollment Policy:</b> Newly enrolled students start at <b>₹0 Total Fees Paid</b> (strictly non-editable on admission).</li>
+                                <li><b>Monthly Accumulation:</b> With each payment receipt, Total Paid dynamically accumulates (e.g. ₹1,000 for 1 month, ₹12,000 for 12 months).</li>
+                                <li><b>Payment Methods:</b> Direct UPI to <code class="bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded text-indigo-600 font-bold">${escapeHtml(upi)}</code> or cash at front office.</li>
+                            </ul>
+                        </div>
+                    `;
+                }
+            }
+
+            // 3. BATCHES / SCHEDULE / TIMINGS / CLASS
+            if (q.includes('batch') || q.includes('timing') || q.includes('schedule') || q.includes('samay') || q.includes('kab') || q.includes('class')) {
+                if (isStudent && myBatch) {
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📚 Your Enrolled Batch:</p>
+                            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
+                                <div class="flex justify-between"><span>Batch Name:</span><span class="font-bold">${escapeHtml(myBatch.name)}</span></div>
+                                <div class="flex justify-between"><span>Subject:</span><span class="font-bold">${escapeHtml(myBatch.subject)}</span></div>
+                                <div class="flex justify-between"><span>Class / Grade:</span><span class="font-bold">${escapeHtml(myBatch.grade || 'General')}</span></div>
+                                <div class="flex justify-between"><span>Timing:</span><span class="font-bold text-indigo-600 dark:text-indigo-400">${escapeHtml(myBatch.timing || '3:30 PM - 5:00 PM')}</span></div>
+                                <div class="flex justify-between"><span>Days:</span><span class="font-bold">${escapeHtml(myBatch.days || 'Mon, Wed, Fri')}</span></div>
+                                <div class="flex justify-between"><span>Teacher / Mentor:</span><span class="font-bold">${escapeHtml(myBatch.teacher || 'Er. Rajesh Chahar')}</span></div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const batches = (state.batches || []).slice(0, 4);
+                    let batchListHtml = batches.map(b => `
+                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px]">
+                            <p class="font-bold text-slate-800 dark:text-slate-200">${escapeHtml(b.name)} (${escapeHtml(b.grade || 'CBSE')})</p>
+                            <p class="text-slate-500 text-[10px]">⏰ ${escapeHtml(b.timing || '3:30 PM - 5:00 PM')} • 👨‍🏫 ${escapeHtml(b.teacher || 'Er. Rajesh Chahar')}</p>
+                        </div>
+                    `).join('');
+
+                    return `
+                        <div class="space-y-1.5">
+                            <p class="font-bold text-indigo-600 dark:text-indigo-400">📚 Available Batches & Schedule:</p>
+                            <div class="space-y-1.5">
+                                ${batchListHtml}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // 4. ADDRESS / LOCATION
+            if (q.includes('address') || q.includes('location') || q.includes('kahan') || q.includes('where') || q.includes('map') || q.includes('pocket')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📍 Institute Location & Address:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">Divine Classes</p>
+                            <p class="text-slate-600 dark:text-slate-400">235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063</p>
+                            <p class="text-[10px] text-slate-500">🏢 <b>Landmark:</b> Near Paschimpuri Club</p>
+                            <p class="text-[10px] text-slate-500">🕒 <b>Visiting Hours:</b> Monday – Saturday (3:00 PM – 8:00 PM)</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 5. CONTACT / PHONE / HELPLINE
+            if (q.includes('contact') || q.includes('phone') || q.includes('call') || q.includes('mobile') || q.includes('helpline') || q.includes('whatsapp') || q.includes('number')) {
+                const phone = (state.settings && state.settings.contactDisplay) || '9555-6787-53';
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">📞 Helpline & Support:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-phone text-indigo-600"></i>
+                                <span><b>Helpline:</b> <a href="tel:${escapeHtml(phone.replace(/[^0-9]/g, ''))}" class="text-indigo-600 font-bold underline">${escapeHtml(phone)}</a></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i>
+                                <span><b>WhatsApp:</b> <a href="https://wa.me/919555678753" target="_blank" class="text-emerald-600 font-bold underline">9555678753</a></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-code text-purple-600"></i>
+                                <span><b>Developer Support:</b> Dev. Anil Kumar Chahar (8126390611)</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 6. DIRECTOR / ER. RAJESH CHAHAR
+            if (q.includes('director') || q.includes('founder') || q.includes('rajesh') || q.includes('chahar')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">👨‍🏫 Director & Head Faculty:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">Er. Rajesh Chahar</p>
+                            <p class="text-slate-600 dark:text-slate-400">Director & Senior Physics/Mathematics Mentor</p>
+                            <p class="text-[10px] text-slate-500 leading-relaxed">Dedicated educator specialized in building core fundamentals for CBSE Board and competitive exams.</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 7. DEVELOPER
+            if (q.includes('anil') || q.includes('developer') || q.includes('engineer') || q.includes('author') || q.includes('banaya')) {
+                return `
+                    <div class="space-y-1.5">
+                        <p class="font-bold text-indigo-600 dark:text-indigo-400">💻 Software Architect & Engineering:</p>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">Dev. Anil Kumar Chahar</p>
+                            <p class="text-slate-600 dark:text-slate-400">Lead Full-Stack Platform Engineer • 8126390611</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 8. DEFAULT FALLBACK + INLINE AUTO-CONNECT PROMPT
+            return `
+                <div class="space-y-2">
+                    <p class="font-semibold text-slate-800 dark:text-slate-100">I can answer anything about Divine Classes, solve study doubts, or enroll students via voice!</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Try asking about fees, batches, Newton's laws, or tap the microphone 🎙️.</p>
+                    
+                    <!-- Inline Auto-Connect Gemini Box -->
+                    <div class="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Auto-Connect Gemini AI</span>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold underline">Get Free Key</a>
+                        </div>
+                        <p class="text-[10px] text-amber-700 dark:text-amber-300">Enter your Gemini API Key once to connect Gemini to this chatbot for asking <b>anything</b>:</p>
+                        <div class="flex gap-1.5">
+                            <input type="password" id="inline-gemini-key" placeholder="Paste AIzaSy... key" class="flex-1 px-2.5 py-1 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg text-xs font-mono focus:outline-none">
+                            <button type="button" onclick="quickSaveInlineGeminiKey()" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg text-xs transition cursor-pointer">
+                                Connect
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        
+        /********************************************************************
+         * DEDICATED FULL-PAGE CHATBOT VIEW (Routes/Chatbot & Pages/Chatbot)
+         ********************************************************************/
+        function renderChatbotDedicatedView() {
+            if (!isChatbotEnabled()) {
+                return `
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center max-w-lg mx-auto my-12 space-y-4">
+                        <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center text-2xl">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">AI Assistant is Currently Disabled</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                            The Divine AI Chatbot has been switched OFF in Developer Settings. You can enable it anytime from Developer Settings.
+                        </p>
+                        ${state.currentRole === 'developer' ? `
+                            <button onclick="navigateTo('settings')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">
+                                Open Settings
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            setTimeout(() => {
+                initDedicatedChatbot();
+            }, 50);
+
+            return `
+                <div class="max-w-5xl mx-auto space-y-4 fade-in">
+                    <!-- Chatbot Hub Top Banner -->
+                    <div class="bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+                                <i class="fa-solid fa-robot"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h2 class="text-lg font-extrabold tracking-tight">Divine AI Assistant & Doubts Helpdesk</h2>
+                                    <span id="page-gemini-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-amber-400 text-slate-900 flex items-center gap-1">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI
+                                    </span>
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live Online
+                                    </span>
+                                </div>
+                                <p class="text-xs text-indigo-100 mt-1 max-w-xl">
+                                    Ask any academic doubt in Physics, Chemistry, Maths & Biology, check real-time student dues & marks, or use oral voice recognition to speak and add students.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button id="dedicated-gemini-config-btn" type="button" onclick="toggleGeminiSettingsDrawer()" class="dev-only-link px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer" style="display:none;">
+                                <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                                <span>Gemini Key</span>
+                            </button>
+                            <button type="button" onclick="resetDivineChatbot()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xs border border-white/20 text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
+                                <i class="fa-solid fa-rotate-right"></i>
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Dedicated Chat Workspace Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                        <!-- Left Sidebar: Quick Actions & Help Topics -->
+                        <div class="lg:col-span-1 space-y-4">
+                            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
+                                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-bolt text-amber-500"></i>
+                                    <span>Quick Prompts</span>
+                                </h4>
+                                <div class="space-y-1.5">
+                                    <button onclick="handleQuickPillClick('My live fee dues')" class="w-full text-left px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 text-xs text-slate-700 dark:text-slate-300 transition flex items-center justify-between group cursor-pointer">
+                                        <span>💰 Live Fee Status</span>
+                                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform"></i>
+                                    </button>
+                                    <button onclick="handleQuickPillClick('Today class timing')" class="w-full text-left px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 text-xs text-slate-700 dark:text-slate-300 transition flex items-center justify-between group cursor-pointer">
+                                        <span>⏰ Class Timetable</span>
+                                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform"></i>
+                                    </button>
+                                    <button onclick="handleQuickPillClick('Institute Address & Helpline')" class="w-full text-left px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 text-xs text-slate-700 dark:text-slate-300 transition flex items-center justify-between group cursor-pointer">
+                                        <span>📍 Coaching Helpline</span>
+                                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform"></i>
+                                    </button>
+                                    <button onclick="handleQuickPillClick('Explain Ohms Law with formula and units')" class="w-full text-left px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 text-xs text-slate-700 dark:text-slate-300 transition flex items-center justify-between group cursor-pointer">
+                                        <span>⚡ Ohm\'s Law</span>
+                                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform"></i>
+                                    </button>
+                                    <button onclick="handleQuickPillClick('Explain Newtons three laws of motion with examples')" class="w-full text-left px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 text-xs text-slate-700 dark:text-slate-300 transition flex items-center justify-between group cursor-pointer">
+                                        <span>🍎 Newton\'s Laws</span>
+                                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Oral Voice Student Enrollment Card -->
+                            <div class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950/30 dark:via-purple-950/30 dark:to-pink-950/30 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-4 space-y-2.5">
+                                <div class="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                                    <i class="fa-solid fa-microphone-lines text-base"></i>
+                                    <h5 class="text-xs font-bold">Oral Voice Admission</h5>
+                                </div>
+                                <p class="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                    Click the microphone button and speak aloud:
+                                    <br><em class="text-indigo-600 dark:text-indigo-400 font-semibold">"Add student Rahul Sharma, father Mukesh Sharma, phone 9876543210, batch Class 11 Physics, fee 12000"</em>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Right 3 Cols: Dedicated Chat Stream & Input -->
+                        <div class="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm flex flex-col h-[650px] overflow-hidden">
+                            <!-- Voice Listening Banner -->
+                            <div id="dedicated-voice-banner" class="hidden bg-rose-500 text-white px-4 py-2 text-xs flex items-center justify-between shrink-0 shadow-inner animate-pulse">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-microphone-lines"></i>
+                                    <span class="font-bold">Listening orally... Speak clearly into your microphone!</span>
+                                </div>
+                                <button type="button" onclick="stopChatbotVoiceRecognition()" class="px-2 py-0.5 bg-black/20 hover:bg-black/30 rounded text-[10px] font-bold cursor-pointer">Stop</button>
+                            </div>
+
+                            <!-- Chat Stream Messages Container -->
+                            <div id="dedicated-chatbot-messages" class="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
+                                <!-- Messages populated by script -->
+                            </div>
+
+                            <!-- Bottom Form -->
+                            <form onsubmit="handleDedicatedChatbotSubmit(event)" class="p-3 sm:p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0">
+                                <button type="button" id="dedicated-chatbot-voice-btn" onclick="toggleChatbotVoiceRecognition()" title="Speak orally to ask doubts or add students" class="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-xs cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700">
+                                    <i id="dedicated-mic-icon" class="fa-solid fa-microphone text-sm"></i>
+                                </button>
+                                <input type="text" id="dedicated-chatbot-input" placeholder="Ask any academic doubt or say 'Add student Rahul, phone 9876543210...'" class="flex-1 px-4 py-2.5 bg-white dark:bg-slate-800 dark:text-slate-100 rounded-2xl text-xs border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:outline-none transition shadow-inner" autocomplete="off">
+                                <button type="submit" class="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition shadow-md shadow-indigo-600/30 cursor-pointer shrink-0">
+                                    <i class="fa-solid fa-paper-plane text-xs"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function initDedicatedChatbot() {
+            const container = document.getElementById('dedicated-chatbot-messages');
+            if (!container) return;
+            if (window.divineChatbotState && window.divineChatbotState.messages && window.divineChatbotState.messages.length > 0) {
+                container.innerHTML = '';
+                window.divineChatbotState.messages.forEach(m => {
+                    appendDedicatedChatMessage(m.role, m.text);
+                });
+            } else {
+                const isStudent = state.currentRole === 'student';
+                const welcome = isStudent
+                    ? '👋 **Namaste! I am Divine AI Assistant.**\n\nI can help you check your live fee dues, attendance records, test marks, and solve academic doubts in Physics, Chemistry, Maths & Biology. How can I assist you today?'
+                    : '👋 **Namaste! I am Divine AI Assistant & Institute Helpdesk.**\n\nAsk any question, resolve physics/maths doubts, or speak aloud to enroll students orally. Type below or press the microphone!';
+                appendDedicatedChatMessage('bot', welcome);
+            }
+        }
+
+        function appendDedicatedChatMessage(role, text) {
+            const container = document.getElementById('dedicated-chatbot-messages');
+            if (!container) return;
+            const isBot = role === 'bot' || role === 'model';
+            const bubble = document.createElement('div');
+            bubble.className = isBot ? 'flex gap-3 max-w-2xl' : 'flex justify-end';
+
+            const formatted = typeof formatGeminiMarkdown === 'function' ? formatGeminiMarkdown(text) : escapeHtml(text);
+
+            if (isBot) {
+                bubble.innerHTML = `
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl rounded-tl-xs px-4 py-3 text-xs shadow-xs space-y-1.5 leading-relaxed overflow-x-auto">
+                        ${formatted}
+                    </div>
+                `;
+            } else {
+                bubble.innerHTML = `
+                    <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-xs px-4 py-2.5 text-xs shadow-xs max-w-lg leading-relaxed">
+                        ${formatted}
+                    </div>
+                `;
+            }
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleDedicatedChatbotSubmit(e) {
+            if (e) e.preventDefault();
+            const input = document.getElementById('dedicated-chatbot-input');
+            if (!input) return;
+            const val = input.value.trim();
+            if (!val) return;
+            input.value = '';
+
+            // handleChatbotSubmit renders the user bubble into whichever chat
+            // stream is visible (dedicated page or floating drawer).
+            const drawerInput = document.getElementById('chatbot-input');
+            if (drawerInput) drawerInput.value = val;
+            if (typeof handleChatbotSubmit === 'function') {
+                handleChatbotSubmit(e);
+            } else {
+                appendDedicatedChatMessage('user', val);
+            }
+        }
+
+</script>
