@@ -24,6 +24,13 @@ import sys
 import argparse
 from pathlib import Path
 
+if sys.platform == "win32":
+    import io
+    if hasattr(sys.stdout, 'buffer'):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'buffer'):
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
@@ -146,10 +153,35 @@ def delete_student(roll_or_id):
     stu_id, stu_roll, stu_name = stu
     print(f"🗑️ Found Student: '{stu_name}' | Roll: {stu_roll} | ID: {stu_id}")
 
-    # Remove related test scores
-    cur.execute("DELETE FROM public.offline_tests WHERE student_id = %s;", (stu_id,))
-    # Remove student
+    # Remove student from public.students
     cur.execute("DELETE FROM public.students WHERE id = %s;", (stu_id,))
+
+    # Also remove from students_master if it exists
+    try:
+        cur.execute("DELETE FROM public.students_master WHERE id = %s OR roll = %s;", (stu_id, stu_roll))
+    except Exception:
+        pass
+
+    # Remove test marks for this student from offline_tests (marks column is JSONB mapping student_id -> mark)
+    try:
+        cur.execute("UPDATE public.offline_tests SET marks = marks - %s WHERE marks ? %s;", (stu_id, stu_id))
+        cur.execute("UPDATE public.offline_tests SET marks = marks - %s WHERE marks ? %s;", (stu_roll, stu_roll))
+    except Exception:
+        pass
+
+    # Also clean student id from batches student_ids array if present
+    try:
+        cur.execute("""
+            UPDATE public.batches 
+            SET student_ids = (
+                SELECT jsonb_agg(elem)
+                FROM jsonb_array_elements(student_ids) elem
+                WHERE elem #>> '{}' NOT IN (%s, %s)
+            )
+            WHERE student_ids @> to_jsonb(%s::text) OR student_ids @> to_jsonb(%s::text);
+        """, (stu_id, stu_roll, stu_id, stu_roll))
+    except Exception:
+        pass
 
     print(f"✅ Successfully deleted student '{stu_name}' ({stu_roll}) from database!")
     cur.close()
@@ -186,28 +218,27 @@ def insert_fresh_batch(batch_id, name, subject="Physics, Chemistry, Mathematics"
 
 
 def insert_fresh_test_score(test_name, test_date, student_id, batch_id, score, max_marks=100, topics="Core Topics", remarks="Good work"):
-    """Inserts a fresh test mark into public.offline_tests."""
+    """Inserts or updates a test mark in public.offline_tests."""
     conn = get_connection()
     cur = conn.cursor()
 
-    test_id = f"test_{int(psycopg2.TimestampFromTicks(0).year)}_{student_id}"
+    test_id = f"test_{batch_id}_{test_name.lower().replace(' ', '_')}"
 
     insert_sql = """
         INSERT INTO public.offline_tests (
-            id, test_name, test_date, student_id, batch_id, score, max_score, topics, remarks, created_at
+            id, batch_id, title, subject, test_date, max_marks, marks, is_dummy, created_at, updated_at
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+            %s, %s, %s, %s, %s, %s, jsonb_build_object(%s::text, %s::numeric), false, NOW(), NOW()
         )
         ON CONFLICT (id) DO UPDATE SET
-            score = EXCLUDED.score,
-            max_score = EXCLUDED.max_score,
-            remarks = EXCLUDED.remarks
-        RETURNING id, test_name, score, max_score;
+            marks = COALESCE(public.offline_tests.marks, '{}'::jsonb) || jsonb_build_object(%s::text, %s::numeric),
+            updated_at = NOW()
+        RETURNING id, title;
     """
 
-    cur.execute(insert_sql, (test_id, test_name, test_date, student_id, batch_id, score, max_marks, topics, remarks))
+    cur.execute(insert_sql, (test_id, batch_id, test_name, topics, test_date, max_marks, student_id, score, student_id, score))
     result = cur.fetchone()
-    print(f"✅ Fresh Test Mark Inserted: {result[1]} -> Score: {result[2]}/{result[3]}")
+    print(f"✅ Fresh Test Mark Recorded: '{result[1]}' -> Student {student_id}: {score}/{max_marks}")
 
     cur.close()
     conn.close()
