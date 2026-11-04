@@ -1202,6 +1202,12 @@
             }
 
             renderAuthHeader();
+            if (typeof autoConnectDeveloperGeminiPro === 'function') {
+                autoConnectDeveloperGeminiPro();
+            }
+            if (typeof updateChatbotVisibility === 'function') {
+                updateChatbotVisibility();
+            }
 
             // Sidebar role badge
             const badge = document.getElementById('sidebar-role-badge');
@@ -7674,18 +7680,68 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-circle-info mr-1 text-violet-500"></i> Current state: <strong>${canAdminDeleteLinks() ? 'ON — Admin can delete study links' : 'OFF — Admin cannot delete study links'}</strong>. Developer always retains full control from this console.</p>
                             `)}
 
-                            ${sectionCard('AI Assistant & Chatbot Control', 'fa-robot', 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300', `
-                                <label class="relative flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Enable Floating Chatbot & Voice Assistant</p>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">ON = Chatbot launcher button & voice helpdesk are active for all users. <strong>Turn OFF to completely hide and disable the chatbot</strong> across the web app.</p>
+                            ${sectionCard('AI Assistant & Chatbot Access Controls', 'fa-robot', 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300', `
+                                <div class="space-y-3">
+                                    <!-- Master Switch -->
+                                    <label class="relative flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Master Switch: Enable Floating Chatbot & Voice Assistant</p>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">Global toggle across entire portal. When turned OFF, chatbot is completely hidden for all non-developer users.</p>
+                                        </div>
+                                        <div class="relative shrink-0 w-11 h-6">
+                                            <input type="checkbox" id="set-chatbotEnabled" ${isChatbotMasterEnabled() ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" aria-label="Enable Floating Chatbot">
+                                            <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
+                                        </div>
+                                    </label>
+
+                                    <!-- Role-Specific Visibility on Login -->
+                                    <div class="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2.5">
+                                        <p class="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                            <i class="fa-solid fa-users text-indigo-500"></i> Role-Based Chatbot Visibility on Login
+                                        </p>
+                                        <p class="text-[10px] text-slate-500 dark:text-slate-400">
+                                            Choose which user roles have the chatbot visible on their screen when they log in:
+                                        </p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                                            <label class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                                                <div>
+                                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1"><i class="fa-solid fa-user-shield text-indigo-500"></i> Admin</span>
+                                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Show on Admin Login</span>
+                                                </div>
+                                                <div class="relative shrink-0 w-9 h-5">
+                                                    <input type="checkbox" id="set-chatbotAdminEnabled" ${isRoleChatbotConfigured('admin') ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer">
+                                                    <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-4"></span>
+                                                </div>
+                                            </label>
+
+                                            <label class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                                                <div>
+                                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1"><i class="fa-solid fa-chalkboard-user text-purple-500"></i> Teacher</span>
+                                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Show on Teacher Login</span>
+                                                </div>
+                                                <div class="relative shrink-0 w-9 h-5">
+                                                    <input type="checkbox" id="set-chatbotTeacherEnabled" ${isRoleChatbotConfigured('teacher') ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer">
+                                                    <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-4"></span>
+                                                </div>
+                                            </label>
+
+                                            <label class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                                                <div>
+                                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1"><i class="fa-solid fa-graduation-cap text-sky-500"></i> Student</span>
+                                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Show on Student Login</span>
+                                                </div>
+                                                <div class="relative shrink-0 w-9 h-5">
+                                                    <input type="checkbox" id="set-chatbotStudentEnabled" ${isRoleChatbotConfigured('student') ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer">
+                                                    <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-4"></span>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500 dark:text-slate-400 italic pt-1">
+                                            * Note: Lead Developer always retains chatbot access for live testing and system maintenance.
+                                        </p>
                                     </div>
-                                    <div class="relative shrink-0 w-11 h-6">
-                                        <input type="checkbox" id="set-chatbotEnabled" ${isChatbotEnabled() ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" aria-label="Enable Floating Chatbot">
-                                        <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
-                                    </div>
-                                </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-circle-info mr-1 text-indigo-500"></i> Current state: <strong>${isChatbotEnabled() ? 'ON — Chatbot visible and active' : 'OFF — Chatbot hidden and disabled'}</strong>. Change takes effect immediately after Save.</p>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1 text-indigo-500"></i> Master State: <strong>${isChatbotMasterEnabled() ? 'ON — Active' : 'OFF — Disabled'}</strong> | Admin: <strong>${isRoleChatbotConfigured('admin') ? 'ON' : 'OFF'}</strong> | Teacher: <strong>${isRoleChatbotConfigured('teacher') ? 'ON' : 'OFF'}</strong> | Student: <strong>${isRoleChatbotConfigured('student') ? 'ON' : 'OFF'}</strong>. Changes persist permanently.</p>
+                                </div>
                             `)}
 
                             ${sectionCard("Coaching Owner's Google Drive Folder", 'fa-folder-tree', 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300', `
@@ -7887,7 +7943,10 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     showDummyData: shouldShowDummyData(),
                     allowAdminFeedbackDelete: canAdminDeleteFeedback(),
                     allowAdminLinkDelete: canAdminDeleteLinks(),
-                    chatbotEnabled: isChatbotEnabled(),
+                    chatbotEnabled: isChatbotMasterEnabled(),
+                    chatbotAdminEnabled: isRoleChatbotConfigured('admin'),
+                    chatbotTeacherEnabled: isRoleChatbotConfigured('teacher'),
+                    chatbotStudentEnabled: isRoleChatbotConfigured('student'),
                     dummyDataWiped: !!(state.settings && (state.settings.dummyDataWiped === true || state.settings.dummyDataWiped === 'true'))
                 };
                 localStorage.setItem(PERSISTENT_SETTINGS_KEY, JSON.stringify(overrides));
@@ -7910,6 +7969,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     if (saved.allowAdminLinkDelete !== undefined) state.settings.allowAdminLinkDelete = saved.allowAdminLinkDelete;
                     if (saved.dummyDataWiped !== undefined) state.settings.dummyDataWiped = saved.dummyDataWiped;
                     if (saved.chatbotEnabled !== undefined) state.settings.chatbotEnabled = saved.chatbotEnabled;
+                    if (saved.chatbotAdminEnabled !== undefined) state.settings.chatbotAdminEnabled = saved.chatbotAdminEnabled;
+                    if (saved.chatbotTeacherEnabled !== undefined) state.settings.chatbotTeacherEnabled = saved.chatbotTeacherEnabled;
+                    if (saved.chatbotStudentEnabled !== undefined) state.settings.chatbotStudentEnabled = saved.chatbotStudentEnabled;
                 }
                 const localChatbot = localStorage.getItem('DIVINE_CHATBOT_ENABLED');
                 if (localChatbot !== null && localChatbot !== undefined && localChatbot !== '') {
@@ -8066,7 +8128,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
             if (!state.settings) state.settings = {};
-            const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'chatbotEnabled', 'sheetsMirrorEnabled', 'supabaseEnabled', 'supabaseUrl', 'supabaseKey', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
+            const keys = ['instituteName', 'tagline', 'address', 'phone', 'contactDisplay', 'email', 'upiId', 'facebookUrl', 'instagramUrl', 'youtubeUrl', 'adminName', 'adminPassword', 'adminEmail', 'showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'chatbotEnabled', 'chatbotAdminEnabled', 'chatbotTeacherEnabled', 'chatbotStudentEnabled', 'sheetsMirrorEnabled', 'supabaseEnabled', 'supabaseUrl', 'supabaseKey', 'driveFolderUrl', 'driveEmail', 'drivePassword', 'driveUrl'];
             keys.forEach(function (k) {
                 const el = document.getElementById('set-' + k);
                 if (el) {
@@ -8091,6 +8153,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             if (state.settings.chatbotEnabled !== undefined) {
                 try {
                     localStorage.setItem('DIVINE_CHATBOT_ENABLED', String(state.settings.chatbotEnabled));
+                    if (state.settings.chatbotAdminEnabled !== undefined) localStorage.setItem('DIVINE_CHATBOT_ADMIN_ENABLED', String(state.settings.chatbotAdminEnabled));
+                    if (state.settings.chatbotTeacherEnabled !== undefined) localStorage.setItem('DIVINE_CHATBOT_TEACHER_ENABLED', String(state.settings.chatbotTeacherEnabled));
+                    if (state.settings.chatbotStudentEnabled !== undefined) localStorage.setItem('DIVINE_CHATBOT_STUDENT_ENABLED', String(state.settings.chatbotStudentEnabled));
                 } catch(e) {}
             }
 
@@ -8923,7 +8988,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             try { loadCachedData(); } catch (e) { console.warn('Cache load warning:', e); }
             try { applyPersistentSettingsOverrides(); } catch (e) { console.warn('Settings overrides warning:', e); }
             try { ensureSupabaseDefaults(); } catch (e) { console.warn('Supabase defaults warning:', e); }
-            try { updateChatbotVisibility(); } catch (e) { console.warn('Chatbot visibility update warning:', e); }
+            try { autoConnectDeveloperGeminiPro(); updateChatbotVisibility(); } catch (e) { console.warn('Chatbot visibility update warning:', e); }
 
             // Restore Supabase config from dedicated localStorage key (survives cache clears)
             try {
@@ -9095,9 +9160,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
         }
         /********************************************************************
-         * DIVINE AI ASSISTANT, GEMINI AUTO-CONNECT & ORAL VOICE ADMISSION
+         * DIVINE AI ASSISTANT, MULTI-PROVIDER AI & ORAL VOICE ADMISSION
          ********************************************************************/
-        function isChatbotEnabled() {
+        function isChatbotMasterEnabled() {
             try {
                 const localVal = localStorage.getItem('DIVINE_CHATBOT_ENABLED');
                 if (localVal !== null && localVal !== undefined && localVal !== '') {
@@ -9110,8 +9175,34 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return true; // Default ON
         }
 
+        function isRoleChatbotConfigured(role) {
+            if (!role) role = state.currentRole;
+            if (role === 'developer') return true; // Lead Developer always has chatbot access
+            const key = role === 'admin' ? 'chatbotAdminEnabled' :
+                        role === 'teacher' ? 'chatbotTeacherEnabled' :
+                        role === 'student' ? 'chatbotStudentEnabled' : null;
+            if (!key) return true;
+            try {
+                const localVal = localStorage.getItem('DIVINE_CHATBOT_' + role.toUpperCase() + '_ENABLED');
+                if (localVal !== null && localVal !== undefined && localVal !== '') {
+                    return localVal === 'true' || localVal === true;
+                }
+            } catch(e) {}
+            if (state && state.settings && state.settings[key] !== undefined) {
+                return state.settings[key] === true || state.settings[key] === 'true';
+            }
+            return true; // Default ON
+        }
+
+        function isChatbotEnabled(role) {
+            if (!role) role = state.currentRole;
+            if (role === 'developer') return true; // Developer always retains access
+            if (!isChatbotMasterEnabled()) return false;
+            return isRoleChatbotConfigured(role);
+        }
+
         function updateChatbotVisibility() {
-            const enabled = isChatbotEnabled();
+            const enabled = isChatbotEnabled(state.currentRole);
             const btn = document.getElementById('divine-chatbot-btn');
             const win = document.getElementById('divine-chatbot-window');
             if (btn) {
@@ -9151,9 +9242,19 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             recognition: null
         };
 
+        // Multi-Provider AI Settings & Persistence
+        function getAiProvider() {
+            try {
+                return localStorage.getItem('DIVINE_AI_PROVIDER') || 'gemini';
+            } catch(e) {
+                return 'gemini';
+            }
+        }
+
         function getGeminiApiKey() {
             try {
                 return localStorage.getItem('DIVINE_GEMINI_API_KEY') ||
+                    localStorage.getItem('DIVINE_DEV_GEMINI_KEY') ||
                     (state.settings && state.settings.geminiApiKey) || '';
             } catch(e) {
                 return (state.settings && state.settings.geminiApiKey) || '';
@@ -9162,6 +9263,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         function getGeminiModel() {
             try {
+                const isLeadDev = (state.currentRole === 'developer') ||
+                    (state.currentUser && (state.currentUser.email === 'anil.chahar170@gmail.com' || state.currentUser.id === 'anil.chahar170@gmail.com'));
+                if (isLeadDev) {
+                    return localStorage.getItem('DIVINE_GEMINI_MODEL') || 'gemini-2.5-pro';
+                }
                 return localStorage.getItem('DIVINE_GEMINI_MODEL') ||
                     (state.settings && state.settings.geminiModel) || 'gemini-2.5-flash';
             } catch(e) {
@@ -9169,61 +9275,129 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
         }
 
+        function getOpenAiApiKey() {
+            try {
+                return localStorage.getItem('DIVINE_OPENAI_API_KEY') ||
+                    (state.settings && state.settings.openaiApiKey) || '';
+            } catch(e) {
+                return (state.settings && state.settings.openaiApiKey) || '';
+            }
+        }
+
+        function getOpenAiModel() {
+            try {
+                return localStorage.getItem('DIVINE_OPENAI_MODEL') ||
+                    (state.settings && state.settings.openaiModel) || 'gpt-4o-mini';
+            } catch(e) {
+                return 'gpt-4o-mini';
+            }
+        }
+
+        function isAiCustomKeyConfigured() {
+            const p = getAiProvider();
+            return p === 'openai' ? !!getOpenAiApiKey() : !!getGeminiApiKey();
+        }
+
         function isGeminiAutoConnected() {
-            return !!getGeminiApiKey();
+            return isAiCustomKeyConfigured();
         }
 
         function updateGeminiBadgeStatus() {
             const badge = document.getElementById('gemini-active-badge');
             const desc = document.getElementById('chatbot-status-desc');
-            const connected = isGeminiAutoConnected();
-            const model = getGeminiModel();
+            const provider = getAiProvider();
+            const hasCustom = isAiCustomKeyConfigured();
+            const isLeadDev = (state.currentRole === 'developer') ||
+                (state.currentUser && (state.currentUser.email === 'anil.chahar170@gmail.com' || state.currentUser.id === 'anil.chahar170@gmail.com'));
+
+            let badgeHtml = '';
+            let statusText = 'Free Auto AI • Ready';
+
+            if (isLeadDev) {
+                badgeHtml = '<i class="fa-solid fa-bolt text-[8px] text-purple-300"></i> Gemini 2.5 Pro (Dev Auto)';
+                statusText = '🚀 Lead Dev Auto-Connected • Gemini Pro';
+            } else if (hasCustom && provider === 'openai') {
+                const model = getOpenAiModel();
+                badgeHtml = `<i class="fa-solid fa-robot text-[8px] text-emerald-300"></i> ${escapeHtml(model)}`;
+                statusText = `Custom Subscription • ${model}`;
+            } else if (hasCustom && provider === 'gemini') {
+                const model = getGeminiModel();
+                badgeHtml = `<i class="fa-solid fa-wand-magic-sparkles text-[8px] text-amber-300"></i> ${escapeHtml(model.replace('gemini-', ''))}`;
+                statusText = `Custom Subscription • ${model}`;
+            } else {
+                badgeHtml = '<i class="fa-solid fa-circle-check text-[8px] text-emerald-300"></i> Free Auto AI';
+                statusText = '100% Free Auto-Connect Active';
+            }
 
             if (badge) {
-                if (connected) {
-                    badge.classList.remove('hidden');
-                    badge.classList.add('flex');
-                    badge.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-[8px]"></i> ${escapeHtml(model.replace('gemini-', ''))}`;
-                } else {
-                    badge.classList.add('hidden');
-                    badge.classList.remove('flex');
-                }
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+                badge.innerHTML = badgeHtml;
             }
             if (desc) {
-                desc.textContent = connected ? `Auto-Connected to ${model}` : 'Institute Helpdesk & Doubts';
+                desc.textContent = statusText;
             }
         }
 
         function toggleGeminiSettingsDrawer(forceState) {
             const drawer = document.getElementById('gemini-config-drawer');
-            const isDev = state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
-            if (!isDev) {
-                showToast('Gemini AI configuration is restricted to Developer mode.', 'warning');
-                if (drawer) drawer.classList.add('hidden');
-                return;
-            }
             if (!drawer) return;
             const isCurrentlyHidden = drawer.classList.contains('hidden');
             const targetShow = (typeof forceState === 'boolean') ? forceState : isCurrentlyHidden;
 
             if (targetShow) {
                 drawer.classList.remove('hidden');
-                const keyInput = document.getElementById('gemini-api-key-input');
-                const modelSel = document.getElementById('gemini-model-select');
-                const modeSel = document.getElementById('gemini-mode-select');
-                if (keyInput) keyInput.value = getGeminiApiKey();
-                if (modelSel) modelSel.value = getGeminiModel();
-                if (modeSel) {
-                    try { modeSel.value = localStorage.getItem('DIVINE_GEMINI_MODE') || 'always'; } catch(e){}
-                }
+                const provider = getAiProvider();
+                switchAiProviderTab(provider);
+
+                const geminiKeyInput = document.getElementById('gemini-api-key-input');
+                const geminiModelSel = document.getElementById('gemini-model-select');
+                if (geminiKeyInput) geminiKeyInput.value = getGeminiApiKey();
+                if (geminiModelSel) geminiModelSel.value = getGeminiModel();
+
+                const openAiKeyInput = document.getElementById('openai-api-key-input');
+                const openAiModelSel = document.getElementById('openai-model-select');
+                if (openAiKeyInput) openAiKeyInput.value = getOpenAiApiKey();
+                if (openAiModelSel) openAiModelSel.value = getOpenAiModel();
             } else {
                 drawer.classList.add('hidden');
             }
         }
 
-        function toggleGeminiKeyVisibility() {
-            const input = document.getElementById('gemini-api-key-input');
-            const icon = document.getElementById('gemini-key-eye-icon');
+        function switchAiProviderTab(provider) {
+            try {
+                localStorage.setItem('DIVINE_AI_PROVIDER', provider);
+            } catch(e){}
+
+            const tabGemini = document.getElementById('ai-tab-gemini');
+            const tabOpenAi = document.getElementById('ai-tab-openai');
+            const panelGemini = document.getElementById('ai-panel-gemini');
+            const panelOpenAi = document.getElementById('ai-panel-openai');
+
+            if (provider === 'openai') {
+                if (tabGemini) {
+                    tabGemini.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+                }
+                if (tabOpenAi) {
+                    tabOpenAi.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-300 shadow-xs cursor-pointer';
+                }
+                if (panelGemini) panelGemini.classList.add('hidden');
+                if (panelOpenAi) panelOpenAi.classList.remove('hidden');
+            } else {
+                if (tabGemini) {
+                    tabGemini.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shadow-xs cursor-pointer';
+                }
+                if (tabOpenAi) {
+                    tabOpenAi.className = 'flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+                }
+                if (panelGemini) panelGemini.classList.remove('hidden');
+                if (panelOpenAi) panelOpenAi.classList.add('hidden');
+            }
+        }
+
+        function toggleApiKeyVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
             if (!input || !icon) return;
             if (input.type === 'password') {
                 input.type = 'text';
@@ -9234,92 +9408,115 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
         }
 
-        function saveGeminiSettingsFromDrawer() {
-            const isDev = state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
-            if (!isDev) {
-                showToast('Only Developer can save Gemini AI configuration.', 'error');
-                return;
-            }
-            const keyInput = document.getElementById('gemini-api-key-input');
-            const modelSel = document.getElementById('gemini-model-select');
-            const modeSel = document.getElementById('gemini-mode-select');
+        function toggleGeminiKeyVisibility() {
+            toggleApiKeyVisibility('gemini-api-key-input', 'gemini-key-eye-icon');
+        }
 
-            const key = keyInput ? keyInput.value.trim() : '';
-            const model = modelSel ? modelSel.value : 'gemini-2.5-flash';
-            const mode = modeSel ? modeSel.value : 'always';
+        function resetToFreeAutoAi() {
+            try {
+                localStorage.removeItem('DIVINE_GEMINI_API_KEY');
+                localStorage.removeItem('DIVINE_OPENAI_API_KEY');
+                localStorage.setItem('DIVINE_AI_PROVIDER', 'gemini');
+                localStorage.setItem('DIVINE_GEMINI_MODEL', 'gemini-2.5-flash');
+            } catch(e){}
+
+            const geminiKeyInput = document.getElementById('gemini-api-key-input');
+            const openAiKeyInput = document.getElementById('openai-api-key-input');
+            if (geminiKeyInput) geminiKeyInput.value = '';
+            if (openAiKeyInput) openAiKeyInput.value = '';
+
+            toggleGeminiSettingsDrawer(false);
+            updateGeminiBadgeStatus();
+            showToast('✓ Reset to Free Auto AI mode successfully! Never asks for key.', 'info');
+            appendChatMessage('bot', `
+                <div class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200">
+                    <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-600"></i> Free Auto AI Active</p>
+                    <p class="mt-0.5">Chatbot will answer all queries and academic doubts automatically for free with zero setup.</p>
+                </div>
+            `);
+        }
+
+        function saveActiveAiSettingsFromDrawer() {
+            const provider = getAiProvider();
+            const geminiKeyInput = document.getElementById('gemini-api-key-input');
+            const geminiModelSel = document.getElementById('gemini-model-select');
+            const openAiKeyInput = document.getElementById('openai-api-key-input');
+            const openAiModelSel = document.getElementById('openai-model-select');
+
+            const geminiKey = geminiKeyInput ? geminiKeyInput.value.trim() : '';
+            const geminiModel = geminiModelSel ? geminiModelSel.value : 'gemini-2.5-flash';
+            const openAiKey = openAiKeyInput ? openAiKeyInput.value.trim() : '';
+            const openAiModel = openAiModelSel ? openAiModelSel.value : 'gpt-4o-mini';
 
             try {
-                if (key) {
-                    localStorage.setItem('DIVINE_GEMINI_API_KEY', key);
+                if (geminiKey) {
+                    localStorage.setItem('DIVINE_GEMINI_API_KEY', geminiKey);
+                    if (state.currentRole === 'developer') localStorage.setItem('DIVINE_DEV_GEMINI_KEY', geminiKey);
                 } else {
                     localStorage.removeItem('DIVINE_GEMINI_API_KEY');
                 }
-                localStorage.setItem('DIVINE_GEMINI_MODEL', model);
-                localStorage.setItem('DIVINE_GEMINI_MODE', mode);
+                localStorage.setItem('DIVINE_GEMINI_MODEL', geminiModel);
+
+                if (openAiKey) {
+                    localStorage.setItem('DIVINE_OPENAI_API_KEY', openAiKey);
+                } else {
+                    localStorage.removeItem('DIVINE_OPENAI_API_KEY');
+                }
+                localStorage.setItem('DIVINE_OPENAI_MODEL', openAiModel);
+                localStorage.setItem('DIVINE_AI_PROVIDER', provider);
             } catch(e){}
 
             if (!state.settings) state.settings = {};
-            state.settings.geminiApiKey = key;
-            state.settings.geminiModel = model;
+            if (geminiKey) state.settings.geminiApiKey = geminiKey;
+            if (openAiKey) state.settings.openaiApiKey = openAiKey;
 
             toggleGeminiSettingsDrawer(false);
             updateGeminiBadgeStatus();
             renderChatbotQuickPills();
 
-            if (key) {
-                showToast(`Gemini AI (${model}) Auto-Connected!`, 'success');
+            const chosenModel = provider === 'openai' ? openAiModel : geminiModel;
+            const chosenKey = provider === 'openai' ? openAiKey : geminiKey;
+
+            if (chosenKey) {
+                showToast(`✓ ${provider === 'openai' ? 'ChatGPT' : 'Gemini'} (${chosenModel}) saved and remembered permanently!`, 'success');
                 appendChatMessage('bot', `
-                    <div class="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
-                        <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Gemini AI Auto-Connected (${escapeHtml(model)})</p>
-                        <p class="mt-0.5">You can now ask <b>anything</b>: complex physics derivations, numerical problems, math formulas, quiz generation, essay writing, or orally speak student details!</p>
+                    <div class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[11px] text-indigo-900 dark:text-indigo-200">
+                        <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-500"></i> ${provider === 'openai' ? 'OpenAI ChatGPT' : 'Google Gemini'} Subscription Saved!</p>
+                        <p class="mt-0.5">Model active: <b>${escapeHtml(chosenModel)}</b>. This key is saved permanently in your browser and will <b>never be asked again on login</b>.</p>
                     </div>
                 `);
             } else {
-                showToast('Gemini Key removed. Operating in Local Knowledge Engine.', 'info');
+                showToast('Operating in Free Auto AI mode. All features active!', 'info');
             }
         }
 
-        function quickSaveInlineGeminiKey() {
-            const input = document.getElementById('inline-gemini-key');
-            const key = input ? input.value.trim() : '';
-            if (!key) {
-                showToast('Please paste a Gemini API Key to connect.', 'warning');
-                return;
+        function saveGeminiSettingsFromDrawer() {
+            saveActiveAiSettingsFromDrawer();
+        }
+
+        async function testCurrentAiConnection(btn) {
+            const provider = getAiProvider();
+            if (provider === 'openai') {
+                await testOpenAiConnection(btn);
+            } else {
+                await testGeminiConnection(btn);
             }
-            try {
-                localStorage.setItem('DIVINE_GEMINI_API_KEY', key);
-                localStorage.setItem('DIVINE_GEMINI_MODEL', 'gemini-2.5-flash');
-            } catch(e){}
-            if (!state.settings) state.settings = {};
-            state.settings.geminiApiKey = key;
-            state.settings.geminiModel = 'gemini-2.5-flash';
-
-            updateGeminiBadgeStatus();
-            renderChatbotQuickPills();
-            showToast('✓ Gemini AI Auto-Connected Successfully!', 'success');
-
-            appendChatMessage('bot', `
-                <div class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200">
-                    <p class="font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check text-emerald-600"></i> Gemini AI Successfully Auto-Connected!</p>
-                    <p class="mt-0.5">Now you can ask any question, academic problem, formula, quiz, or speak student details orally!</p>
-                </div>
-            `);
         }
 
         async function testGeminiConnection(btn) {
             const keyInput = document.getElementById('gemini-api-key-input');
             const key = keyInput ? keyInput.value.trim() : getGeminiApiKey();
-            const model = document.getElementById('gemini-model-select')?.value || 'gemini-2.5-flash';
+            const model = document.getElementById('gemini-model-select')?.value || getGeminiModel();
 
             if (!key) {
-                showToast('Please enter an API Key to test.', 'warning');
+                showToast('Free Auto Mode is active. No custom Gemini key needed!', 'info');
                 return;
             }
 
             const orig = btn ? btn.innerHTML : '';
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Testing...';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Testing Gemini...';
             }
 
             try {
@@ -9349,9 +9546,53 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
         }
 
-        /********************************************************************
-         * ORAL SPEECH & VOICE RECOGNITION (WEB SPEECH API)
-         ********************************************************************/
+        async function testOpenAiConnection(btn) {
+            const keyInput = document.getElementById('openai-api-key-input');
+            const key = keyInput ? keyInput.value.trim() : getOpenAiApiKey();
+            const model = document.getElementById('openai-model-select')?.value || getOpenAiModel();
+
+            if (!key) {
+                showToast('Free Auto Mode is active. No custom ChatGPT key needed!', 'info');
+                return;
+            }
+
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Testing ChatGPT...';
+            }
+
+            try {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + key
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{ role: 'user', content: 'Say OK' }],
+                        max_tokens: 5
+                    })
+                });
+
+                if (res.ok) {
+                    showToast(`✓ ChatGPT Connected Successfully! (${model})`, 'success');
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    const msg = errJson.error?.message || `HTTP ${res.status}`;
+                    showToast(`ChatGPT API Error: ${msg}`, 'error');
+                }
+            } catch(e) {
+                showToast(`Connection failed: ${e.message}`, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            }
+        }
+
         function getSpeechRecognition() {
             return window.SpeechRecognition || window.webkitSpeechRecognition || null;
         }
@@ -10244,6 +10485,115 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return html;
         }
 
+        async function callOpenAiApi(userPrompt) {
+            const apiKey = getOpenAiApiKey();
+            const model = getOpenAiModel();
+            if (!apiKey) return { success: false, error: 'NO_KEY' };
+
+            const isStudent = state.currentRole === 'student';
+            const { student: ownStudent, batch: myBatch } = typeof getCurrentStudentAndBatch === 'function' ? getCurrentStudentAndBatch() : { student: null, batch: null };
+            let studentContext = '';
+            if (isStudent && ownStudent) {
+                studentContext = `Student Profile: ${ownStudent.name}, Roll: ${ownStudent.roll}, Batch: ${myBatch ? myBatch.name : 'CBSE Batch'}, Monthly Fee: ₹${ownStudent.monthlyFee || 1000}, Total Paid: ₹${ownStudent.paidFee || 0}`;
+            }
+
+            const systemPrompt = "You are the advanced official AI Academic Tutor and Institute Assistant for Divine Classes.\n" +
+                "Location: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063\n" +
+                "Director: Er. Rajesh Chahar | Lead Architect: Dev. Anil Kumar Chahar (8126390611)\n" +
+                "Current User Role: " + state.currentRole + "\n" +
+                (studentContext ? ("Current Student Context: " + studentContext + "\n") : "") +
+                "Explain physics and math step-by-step with formulas and clear calculations. Answer academic queries clearly.";
+
+            const messages = [{ role: 'system', content: systemPrompt }];
+            const history = (window.divineChatbotState.messages || []).slice(-6);
+            history.forEach(m => {
+                messages.push({
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: m.text
+                });
+            });
+            messages.push({ role: 'user', content: userPrompt });
+
+            try {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + apiKey
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: messages,
+                        temperature: 0.7,
+                        max_tokens: 2048
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    return { success: false, error: err.error?.message || ('HTTP ' + res.status) };
+                }
+                const data = await res.json();
+                if (data.choices && data.choices.length > 0) {
+                    return { success: true, reply: data.choices[0].message.content, model: model };
+                }
+                return { success: false, error: 'Empty OpenAI response' };
+            } catch(e) {
+                if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.apiAskOpenAi) {
+                    return new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(err => resolve({ success: false, error: err.message }))
+                            .apiAskOpenAi(userPrompt, history, { apiKey: apiKey, model: model, studentSummary: studentContext });
+                    });
+                }
+                return { success: false, error: e.message };
+            }
+        }
+
+        async function callAiModel(userPrompt) {
+            const provider = getAiProvider();
+            const openAiKey = getOpenAiApiKey();
+            const geminiKey = getGeminiApiKey();
+
+            // 1. If OpenAI selected and key present
+            if (provider === 'openai' && openAiKey) {
+                const openAiRes = await callOpenAiApi(userPrompt);
+                if (openAiRes.success) return openAiRes;
+            }
+
+            // 2. If Gemini selected or key present
+            if (geminiKey) {
+                const geminiRes = await callGeminiAiApi(userPrompt);
+                if (geminiRes.success) return { success: true, reply: geminiRes.reply, model: getGeminiModel() };
+            }
+
+            // 3. If OpenAI key present fallback
+            if (openAiKey) {
+                const openAiRes = await callOpenAiApi(userPrompt);
+                if (openAiRes.success) return openAiRes;
+            }
+
+            // 4. Free Auto-Connect via Google Apps Script Backend Proxy
+            if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.apiAskGeminiAi) {
+                try {
+                    const backendRes = await new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(err => resolve({ success: false, error: err.message }))
+                            .apiAskGeminiAi(userPrompt, (window.divineChatbotState.messages || []).slice(-6), {});
+                    });
+                    if (backendRes && backendRes.success) {
+                        return { success: true, reply: backendRes.reply, model: 'Gemini Auto' };
+                    }
+                } catch(e){}
+            }
+
+            // 5. Intelligent Fallback: Built-in Academic & Student Knowledge Engine
+            const localReply = resolveDivineChatbotQuery(userPrompt);
+            return { success: true, reply: localReply, model: 'Free Auto AI', isLocal: true };
+        }
+
         async function callGeminiAiApi(userPrompt) {
             const apiKey = getGeminiApiKey();
             const model = getGeminiModel();
@@ -10362,6 +10712,24 @@ Guidelines:
                 if (iconClosed) iconClosed.classList.remove('hidden');
                 if (iconOpened) iconOpened.classList.add('hidden');
             }
+        }
+
+        
+        function autoConnectDeveloperGeminiPro() {
+            try {
+                const isLeadDev = (state.currentRole === 'developer') ||
+                    (state.currentUser && (state.currentUser.email === 'anil.chahar170@gmail.com' || state.currentUser.id === 'anil.chahar170@gmail.com'));
+                if (isLeadDev) {
+                    const devSavedKey = localStorage.getItem('DIVINE_DEV_GEMINI_KEY') || localStorage.getItem('DIVINE_GEMINI_API_KEY') || (state.settings && state.settings.geminiApiKey) || '';
+                    if (devSavedKey) {
+                        localStorage.setItem('DIVINE_DEV_GEMINI_KEY', devSavedKey);
+                        localStorage.setItem('DIVINE_GEMINI_API_KEY', devSavedKey);
+                    }
+                    localStorage.setItem('DIVINE_AI_PROVIDER', 'gemini');
+                    localStorage.setItem('DIVINE_AI_MODEL', 'gemini-2.5-pro');
+                    console.log('[AI Auto-Connect] Lead Developer Anil auto-connected to Gemini 2.5 Pro');
+                }
+            } catch(e){}
         }
 
         function initDivineChatbot() {
@@ -10574,40 +10942,40 @@ Guidelines:
                 return;
             }
 
-            // 2. If Gemini is auto-connected, call Gemini!
-            if (isGeminiAutoConnected()) {
-                try {
-                    const geminiResponse = await callGeminiAiApi(text);
-                    removeChatbotTypingIndicator();
-                    if (geminiResponse.success) {
-                        const formatted = formatGeminiMarkdown(geminiResponse.reply);
-                        const modelName = getGeminiModel();
+            // 2. Auto-connect to Gemini, ChatGPT, or Free Auto AI (ZERO key prompt friction!)
+            try {
+                const aiResult = await callAiModel(text);
+                removeChatbotTypingIndicator();
+                if (aiResult.success) {
+                    if (aiResult.isLocal) {
+                        appendChatMessage('bot', aiResult.reply);
+                    } else {
+                        const formatted = formatGeminiMarkdown(aiResult.reply);
+                        const modelLabel = aiResult.model || 'Free Auto AI';
                         appendChatMessage('bot', `
                             <div class="space-y-1.5">
                                 ${formatted}
                                 <div class="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[10px] text-amber-500 font-semibold">
-                                    <span class="flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> Answered by ${escapeHtml(modelName)}</span>
-                                    <button type="button" onclick="speakChatbotResponse(this.closest('.space-y-1.5').innerText)" title="Listen to answer" class="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                                    <span class="flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> Answered by ${escapeHtml(modelLabel)}</span>
+                                    <button type="button" onclick="speakChatbotResponse(this.closest('.space-y-1.5').innerText)" title="Listen to answer" class="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer">
                                         <i class="fa-solid fa-volume-high text-[10px]"></i> Speak
                                     </button>
                                 </div>
                             </div>
                         `);
-                        return;
-                    } else {
-                        console.warn('[Gemini Call Failed]', geminiResponse.error);
                     }
-                } catch(err) {
-                    console.error('[Gemini Exception]', err);
+                    return;
                 }
+            } catch(err) {
+                console.warn('[AI Model Exception]', err);
             }
 
-            // 3. Fallback to Local Knowledge & Personal Ledger Engine
+            // 3. Fallback to Local Knowledge Engine
             setTimeout(() => {
                 removeChatbotTypingIndicator();
                 const responseHtml = resolveDivineChatbotQuery(text);
                 appendChatMessage('bot', responseHtml);
-            }, 350);
+            }, 250);
         }
 
         function resolveDivineChatbotQuery(rawQuery) {

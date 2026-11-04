@@ -315,7 +315,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-1">
-                <button id="chatbot-gemini-config-btn" onclick="toggleGeminiSettingsDrawer()" title="Gemini AI Subscription & Key Config" class="dev-only-link w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-amber-300 hover:text-white text-xs transition" style="display:none;">
+                <button id="chatbot-gemini-config-btn" onclick="toggleGeminiSettingsDrawer()" title="AI Models & Subscription Keys (Gemini & ChatGPT)" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-amber-300 hover:text-white text-xs transition cursor-pointer">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
                 <button onclick="resetDivineChatbot()" title="Clear chat history" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center text-white/80 hover:text-white text-xs transition">
@@ -327,60 +327,100 @@
             </div>
         </div>
 
-        <!-- Gemini AI Subscription & Key Drawer (Inline Drawer) -->
-        <div id="gemini-config-drawer" class="hidden bg-slate-100 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700/80 p-3.5 space-y-3 shrink-0 text-xs fade-in">
+        <!-- Gemini & ChatGPT AI Subscription & Key Drawer (Inline Drawer) -->
+        <div id="gemini-config-drawer" class="hidden bg-slate-100 dark:bg-slate-800/95 border-b border-slate-200 dark:border-slate-700/80 p-3.5 space-y-3 shrink-0 text-xs fade-in">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
                     <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
-                    <span>Developer Gemini AI Subscription</span>
+                    <span>AI Model & Subscription Setup</span>
                 </div>
-                <button type="button" onclick="toggleGeminiSettingsDrawer(false)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <button type="button" onclick="toggleGeminiSettingsDrawer(false)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <i class="fa-solid fa-xmark text-xs"></i>
                 </button>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                Connect your Google Gemini API Key to enable advanced deep reasoning, step-by-step doubt solving, quiz generation, and full generative intelligence.
-            </p>
-            <div class="space-y-2">
+
+            <div class="p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> <b>100% Free Auto-Connect:</b> All users auto-connect for free. If you have your own <b>Gemini Pro</b> or <b>ChatGPT</b> subscription, choose your provider and save your key below. Saved keys persist permanently and are <b>never asked again on login!</b>
+            </div>
+
+            <!-- Provider Selection Tabs -->
+            <div class="flex items-center gap-1.5 p-1 bg-slate-200 dark:bg-slate-900 rounded-xl">
+                <button type="button" onclick="switchAiProviderTab('gemini')" id="ai-tab-gemini" class="flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shadow-xs cursor-pointer">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                    <span>Google Gemini</span>
+                </button>
+                <button type="button" onclick="switchAiProviderTab('openai')" id="ai-tab-openai" class="flex-1 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                    <i class="fa-solid fa-robot text-emerald-500"></i>
+                    <span>ChatGPT (OpenAI)</span>
+                </button>
+            </div>
+
+            <!-- Gemini Panel -->
+            <div id="ai-panel-gemini" class="space-y-2.5">
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Gemini API Key</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300">Gemini API Key (Free or Pro)</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Get Gemini Key
+                        </a>
+                    </div>
                     <div class="relative">
-                        <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..."
+                        <input type="password" id="gemini-api-key-input" placeholder="AIzaSy... (leave blank for free auto-connect)"
                             class="w-full px-3 py-1.5 pr-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none focus:border-indigo-500">
-                        <button type="button" onclick="toggleGeminiKeyVisibility()" class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs">
+                        <button type="button" onclick="toggleApiKeyVisibility('gemini-api-key-input', 'gemini-key-eye-icon')" class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
                             <i id="gemini-key-eye-icon" class="fa-solid fa-eye"></i>
                         </button>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Model Selection</label>
-                        <select id="gemini-model-select" class="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none">
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast & Smart)</option>
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning)</option>
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">AI Mode</label>
-                        <select id="gemini-mode-select" class="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none">
-                            <option value="always">Always Use Gemini</option>
-                            <option value="hybrid">Hybrid (Local + Gemini)</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Gemini Model</label>
+                    <select id="gemini-model-select" class="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none">
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Auto / Fast & Smart)</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning & Pro Subscription)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    </select>
                 </div>
             </div>
+
+            <!-- OpenAI / ChatGPT Panel -->
+            <div id="ai-panel-openai" class="hidden space-y-2.5">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300">ChatGPT / OpenAI API Key</label>
+                        <a href="https://platform.openai.com/api-keys" target="_blank" class="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Get ChatGPT Key
+                        </a>
+                    </div>
+                    <div class="relative">
+                        <input type="password" id="openai-api-key-input" placeholder="sk-... (leave blank for free auto-connect)"
+                            class="w-full px-3 py-1.5 pr-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none focus:border-indigo-500">
+                        <button type="button" onclick="toggleApiKeyVisibility('openai-api-key-input', 'openai-key-eye-icon')" class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+                            <i id="openai-key-eye-icon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">ChatGPT Model</label>
+                    <select id="openai-model-select" class="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none">
+                        <option value="gpt-4o-mini">GPT-4o Mini (Fast & Smart)</option>
+                        <option value="gpt-4o">GPT-4o (Most Intelligent Flagship)</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
             <div class="flex items-center justify-between pt-1 gap-2">
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold">
-                    <i class="fa-solid fa-external-link text-[9px]"></i> Get Free API Key
-                </a>
+                <button type="button" onclick="resetToFreeAutoAi()" class="text-[11px] text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 underline cursor-pointer">
+                    Reset to Free Auto
+                </button>
                 <div class="flex items-center gap-1.5">
-                    <button type="button" onclick="testGeminiConnection(this)" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg text-[11px] transition">
-                        Test Key
+                    <button type="button" onclick="testCurrentAiConnection(this)" class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg text-[11px] transition cursor-pointer">
+                        Test Connection
                     </button>
-                    <button type="button" onclick="saveGeminiSettingsFromDrawer()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[11px] transition shadow-xs">
-                        Save & Activate
+                    <button type="button" onclick="saveActiveAiSettingsFromDrawer()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[11px] transition shadow-xs cursor-pointer">
+                        Save & Remember
                     </button>
                 </div>
             </div>
