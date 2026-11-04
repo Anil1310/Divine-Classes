@@ -444,6 +444,7 @@
                 try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) {}
             }
             // Strict enforcement: Retain genuine fee notices & material alerts, never wipe on refresh.
+            if (!state.activeTab || state.activeTab === 'loading') state.activeTab = 'dashboard';
             if (!state.notifications || !Array.isArray(state.notifications)) {
                 state.notifications = [];
             } else {
@@ -1160,6 +1161,7 @@
             });
 
             if (!state.isAuthenticated) {
+                document.documentElement.classList.add('dc-unauth');
                 // Completely hide left, right, top chrome when not signed in
                 if (sidebar) sidebar.style.display = 'none';
                 if (backdrop) backdrop.style.display = 'none';
@@ -1187,6 +1189,7 @@
             }
 
             // Authenticated State - Restore Portal Chrome
+            document.documentElement.classList.remove('dc-unauth');
             if (sidebar) sidebar.style.display = '';
             if (backdrop) backdrop.style.display = '';
             if (header) header.style.display = '';
@@ -8264,8 +8267,16 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         }
 
         function renderLoadingView() {
+            setTimeout(function () {
+                if (typeof state !== 'undefined') {
+                    state.activeTab = 'dashboard';
+                }
+                if (typeof renderMainContent === 'function') {
+                    renderMainContent();
+                }
+            }, 600);
             return `
-                <div id="initial-page-loader" class="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 fade-in py-12">
+                <div class="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 fade-in py-12">
                     <div class="relative w-14 h-14">
                         <div class="w-14 h-14 rounded-full border-4 border-indigo-200 dark:border-indigo-950 border-t-indigo-600 animate-spin"></div>
                     </div>
@@ -8273,6 +8284,10 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Connecting to Divine Classes...</h3>
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Initializing cloud database & secure portal workspace</p>
                     </div>
+                    <button type="button" onclick="if(typeof state!=='undefined'){state.activeTab='dashboard';} if(typeof renderMainContent==='function'){renderMainContent();}" class="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-indigo-300 text-xs font-semibold transition shadow-xs cursor-pointer">
+                        <span>Continue to Portal</span>
+                        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </button>
                 </div>
             `;
         }
@@ -8971,6 +8986,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 return;
             }
             window._appBooted = true;
+            if (!state.activeTab || state.activeTab === 'loading') state.activeTab = 'dashboard';
+            const initLdr = document.getElementById('initial-page-loader');
+            if (initLdr) initLdr.remove();
             try {
                 window.addEventListener('offline', function () {
                     if (typeof showToast === 'function') {

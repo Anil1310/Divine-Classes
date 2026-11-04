@@ -412,4 +412,28 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+
+    /* Instant Unauthenticated Portal Styles (prevents loader hang / UI flash) */
+    html.dc-unauth #sidebar,
+    html.dc-unauth #desktop-header,
+    html.dc-unauth #primary-menu-bar,
+    html.dc-unauth #role-banner,
+    html.dc-unauth #mobile-nav,
+    html.dc-unauth #sidebar-backdrop {
+        display: none !important;
+    }
+    html.dc-unauth body {
+        background-color: #0b1021 !important;
+    }
+    html.dc-unauth #main-content {
+        width: 100% !important;
+        min-height: 100vh !important;
+        background-color: #0b1021 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 1rem !important;
+        overflow-y: auto !important;
+    }
+
 </style>
