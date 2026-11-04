@@ -6,17 +6,17 @@
      * Used as a fallback backend when Apps Script (google.script.run) is unavailable.
      ********************************************************************/
     function getSupabaseApiUrl() {
-        return (state.settings && state.settings.supabaseUrl) || '';
+        return (state.settings && state.settings.supabaseUrl) || 'https://srjqsofkjizwskqnzyfn.supabase.co';
     }
     function getSupabaseAnonKey() {
-        return (state.settings && state.settings.supabaseKey) || '';
+        return (state.settings && state.settings.supabaseKey) || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
     }
     async function supabaseFetch(path, options) {
         const base = getSupabaseApiUrl();
         const key = getSupabaseAnonKey();
         if (!base) throw new Error('Supabase Project URL not set in Settings.');
         if (!key) throw new Error('Supabase Anon Key not set in Settings.');
-        if (!state.settings || state.settings.supabaseEnabled !== true) {
+        if (state.settings && (state.settings.supabaseEnabled === false || state.settings.supabaseEnabled === 'false')) {
             throw new Error('Supabase Database is disabled in Settings.');
         }
         const normalizedBase = base.replace(/\/+$/, '');
@@ -636,7 +636,7 @@
     }
 
     async function loadDataFromSupabase() {
-        if (!state.settings || state.settings.supabaseEnabled !== true) return;
+        if (state.settings && (state.settings.supabaseEnabled === false || state.settings.supabaseEnabled === 'false')) return;
 
         const loadedData = {};
         const loadErrors = [];
@@ -866,7 +866,7 @@
     let supabaseSettingsPollTimer = null;
 
     async function pollSupabaseSettings() {
-        if (!state.settings || state.settings.supabaseEnabled !== true) return;
+        if (state.settings && (state.settings.supabaseEnabled === false || state.settings.supabaseEnabled === 'false')) return;
         try {
             const rawData = await supabaseLoadTable('settings_config');
             if (!Array.isArray(rawData) || rawData.length === 0) return;
