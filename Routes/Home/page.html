@@ -33,6 +33,17 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
         rel="stylesheet">
     <?!= include('css'); ?>
+    <script>
+        try {
+            var _dcAuth = localStorage.getItem('DIVINE_AUTH_SESSION');
+            if (_dcAuth) {
+                var _dcParsed = JSON.parse(_dcAuth);
+                if (_dcParsed && _dcParsed.isAuthenticated) {
+                    document.documentElement.classList.remove('dc-unauth');
+                }
+            }
+        } catch(e) {}
+    </script>
     <style>
         /* Route-specific styles can be added here. Shared styles remain in css.html. */
     </style>
@@ -63,7 +74,7 @@
             class="fixed inset-0 bg-slate-950/60 z-30 lg:hidden hidden backdrop-blur-2xs transition-opacity"></div>
 
         <!-- Sidebar Navigation -->
-        <aside id="sidebar" style="display:none;"
+        <aside id="sidebar"
             class="fixed inset-y-0 left-0 z-40 w-[256px] max-w-[78vw] lg:w-72 lg:max-w-none bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 lg:static lg:inset-0 shrink-0 border-r border-slate-800 shadow-2xl lg:shadow-none">
             <!-- Brand Logo -->
             <div class="flex items-center justify-between px-5 h-16 bg-slate-950 border-b border-slate-800">
@@ -164,7 +175,7 @@
         <!-- Main Content Wrapper -->
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
             <!-- Top Header with Role Switcher & Live Database Sync -->
-            <header id="app-header" style="display:none;" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
+            <header id="app-header" class="bg-white border-b border-slate-200 z-20 shrink-0 shadow-2xs">
                 <div class="px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3">
                     <!-- Left: Hamburger & Page Title -->
                     <div id="header-brand-block" class="flex items-center gap-3 min-w-0">
@@ -239,7 +250,7 @@
             </header>
 
             <!-- Desktop primary menu bar; on mobile the sidebar and bottom menu are used -->
-            <nav id="primary-menu-bar" aria-label="Primary navigation" style="display:none;"
+            <nav id="primary-menu-bar" aria-label="Primary navigation"
                 class="hidden lg:flex items-center gap-1 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 overflow-x-auto">
                 <div id="primary-menu-links" class="flex items-center gap-1 min-w-max"></div>
             </nav>
@@ -267,7 +278,7 @@
                     </div>
 
                     <!-- Form -->
-                    <form onsubmit="handleAuthLogin(event)" class="space-y-4 text-xs">
+                    <form onsubmit="handleAuthLogin(event); return false;" class="space-y-4 text-xs">
                         <!-- Login ID Field -->
                         <div>
                             <label class="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
@@ -309,7 +320,7 @@
                         </div>
 
                         <!-- Sign In Button -->
-                        <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold rounded-2xl text-sm transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer">
+                        <button type="button" onclick="handleAuthLogin(event)" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold rounded-2xl text-sm transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer">
                             <i class="fa-solid fa-right-to-bracket"></i>
                             <span>Sign In</span>
                         </button>

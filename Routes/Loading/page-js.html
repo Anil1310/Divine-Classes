@@ -24,8 +24,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (bar) bar.style.width = '100%';
                 if (statusText) statusText.textContent = "Launching Divine Classes...";
                 setTimeout(function() {
-                    window.location.href = '?page=index';
-                }, 400);
+                    try {
+                        if (window.top && window.top !== window) {
+                            window.top.location.href = '?page=index';
+                        } else {
+                            window.location.replace('?page=index');
+                        }
+                    } catch(e) {
+                        window.location.href = '?page=index';
+                    }
+                }, 100);
             }, 400);
         }
     }, 400);

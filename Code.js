@@ -43,10 +43,10 @@ function doGet(e) {
 
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     const routeConfig = typeof ROUTE_MODULES !== 'undefined' ? ROUTE_MODULES : {
-      index: { template: 'index', title: 'Divine Classes - Institute Management System' },
-      login: { template: 'login', title: 'Sign In - Divine Classes Portal' },
-      logout: { template: 'logout', title: 'Signed Out - Divine Classes Portal' },
-      loading: { template: 'Routes/Loading/page', title: 'Connecting to Divine Classes...' },
+      index: { template: 'Routes/Home/page', title: 'Divine Classes - Institute Management System' },
+      login: { template: 'Routes/Home/page', title: 'Sign In - Divine Classes Portal' },
+      logout: { template: 'Routes/Logout/page', title: 'Signed Out - Divine Classes Portal' },
+      loading: { template: 'Routes/Home/page', title: 'Connecting to Divine Classes...' },
       chatbot: { template: 'Routes/Chatbot/page', title: 'Divine AI Assistant - Divine Classes' }
     };
     const route = routeConfig[page] || routeConfig.index;
