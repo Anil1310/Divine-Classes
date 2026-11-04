@@ -11478,16 +11478,124 @@ Guidelines:
         window.bootApp = bootApp;
 
         // Multi-stage boot guarantee for Google Apps Script HtmlService iframe & standalone web app:
+        // A boot failure must never leave the branded loader spinning forever.
+        function safeBootApp() {
+            try {
+                bootApp();
+            } catch (err) {
+                console.error('Divine Classes boot failed:', err);
+                if (window.DCV_BOOT_ERRORS) {
+                    var loc = '';
+                    if (err.filename) loc += ' @ ' + err.filename;
+                    if (err.lineno) loc += ':' + err.lineno;
+                    if (err.colno) loc += ':' + err.colno;
+                    window.DCV_BOOT_ERRORS.push(String((err && err.message) || err) + loc);
+                }
+            }
+        }
+
         // 1. If DOM is already interactive/complete, trigger immediately
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            bootApp();
+            safeBootApp();
         } else {
-            document.addEventListener('DOMContentLoaded', bootApp);
-            window.addEventListener('load', bootApp);
+            document.addEventListener('DOMContentLoaded', safeBootApp);
+            window.addEventListener('load', safeBootApp);
         }
-        window.onload = bootApp;
+        window.onload = safeBootApp;
         // 2. Safety fallbacks for embedded sandbox iframes
-        setTimeout(bootApp, 10);
-        setTimeout(bootApp, 100);
-        setTimeout(bootApp, 500);
+        setTimeout(safeBootApp, 10);
+        setTimeout(safeBootApp, 100);
+        setTimeout(safeBootApp, 500);
+
+        /* Boot watchdog: runs independently of javascript.html include order.
+           If the branded loader is still on screen and the portal hasn't painted,
+           retry renderMainContent() up to 8x, then show a failure panel with the
+           captured error and a Reload button instead of spinning forever. */
+        (function () {
+            var attempts = 0;
+            var MAX_ATTEMPTS = 8;
+
+            function recordError(err) {
+                try {
+                    if (!window.DCV_BOOT_ERRORS) window.DCV_BOOT_ERRORS = [];
+                    window.DCV_BOOT_ERRORS.push(String((err && err.message) || err));
+                } catch (e) { }
+            }
+
+            function isPortalPainted() {
+                var container = document.getElementById('main-content');
+                if (!container) return false;
+                if (document.getElementById('initial-page-loader')) return false;
+                if (document.getElementById('dcv-boot-failure')) return false;
+                return container.children.length > 0;
+            }
+
+            function showBootFailure(loader) {
+                if (document.getElementById('dcv-boot-failure')) return;
+                var container = document.getElementById('main-content');
+                var target = loader || container;
+                if (!target) return;
+                var errors = window.DCV_BOOT_ERRORS || [];
+                var detail = errors.length
+                    ? String(errors[errors.length - 1])
+                    : 'The portal scripts did not start in this browser.';
+                var safeDetail = String(detail)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                var panel = document.createElement('div');
+                panel.id = 'dcv-boot-failure';
+                panel.className = 'flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 fade-in';
+                panel.innerHTML =
+                    '<div class="w-14 h-14 mx-auto rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 flex items-center justify-center">' +
+                        '<i class="fa-solid fa-triangle-exclamation text-rose-600 text-xl"></i>' +
+                    '</div>' +
+                    '<div class="space-y-1">' +
+                        '<h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">The portal could not start</h3>' +
+                        '<p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto break-words">' + safeDetail + '</p>' +
+                        '<p class="text-[11px] text-slate-400 dark:text-slate-500">Reload once; if it repeats, send this message to the administrator.</p>' +
+                    '</div>' +
+                    '<button type="button" data-dcv-reload class="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer">' +
+                        '<i class="fa-solid fa-rotate-right text-[10px]"></i><span>Reload portal</span>' +
+                    '</button>';
+                if (loader && loader.parentNode) {
+                    loader.parentNode.replaceChild(panel, loader);
+                } else {
+                    target.innerHTML = '';
+                    target.appendChild(panel);
+                }
+                var reloadButton = panel.querySelector('[data-dcv-reload]');
+                if (reloadButton) {
+                    reloadButton.onclick = function () { window.location.reload(); };
+                }
+                console.error('[Divine Classes] Boot did not complete:', detail);
+            }
+
+            function settleBootLoader() {
+                if (isPortalPainted()) return;
+                if (document.getElementById('dcv-boot-failure')) return;
+                attempts++;
+                try {
+                    if (typeof window.renderMainContent === 'function') {
+                        window.renderMainContent();
+                    } else if (typeof window.bootApp === 'function') {
+                        window.bootApp();
+                    } else if (!window.DCV_BOOT_ERRORS || !window.DCV_BOOT_ERRORS.length) {
+                        recordError('Application scripts did not load (renderMainContent/bootApp are missing).');
+                    }
+                } catch (err) {
+                    recordError(err);
+                }
+                if (isPortalPainted()) return;
+                if (attempts < MAX_ATTEMPTS) {
+                    setTimeout(settleBootLoader, 350);
+                    return;
+                }
+                showBootFailure(document.getElementById('initial-page-loader'));
+            }
+
+            window.dcvSettleBootLoader = settleBootLoader;
+            setTimeout(settleBootLoader, 500);
+            window.addEventListener('load', function () { setTimeout(settleBootLoader, 120); });
+        })();
     </script>
