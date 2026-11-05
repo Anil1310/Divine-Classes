@@ -502,6 +502,30 @@
         overflow-y: auto !important;
     }
 
+    #divine-chatbot-btn {
+        width: 3.5rem;
+        height: 3.5rem;
+    }
+
+    #divine-chatbot-window {
+        bottom: 5.5rem;
+        width: min(410px, calc(100vw - 1.5rem));
+    }
+
+    @media (max-width: 1023px) {
+        #divine-chatbot-btn {
+            bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #divine-chatbot-window {
+            bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+            height: min(550px, calc(100vh - 10rem - env(safe-area-inset-bottom, 0px)));
+            height: min(550px, calc(100dvh - 10rem - env(safe-area-inset-bottom, 0px)));
+            max-height: calc(100vh - 10rem - env(safe-area-inset-bottom, 0px));
+            max-height: calc(100dvh - 10rem - env(safe-area-inset-bottom, 0px));
+        }
+    }
+
 </style>
 
     <style>
@@ -14536,7 +14560,7 @@ Guidelines:
 
     <!-- Divine AI Assistant Floating Button -->
     <button id="divine-chatbot-btn" onclick="toggleDivineChatbot()" 
-        class="fixed bottom-6 right-4 sm:right-6 z-[60] w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-xl hover:shadow-indigo-500/40 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group"
+        class="fixed bottom-6 right-4 sm:right-6 z-[60] w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-xl hover:shadow-indigo-500/40 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group"
         title="Divine AI Assistant & Doubts Helpdesk" aria-label="Open Divine AI Assistant">
         <span class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 flex items-center justify-center">
             <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
@@ -14547,7 +14571,7 @@ Guidelines:
 
     <!-- Divine AI Assistant Chat Window -->
     <div id="divine-chatbot-window"
-        class="hidden fixed bottom-22 right-3 sm:right-6 w-[calc(100vw-24px)] sm:w-[410px] h-[550px] max-h-[82vh] z-[70] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden fade-in transition-all duration-300">
+        class="hidden fixed right-3 sm:right-6 w-[calc(100vw-24px)] sm:w-[410px] h-[550px] max-h-[82vh] z-[70] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden fade-in transition-all duration-300">
         <!-- Chatbot Header -->
         <div class="px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-sm">
             <div class="flex items-center gap-2.5">
