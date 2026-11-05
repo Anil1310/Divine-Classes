@@ -276,10 +276,7 @@ At the bottom of the report card modal, click any of the action buttons:
 ### 9.1 Using the Floating AI Assistant
 1. Tap the floating **robot icon button** in the bottom-right corner of your screen (or open **AI Assistant** from the navigation sidebar).
 2. Ask any academic doubt in Physics, Chemistry, Maths, or Biology.
-3. Tap on quick prompt pills to check:
-   - 💰 **Live Fee Status**: Your pending fee dues and next due date.
-   - ⏰ **Class Timetable**: Schedule for your enrolled batch.
-   - 📍 **Coaching Helpline**: Address and contact details for the Paschimpuri center.
+3. Use quick prompts for portal navigation, institute contact details, and general academic questions. View personal fee dues, attendance, marks, and batch information in their respective portal pages; the assistant does not read private student records.
 4. Listen to responses orally by tapping the speaker button.
 
 ### 9.2 Oral Voice Student Admission (For Faculty & Admin)
@@ -287,8 +284,8 @@ At the bottom of the report card modal, click any of the action buttons:
 2. Tap the **Microphone** icon.
 3. Speak clearly:
    > *"Add student Rahul Sharma, father Mukesh Sharma, phone 9876543210, batch Class 11 Physics, fee 12000"*
-4. The system transcribes your speech and presents a **Voice Admission Confirmation Card**.
-5. Tap **Confirm & Enroll** to add the student instantly to the batch with initial Total Fees Paid strictly set to ₹0.
+4. The system transcribes your speech and presents a review card with the detected details.
+5. Tap **Review & Continue**, verify the enrollment form, upload the required student photo, and submit. Initial Total Fees Paid remains ₹0.
 
 ### 9.3 Toggling Chatbot ON / OFF (Developer Settings)
 1. Sign in as Lead Developer (`anil.chahar170@gmail.com`).
@@ -312,6 +309,6 @@ If the system displays *"Microphone Access is Blocked"*:
 ### 9.5 Developer-Only Gemini Key & Model Configuration
 - To protect institute API quotas and credentials, only the **Lead Developer** role can configure or modify Gemini AI settings.
 - The **Gemini Key** button (`🪄`) in the chatbot header is visible exclusively in Developer mode.
-- Non-developers (Admins, Teachers, Students) can freely use AI doubt resolution, but cannot inspect or modify API keys.
-
+- Non-developers (Admins, Teachers, Students) can use AI doubt resolution through the server-managed key, but cannot inspect or modify API keys.
+- The shared Gemini key is stored in Apps Script **Project Settings → Script Properties** as `DIVINE_GEMINI_API_KEY`; never place it in browser code or shared portal settings.
 

@@ -7221,7 +7221,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     </div>
 
                     <!-- Form -->
-                    <form onsubmit="handleAuthLogin(event)" class="space-y-4 text-xs">
+                    <form data-auth-login class="space-y-4 text-xs">
                         <!-- Login ID Field -->
                         <div>
                             <label class="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
@@ -7245,7 +7245,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                     <i class="fa-solid fa-lock text-sm"></i>
                                 </div>
                                 <input type="password" id="login-password" autocomplete="current-password" required value="${safeSavedPwd}" placeholder="Enter your password" class="w-full pl-10 pr-10 py-3 text-xs border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50/50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
-                                <button type="button" id="login-password-toggle" aria-label="Show password" aria-pressed="false" title="Show password" onclick="event.preventDefault(); toggleLoginPasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center justify-center min-w-10 text-slate-500 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300 cursor-pointer" style="z-index:2">
+                                <button type="button" id="login-password-toggle" data-login-password-toggle aria-label="Show password" aria-pressed="false" title="Show password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center justify-center min-w-10 text-slate-500 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300 cursor-pointer" style="z-index:2">
                                     <i class="fa-solid fa-eye text-xs"></i>
                                 </button>
                             </div>
@@ -7302,7 +7302,15 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             const isDevLogin = lowerId === 'anil.chahar170@gmail.com';
             if (isDevLogin) {
                 if (typeof google === 'undefined' || !google.script || !google.script.run) {
-                    showToast('Developer sign-in requires a secure server connection.', 'error');
+                    openModal(`
+                        <div class="w-full max-w-md text-center">
+                            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700"><i class="fa-solid fa-lock" aria-hidden="true"></i></div>
+                            <h2 class="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">Use the secure Developer portal</h2>
+                            <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Developer sign-in is not available on this static GitHub Pages site. Open the secure Apps Script portal and enter your credentials there.</p>
+                            <a href="https://script.google.com/macros/s/AKfycbySJOW4-AlwDHziPVoLCsz-X3LAf9CWurzGsJtyyxa4qIi7n9yh-A3lLatRUsOaN_sf/exec" target="_top" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open secure sign-in</a>
+                            <button type="button" onclick="closeModal()" class="ml-2 min-h-11 rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+                        </div>
+                    `);
                     return;
                 }
                 google.script.run
@@ -7796,14 +7804,14 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                                 <label class="relative flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3.5 cursor-pointer select-none">
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Enable Gemini Help Chatbot</p>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">When enabled, Admin, Teachers, and Students see Chatbot in the navigation and can connect their own Google AI Studio Gemini key for study and portal help. Private student records are not sent to Gemini.</p>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">When enabled, Admin, Teachers, and Students can use the assistant. Only the Developer can configure Gemini or ChatGPT provider keys; private student records are not sent to AI providers.</p>
                                     </div>
                                     <div class="relative shrink-0 w-11 h-6">
-                                        <input type="checkbox" id="set-chatbotEnabled" ${isChatbotEnabled() ? 'checked' : ''} class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" aria-label="Enable Gemini Help Chatbot">
+                                        <input type="checkbox" id="set-chatbotEnabled" ${isChatbotEnabled() ? 'checked' : ''} onchange="handleChatbotToggle(this)" class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" aria-label="Enable Gemini Help Chatbot">
                                         <span class="absolute inset-0 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors duration-200 peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-5"></span>
                                     </div>
                                 </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>Each user connects their own AI Studio key from the Chatbot page. Their key remains in their browser profile and is not stored in the shared database.</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>Saved immediately to local settings and synced to the cloud. The Developer configures the provider key in the assistant’s AI Keys drawer.</p>
                             `, 'lg:col-span-2')}
 
                             ${sectionCard('Client Demo Mode', 'fa-eye-slash', 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300', `
@@ -8288,17 +8296,24 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 const overrides = {
                     showRequirementLabels: shouldShowReqLabels(),
                     showDummyData: shouldShowDummyData(),
+                    chatbotEnabled: isChatbotEnabled(),
                     allowAdminFeedbackDelete: canAdminDeleteFeedback(),
                     allowAdminLinkDelete: canAdminDeleteLinks(),
                     dummyDataWiped: !!(state.settings && (state.settings.dummyDataWiped === true || state.settings.dummyDataWiped === 'true')),
                     studentSeedDataDisabled: !!(state.settings && (state.settings.studentSeedDataDisabled === true || state.settings.studentSeedDataDisabled === 'true'))
                 };
                 localStorage.setItem(PERSISTENT_SETTINGS_KEY, JSON.stringify(overrides));
+                localStorage.setItem('DIVINE_CHATBOT_ENABLED', String(overrides.chatbotEnabled));
             } catch (e) {}
         }
 
         function applyPersistentSettingsOverrides() {
             try {
+                const chatbotEnabled = localStorage.getItem('DIVINE_CHATBOT_ENABLED');
+                if (chatbotEnabled !== null) {
+                    if (!state.settings) state.settings = {};
+                    state.settings.chatbotEnabled = chatbotEnabled === 'true';
+                }
                 const raw = localStorage.getItem(PERSISTENT_SETTINGS_KEY);
                 if (!raw) return;
                 const saved = JSON.parse(raw);
@@ -8308,6 +8323,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                         state.settings.dummyDataWiped === 'true';
                     if (saved.showRequirementLabels !== undefined) state.settings.showRequirementLabels = saved.showRequirementLabels;
                     if (!serverDummyLock && saved.showDummyData !== undefined) state.settings.showDummyData = saved.showDummyData;
+                    if (saved.chatbotEnabled !== undefined) state.settings.chatbotEnabled = !!saved.chatbotEnabled;
                     if (saved.allowAdminFeedbackDelete !== undefined) state.settings.allowAdminFeedbackDelete = saved.allowAdminFeedbackDelete;
                     if (saved.allowAdminLinkDelete !== undefined) state.settings.allowAdminLinkDelete = saved.allowAdminLinkDelete;
                     if (!serverDummyLock && saved.dummyDataWiped !== undefined) state.settings.dummyDataWiped = saved.dummyDataWiped;
@@ -8870,6 +8886,36 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
         }
 
+        function handleChatbotToggle(input) {
+            if (state.currentRole !== 'developer') {
+                if (input) input.checked = isChatbotEnabled();
+                showToast('Only the Developer can change the chatbot setting.', 'error');
+                return;
+            }
+            if (!state.settings) state.settings = {};
+            const enabled = !!(input && input.checked);
+            state.settings.chatbotEnabled = enabled;
+            try {
+                localStorage.setItem('DIVINE_CHATBOT_ENABLED', String(enabled));
+            } catch (error) {
+                state.settings.chatbotEnabled = !enabled;
+                if (input) input.checked = !enabled;
+                console.error('Could not save the chatbot toggle in this browser.', error);
+                showToast('The chatbot setting could not be saved in this browser.', 'error');
+                return;
+            }
+            saveStateLocally();
+            savePersistentSettingsToLocal();
+            if (!enabled) {
+                if (typeof stopChatbotVoiceInput === 'function') stopChatbotVoiceInput();
+                state.chatbotKeyDrawerOpen = false;
+                if (typeof clearChatbotVoiceEnrollmentDraft === 'function') clearChatbotVoiceEnrollmentDraft();
+            }
+            renderSidebar();
+            if (state.activeTab === 'chatbot' && !enabled) renderMainContent();
+            showToast(enabled ? 'The AI assistant is enabled.' : 'The AI assistant is disabled.', 'success');
+        }
+
         // Record the panel position before pointer focus can move the viewport.
         function rememberSettingsScroll(event) {
             const form = event && event.currentTarget ? event.currentTarget.form : null;
@@ -8922,6 +8968,18 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             button.title = isVisible ? 'Hide password' : 'Show password';
             button.innerHTML = `<i class="fa-solid ${isVisible ? 'fa-eye-slash' : 'fa-eye'} text-xs" aria-hidden="true"></i>`;
         }
+
+        document.addEventListener('submit', function (event) {
+            if (event.target && event.target.matches('form[data-auth-login]')) {
+                handleAuthLogin(event);
+            }
+        });
+        document.addEventListener('click', function (event) {
+            if (event.target && event.target.closest('[data-login-password-toggle]')) {
+                event.preventDefault();
+                toggleLoginPasswordVisibility();
+            }
+        });
 
         /********************************************************************
          * MODAL & TOAST UTILITIES (No alert() or confirm() used)

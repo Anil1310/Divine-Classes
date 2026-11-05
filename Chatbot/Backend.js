@@ -12,13 +12,21 @@ function apiChatbotReply(history, configOrApiKey) {
     ? { provider: 'gemini', apiKey: configOrApiKey, model: 'gemini-2.5-flash' }
     : configOrApiKey;
   const provider = config && config.provider === 'openai' ? 'openai' : 'gemini';
-  const apiKey = config && typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+  if (!config || (config.provider && config.provider !== 'gemini' && config.provider !== 'openai')) {
+    return { success: false, error: 'Choose a supported AI provider.' };
+  }
+  let apiKey = config && typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+  if (!apiKey) {
+    const propertyName = provider === 'openai' ? 'DIVINE_OPENAI_API_KEY' : 'DIVINE_GEMINI_API_KEY';
+    apiKey = PropertiesService.getScriptProperties().getProperty(propertyName) || '';
+  }
+  apiKey = apiKey.trim();
   const allowedModels = provider === 'openai'
     ? ['gpt-4o-mini', 'gpt-4o']
     : ['gemini-2.5-flash', 'gemini-2.5-pro'];
   const model = config && allowedModels.indexOf(config.model) !== -1 ? config.model : allowedModels[0];
-  if (!config || (config.provider && config.provider !== 'gemini' && config.provider !== 'openai')) {
-    return { success: false, error: 'Choose a supported AI provider.' };
+  if (!apiKey) {
+    return { success: false, error: 'The shared AI key is not configured by the developer.' };
   }
   if (apiKey.length < 20 || apiKey.length > 500 || /\s/.test(apiKey)) {
     return { success: false, error: 'Add a valid API key for the selected AI provider.' };

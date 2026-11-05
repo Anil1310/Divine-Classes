@@ -671,23 +671,23 @@ The portal integrates an interactive AI Assistant & Doubts Helpdesk:
   - Standalone dedicated route (`?page=chatbot`) and page module (`Pages/Chatbot/`).
 - **Gemini & ChatGPT API Settings**:
   - Developer-only **AI Keys** control opens the Gemini/OpenAI provider drawer with model selection, connection testing, and key removal.
-  - API keys are saved in the current browser's local storage only; they are not added to shared portal settings or cloud sync.
-  - Chat requests are forwarded by Apps Script to the selected provider using the chosen Gemini 2.5 or GPT-4o model.
-- **Real-Time State & Institute Intelligence**:
-  - Live student queries: fee dues, total payments, enrolled batch, attendance, test marks.
+  - Local keys entered by the Developer stay in that browser. For other roles, Apps Script uses the shared `DIVINE_GEMINI_API_KEY` Script Property; it is never sent back to the browser or included in cloud portal data.
+  - Set the shared Gemini key in Apps Script **Project Settings → Script Properties**. Chat requests use the allowlisted Gemini 2.5 or GPT-4o models.
+- **Institute & Portal Guidance**:
   - Institute knowledge base: Paschimpuri address, contact numbers, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar.
+  - Guides users to the portal's fee, attendance, marks, and batch pages; the assistant does not read or disclose personal student records.
   - Academic doubt solving: Physics, Chemistry, Maths & Biology with pedagogical Markdown formatting.
 - **AI Chat Engine**:
   - Supports Gemini 2.5 Flash/Pro and GPT-4o Mini/GPT-4o through the Apps Script endpoint in `Chatbot/Backend.js`.
   - Text-to-speech audio feedback (`speakChatbotResponse`) and Markdown-to-HTML parser.
 - **Oral Speech & Voice-Powered Student Admission**:
-  - Web Speech API microphone input allowing oral speech queries and enrollment.
-  - Natural speech parser extracting Name, Parent, Phone, Batch, and Fee with 1-click enrollment card strictly enforcing non-editable ₹0 initial Total Fees Paid.
+  - Web Speech API microphone input starts directly from the browser speech interface, without a separate `getUserMedia` preflight. Permission failures show browser and system guidance.
+  - The **Speak: Add Student** prompt captures Name, Parent, Phone, Batch, and Monthly Fee, then shows a review card and prefills the enrollment form. The existing required photo upload and final form submission remain in place; Total Fees Paid stays read-only at ₹0.
 
 ---
 
 ## 15. Developer Settings Feature Governance & Master Chatbot Toggle
 
 - **Master Chatbot Toggle**: Located in Developer Settings (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
-- **State Storage & Persistence**: Saved to `state.settings.chatbotEnabled` (default: `true`) and `localStorage ('DIVINE_CHATBOT_ENABLED')`, surviving browser reloads and syncing to the cloud database.
-- **Complete Disablement**: When toggled OFF, the floating button and drawer are completely hidden, active voice recognition is cancelled, and the navigation link is removed from the sidebar.
+- **State Storage & Persistence**: Saved immediately to `state.settings.chatbotEnabled` and `localStorage ('DIVINE_CHATBOT_ENABLED')`, surviving browser reloads and syncing through normal settings persistence.
+- **Complete Disablement**: When toggled OFF, the floating button and drawer are completely hidden, active voice recognition is stopped, and the navigation link is removed from the sidebar. Toggling it back ON restores access without a reload.

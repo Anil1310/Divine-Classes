@@ -351,6 +351,26 @@
     .chatbot-error-actions button:hover { background: #f0efff; }
 
     .chatbot-composer-wrap { padding: 12px 20px 11px; border-top: 1px solid #edf0f5; background: #fff; }
+    .chatbot-voice-banner { display: flex; align-items: center; gap: 9px; margin: 0 0 9px; padding: 9px 11px; color: #9f1239; font-size: 10px; line-height: 1.4; border: 1px solid #fecdd3; border-radius: 12px; background: #fff1f2; }
+    .chatbot-voice-banner[hidden] { display: none; }
+    .chatbot-voice-recording-badge { display: inline-flex; width: 25px; height: 25px; flex: 0 0 auto; align-items: center; justify-content: center; color: #fff; font-size: 10px; border-radius: 50%; background: #e11d48; box-shadow: 0 0 0 4px #fecdd3; animation: chatbot-recording-pulse 1.2s ease-in-out infinite; }
+    .chatbot-voice-wave { display: inline-flex; height: 15px; align-items: center; gap: 2px; margin-left: auto; }
+    .chatbot-voice-wave i { width: 3px; height: 5px; border-radius: 3px; background: #e11d48; animation: chatbot-voice-wave .7s ease-in-out infinite alternate; }
+    .chatbot-voice-wave i:nth-child(2) { animation-delay: .18s; }
+    .chatbot-voice-wave i:nth-child(3) { animation-delay: .36s; }
+    @keyframes chatbot-recording-pulse { 50% { box-shadow: 0 0 0 7px rgba(225, 29, 72, .12); } }
+    @keyframes chatbot-voice-wave { to { height: 14px; } }
+    .chatbot-voice-enrollment-card { margin: 8px 14px; padding: 12px; color: #334155; font-size: 10px; border: 1px solid #c7d2fe; border-radius: 14px; background: #f5f3ff; }
+    .chatbot-voice-enrollment-heading { display: flex; align-items: center; gap: 7px; color: #5145cd; font-size: 11px; }
+    .chatbot-voice-enrollment-card dl { display: grid; gap: 5px; margin: 9px 0; }
+    .chatbot-voice-enrollment-card dl > div { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #e6e3f5; }
+    .chatbot-voice-enrollment-card dt { color: #64748b; }
+    .chatbot-voice-enrollment-card dd { max-width: 65%; margin: 0; color: #1e293b; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+    .chatbot-voice-enrollment-note { margin: 8px 0; color: #64748b; font-size: 9px; line-height: 1.5; }
+    .chatbot-voice-enrollment-card > button { display: inline-flex; min-height: 33px; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; color: #fff; font-size: 10px !important; font-weight: 700; border: 0; border-radius: 9px; background: #4f46e5; cursor: pointer; }
+    .chatbot-voice-enrollment-card > button:hover { background: #4338ca; }
+    .chatbot-voice-enrollment-card > .chatbot-voice-enrollment-dismiss { margin-left: 5px; color: #64748b; border: 1px solid #dbe1ec; background: transparent; }
+    .chatbot-voice-enrollment-card > .chatbot-voice-enrollment-dismiss:hover { color: #334155; background: #e9e7f6; }
     .chatbot-composer { display: flex; min-height: 56px; align-items: flex-end; gap: 10px; padding: 9px 10px 8px 15px; border: 1px solid #e1e5ed; border-radius: 16px; background: #fff; box-shadow: 0 3px 12px rgba(24, 35, 59, .035); transition: border-color .16s ease, box-shadow .16s ease; }
     .chatbot-composer:focus-within { border-color: #aaa5f2; box-shadow: 0 0 0 3px rgba(99, 102, 241, .09); }
     .chatbot-composer textarea { flex: 1; min-width: 0; max-height: 144px; resize: none; padding: 7px 0 5px; color: #30394c; font-size: 12px !important; line-height: 1.55; border: 0; outline: 0; background: transparent; }
