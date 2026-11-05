@@ -48,19 +48,24 @@ function doGet(e) {
       login: { template: 'login', title: 'Sign In - Divine Classes Portal' },
       logout: { template: 'logout', title: 'Signed Out - Divine Classes Portal' }
     };
-    const route = routeConfig[page] || routeConfig.index;
+    const route = page === 'index'
+      ? { template: 'index', title: routeConfig.index.title }
+      : routeConfig[page] || routeConfig.index;
     const templateName = route.template;
     const title = route.title;
 
-    const template = HtmlService.createTemplateFromFile(templateName);
-    return template.evaluate()
+    // The standalone bundle contains client-side template literals; serve it
+    // directly so Apps Script does not rewrite its JavaScript during evaluation.
+    const output = templateName === 'index'
+      ? HtmlService.createHtmlOutputFromFile(templateName)
+      : HtmlService.createTemplateFromFile(templateName).evaluate();
+    return output
       .setTitle(title)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (err) {
     try {
-      const fallback = HtmlService.createTemplateFromFile('index');
-      return fallback.evaluate()
+      return HtmlService.createHtmlOutputFromFile('index')
         .setTitle('Divine Classes - Institute Management System')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
