@@ -68,7 +68,7 @@
     <div id="toast-container"
         class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-    <button id="chatbot-launcher" type="button" onclick="navigateTo('chatbot')" aria-label="Open Divine Classes AI assistant" title="Chat with Divine Classes AI" hidden>
+    <button id="chatbot-launcher" type="button" onclick="toggleChatbotOverlay()" aria-label="Open Divine Classes AI assistant" title="Chat with Divine Classes AI" aria-expanded="false" aria-controls="chatbot-overlay" hidden>
         <svg class="chatbot-launcher-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 5.5V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <circle cx="16" cy="4" r="1.8" fill="currentColor"/>
@@ -315,6 +315,10 @@
             </main>
         </div>
     </div>
+
+    <section id="chatbot-overlay" class="chatbot-floating-panel" aria-label="Divine Assistant chat" hidden>
+        <div id="chatbot-overlay-content"></div>
+    </section>
 
     <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
         onload="if (typeof startSupabaseLiveSync === 'function') startSupabaseLiveSync()"

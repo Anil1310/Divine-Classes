@@ -545,6 +545,7 @@ This is a build-time step; Apps Script must continue serving `index.html` as raw
 !index.html
 !css.html
 !javascript.html
+!Chatbot/Backend.js
 !login.html
 !logout.html
 ```

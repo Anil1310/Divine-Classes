@@ -768,6 +768,67 @@
         to { transform: translateY(0) scale(1); opacity: 1; }
     }
 
+    #chatbot-overlay {
+        position: fixed;
+        z-index: 45;
+        right: max(24px, env(safe-area-inset-right));
+        bottom: max(82px, calc(72px + env(safe-area-inset-bottom)));
+        width: min(440px, calc(100vw - 32px));
+        height: min(620px, calc(100dvh - 112px - env(safe-area-inset-bottom)));
+        min-height: 0;
+        overflow: hidden;
+        border-radius: 20px;
+        filter: drop-shadow(0 18px 48px rgba(37, 24, 82, .24));
+        animation: chatbot-launcher-appear .2s ease-out both;
+    }
+
+    #chatbot-overlay[hidden] { display: none; }
+    #chatbot-overlay-content,
+    #chatbot-overlay #chatbot-shell { width: 100%; height: 100%; min-height: 0; }
+    #chatbot-overlay #chatbot-shell { border-color: #e7e1fb; border-radius: 20px; box-shadow: 0 2px 9px rgba(39, 30, 75, .08); }
+    #chatbot-overlay .chatbot-header {
+        min-height: 70px;
+        padding: 12px 14px;
+        color: #fff;
+        border-bottom: 0;
+        background: linear-gradient(115deg, #5b3cc4 0%, #7548dc 55%, #8a4dde 100%);
+    }
+    #chatbot-overlay .chatbot-brand-icon { color: #6844c9; background: #fff; box-shadow: 0 5px 16px rgba(33, 17, 74, .18); }
+    #chatbot-overlay .chatbot-title-row h2,
+    #chatbot-overlay .chatbot-brand-copy > p { color: #fff; }
+    #chatbot-overlay .chatbot-brand-copy > p { opacity: .84; }
+    #chatbot-overlay .chatbot-version-badge {
+        color: #fff;
+        border-color: rgba(255,255,255,.32);
+        background: rgba(255,255,255,.16);
+    }
+    #chatbot-overlay .chatbot-status-dot { background: #86efac; box-shadow: 0 0 0 3px rgba(134,239,172,.2); }
+    #chatbot-overlay .chatbot-status-dot-offline { background: #fbbf24; box-shadow: 0 0 0 3px rgba(251,191,36,.2); }
+    #chatbot-overlay .chatbot-header-divider { color: rgba(255,255,255,.6); }
+    #chatbot-overlay .chatbot-header-actions .chatbot-new-chat {
+        min-height: 32px;
+        padding: 0 9px;
+        color: #fff;
+        border-color: rgba(255,255,255,.3);
+        background: rgba(255,255,255,.12);
+    }
+    #chatbot-overlay .chatbot-header-actions .chatbot-new-chat:hover:not(:disabled) { background: rgba(255,255,255,.22); }
+    #chatbot-overlay .chatbot-overlay-close { width: 32px; min-width: 32px; padding: 0; justify-content: center; }
+    #chatbot-overlay .chatbot-overlay-close span { display: none; }
+    #chatbot-overlay .chatbot-welcome { min-height: 100%; align-items: flex-start; justify-content: center; padding: 22px 18px; text-align: left; }
+    #chatbot-overlay .chatbot-welcome-mark { width: 44px; height: 44px; margin-bottom: 12px; border-radius: 15px; }
+    #chatbot-overlay .chatbot-welcome h3 { font-size: 22px; }
+    #chatbot-overlay .chatbot-welcome-copy { margin-top: 7px; font-size: 11px; }
+    #chatbot-overlay .chatbot-suggestions { margin-top: 18px; }
+    #chatbot-overlay .chatbot-suggestions-label { margin-bottom: 7px; }
+    #chatbot-overlay .chatbot-suggestion-grid { grid-template-columns: 1fr; gap: 7px; }
+    #chatbot-overlay .chatbot-suggestion { min-height: 43px; padding: 7px 10px; }
+    #chatbot-overlay .chatbot-suggestion-icon { width: 27px; height: 27px; }
+    #chatbot-overlay .chatbot-composer-wrap { padding: 10px 12px 8px; }
+    #chatbot-overlay .chatbot-privacy-note { font-size: 8px; }
+    #chatbot-overlay .chatbot-thread { padding: 17px 14px 20px; }
+    #chatbot-overlay .chatbot-message { margin-bottom: 15px; }
+
     #chatbot-shell {
         --chatbot-accent: #4f46e5;
         --chatbot-ink: #172033;
@@ -988,6 +1049,30 @@
             bottom: max(86px, calc(72px + env(safe-area-inset-bottom)));
             border-radius: 50%;
         }
+        #chatbot-overlay {
+            right: max(10px, env(safe-area-inset-right));
+            bottom: max(78px, calc(72px + env(safe-area-inset-bottom)));
+            width: calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
+            height: min(620px, calc(100dvh - 92px - env(safe-area-inset-bottom)));
+            border-radius: 18px;
+        }
+        #chatbot-overlay #chatbot-shell { border-radius: 18px; }
+        #chatbot-overlay .chatbot-header { min-height: 62px; padding: 9px 10px; }
+        #chatbot-overlay .chatbot-header-actions { gap: 4px; }
+        #chatbot-overlay .chatbot-header-actions .chatbot-new-chat { min-height: 30px; padding: 0 8px; }
+        #chatbot-overlay .chatbot-header-actions .chatbot-connect-button span,
+        #chatbot-overlay .chatbot-header-actions .chatbot-new-chat:not(.chatbot-overlay-close) span { display: none; }
+        #chatbot-overlay .chatbot-brand-icon { width: 36px; height: 36px; }
+        #chatbot-overlay .chatbot-title-row { flex-wrap: nowrap; gap: 5px; }
+        #chatbot-overlay .chatbot-title-row h2 { font-size: 11px; white-space: nowrap; }
+        #chatbot-overlay .chatbot-brand-copy > p { gap: 4px; font-size: 9px; white-space: nowrap; }
+        #chatbot-overlay .chatbot-welcome { padding: 17px 14px; }
+        #chatbot-overlay .chatbot-welcome h3 { font-size: 20px; }
+        #chatbot-overlay .chatbot-welcome-copy { font-size: 10px; }
+        #chatbot-overlay .chatbot-suggestions { margin-top: 14px; }
+        #chatbot-overlay .chatbot-suggestion { min-height: 39px; font-size: 10px !important; }
+        #chatbot-overlay .chatbot-composer-wrap { padding: 8px 9px 7px; }
+        #chatbot-overlay .chatbot-privacy-note { margin-top: 6px; font-size: 7px; }
         #chatbot-shell { width: 100%; height: calc(100dvh - 245px); min-height: 430px; border-radius: 18px; }
         .chatbot-header { min-height: 68px; padding: 11px 13px; }
         .chatbot-header-actions { gap: 5px; }
@@ -1034,7 +1119,7 @@
     <div id="toast-container"
         class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-    <button id="chatbot-launcher" type="button" onclick="navigateTo('chatbot')" aria-label="Open Divine Classes AI assistant" title="Chat with Divine Classes AI" hidden>
+    <button id="chatbot-launcher" type="button" onclick="toggleChatbotOverlay()" aria-label="Open Divine Classes AI assistant" title="Chat with Divine Classes AI" aria-expanded="false" aria-controls="chatbot-overlay" hidden>
         <svg class="chatbot-launcher-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 5.5V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <circle cx="16" cy="4" r="1.8" fill="currentColor"/>
@@ -1281,6 +1366,10 @@
             </main>
         </div>
     </div>
+
+    <section id="chatbot-overlay" class="chatbot-floating-panel" aria-label="Divine Assistant chat" hidden>
+        <div id="chatbot-overlay-content"></div>
+    </section>
 
     <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
         onload="if (typeof startSupabaseLiveSync === 'function') startSupabaseLiveSync()"
@@ -5170,7 +5259,10 @@ window.DIVINE_PAGE_BACKENDS = {
             if (!launcher) return;
             const allowedRole = ['admin', 'teacher', 'student', 'developer'].includes(state.currentRole);
             launcher.hidden = !state.isAuthenticated || !isChatbotEnabled() ||
-                !allowedRole || !canRoleAccessTab(state.currentRole, 'chatbot');
+                !allowedRole || !canRoleAccessTab(state.currentRole, 'chatbot') || state.activeTab === 'chatbot';
+            if (launcher.hidden && typeof toggleChatbotOverlay === 'function') {
+                toggleChatbotOverlay(false);
+            }
         }
 
         function updateRoleUI() {
@@ -13936,11 +14028,55 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
     <script>
     const CHATBOT_PROMPTS = [
-        { icon: 'fa-book-open', label: 'Find my assignments', prompt: 'Where can I find my assignments and study materials?' },
-        { icon: 'fa-calendar-check', label: 'Check attendance', prompt: 'Where can I view attendance in the portal?' },
-        { icon: 'fa-chart-line', label: 'View test marks', prompt: 'How do I view my test marks and results?' },
-        { icon: 'fa-building', label: 'Institute information', prompt: 'How can I find the institute contact information?' }
+        { icon: 'fa-microphone', label: 'Speak: Add Student', voice: true },
+        { icon: 'fa-indian-rupee-sign', label: 'Fee Structure', prompt: 'Where can I find the fee structure and my fee payment information?' },
+        { icon: 'fa-users-rectangle', label: 'Batches & Schedule', prompt: 'Where can I find the available batches and class schedule?' }
     ];
+
+    function isChatbotOverlayOpen() {
+        const overlay = document.getElementById('chatbot-overlay');
+        return !!overlay && !overlay.hidden;
+    }
+
+    function renderChatbotSurface() {
+        const overlayContent = document.getElementById('chatbot-overlay-content');
+        if (isChatbotOverlayOpen() && overlayContent) {
+            overlayContent.innerHTML = renderChatbotView();
+            updateChatbotComposer();
+            return;
+        }
+        renderMainContent();
+    }
+
+    function toggleChatbotOverlay(forceOpen) {
+        const overlay = document.getElementById('chatbot-overlay');
+        const launcher = document.getElementById('chatbot-launcher');
+        if (!overlay) return;
+        const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : overlay.hidden;
+        if (shouldOpen && (!state.isAuthenticated || !isChatbotEnabled() ||
+            !['admin', 'teacher', 'student', 'developer'].includes(state.currentRole) ||
+            !canRoleAccessTab(state.currentRole, 'chatbot') || state.activeTab === 'chatbot')) {
+            showToast('The chatbot is unavailable or you do not have access.', 'warning');
+            return;
+        }
+
+        overlay.hidden = !shouldOpen;
+        if (launcher) {
+            launcher.setAttribute('aria-expanded', String(shouldOpen));
+            launcher.setAttribute('aria-label', shouldOpen ? 'Close Divine Assistant' : 'Open Divine Classes AI assistant');
+            launcher.title = shouldOpen ? 'Close Divine Assistant' : 'Chat with Divine Classes AI';
+        }
+        if (!shouldOpen) {
+            stopChatbotVoiceInput();
+            return;
+        }
+
+        const content = document.getElementById('chatbot-overlay-content');
+        if (content) content.innerHTML = renderChatbotView();
+        updateChatbotComposer();
+        const input = document.getElementById('chatbot-input');
+        if (input) input.focus();
+    }
 
     function renderChatbotText(value) {
         return escapeHtml(value || '')
@@ -14025,7 +14161,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return;
         }
         closeModal();
-        renderMainContent();
+        renderChatbotSurface();
         showToast('Your Gemini API key is connected in this browser.', 'success');
     }
 
@@ -14043,7 +14179,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             return;
         }
         closeModal();
-        renderMainContent();
+        renderChatbotSurface();
         showToast('Gemini disconnected for this portal account on this browser.', 'info');
     }
 
@@ -14268,7 +14404,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         microphoneStream.getTracks().forEach(function (track) { track.stop(); });
         chatbotMicPermissionPending = false;
         if (microphoneButton) microphoneButton.disabled = false;
-        if (!input.isConnected || state.activeTab !== 'chatbot' ||
+        if (!input.isConnected || (state.activeTab !== 'chatbot' && !isChatbotOverlayOpen()) ||
             permissionRequestUserKey !== getChatbotHistoryStorageKey()) return;
 
         const recognition = new Recognition();
@@ -14363,10 +14499,11 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         const suggestions = !hasMessages ? `<div class="chatbot-suggestions" aria-label="Suggested questions">
             <p class="chatbot-suggestions-label">Try asking</p>
             <div class="chatbot-suggestion-grid">${CHATBOT_PROMPTS.map(function (item) {
-                return `<button type="button" class="chatbot-suggestion" onclick="sendChatbotPrompt('${escapeAttr(item.prompt)}')">
+                const action = item.voice ? 'toggleChatbotVoiceInput()' : `sendChatbotPrompt('${escapeAttr(item.prompt)}')`;
+                return `<button type="button" class="chatbot-suggestion" onclick="${action}">
                     <span class="chatbot-suggestion-icon"><i class="fa-solid ${item.icon}" aria-hidden="true"></i></span>
                     <span>${item.label}</span>
-                    <i class="fa-solid fa-arrow-up-right-from-square chatbot-suggestion-arrow" aria-hidden="true"></i>
+                    <i class="fa-solid ${item.voice ? 'fa-microphone' : 'fa-arrow-up-right-from-square'} chatbot-suggestion-arrow" aria-hidden="true"></i>
                 </button>`;
             }).join('')}</div>
         </div>` : '';
@@ -14386,8 +14523,8 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 <div class="chatbot-brand">
                     <span class="chatbot-brand-icon"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></span>
                     <div class="chatbot-brand-copy">
-                        <div class="chatbot-title-row"><h2>Divine Classes AI</h2><span class="chatbot-version-badge">BETA</span></div>
-                        <p><span class="chatbot-status-dot"></span> Your portal assistant <span class="chatbot-header-divider">·</span> Ready to help</p>
+                        <div class="chatbot-title-row"><h2>Divine Assistant</h2><span class="chatbot-version-badge">GEMINI AI</span></div>
+                        <p><span class="chatbot-status-dot ${connected ? '' : 'chatbot-status-dot-offline'}"></span> Gemini 2.5 Flash <span class="chatbot-header-divider">·</span> ${connected ? 'Connected' : 'Ready when connected'}</p>
                     </div>
                 </div>
                 <div class="chatbot-header-actions">
@@ -14397,6 +14534,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     <button type="button" class="chatbot-new-chat chatbot-connect-button" onclick="openChatbotKeyDialog()" title="${connected ? 'Manage your Gemini API key' : 'Connect your Gemini API key'}" aria-label="${connected ? 'Manage connected Gemini API key' : 'Connect Gemini API key'}">
                         <i class="fa-solid ${connected ? 'fa-link' : 'fa-plug'}" aria-hidden="true"></i><span>${connected ? 'Gemini connected' : 'Connect Gemini'}</span>
                     </button>
+                    ${isChatbotOverlayOpen() ? '<button type="button" class="chatbot-new-chat chatbot-overlay-close" onclick="toggleChatbotOverlay(false)" aria-label="Close Divine Assistant" title="Close chat"><i class="fa-solid fa-xmark" aria-hidden="true"></i><span>Close</span></button>' : ''}
                 </div>
             </header>
 
@@ -14404,8 +14542,8 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 ${!hasMessages ? `<div class="chatbot-welcome">
                     <span class="chatbot-welcome-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
                     <p class="chatbot-eyebrow">YOUR DIVINE CLASSES ASSISTANT</p>
-                    <h3>How can I help you today?</h3>
-                    <p class="chatbot-welcome-copy">Ask about navigating the portal, finding learning resources, or getting in touch with the institute.</p>
+                    <h3>Welcome to Divine Classes!</h3>
+                    <p class="chatbot-welcome-copy">Ask about fee structure, batches, and class schedules—or speak your question using the microphone.</p>
                     ${suggestions}
                 </div>` : `<div class="chatbot-thread">${messages}${typing}${errorMessage}</div>`}
             </div>
@@ -14491,7 +14629,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             state.chatbotHistory = [];
             state.chatbotError = '';
             saveChatbotHistoryForCurrentUser();
-            renderMainContent();
+            renderChatbotSurface();
             const input = document.getElementById('chatbot-input');
             if (input) input.focus();
         });
@@ -14545,7 +14683,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         state.chatbotRequestId = requestId;
         state.chatbotError = '';
         state.chatbotBusy = true;
-        renderMainContent();
+        renderChatbotSurface();
         const conversation = document.getElementById('chatbot-conversation');
         if (conversation) conversation.scrollTop = conversation.scrollHeight;
 
@@ -14553,7 +14691,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             if (state.chatbotRequestId !== requestId) return;
             state.chatbotBusy = false;
             if (requestUserKey !== getChatbotHistoryStorageKey()) {
-                renderMainContent();
+                renderChatbotSurface();
                 return;
             }
             if (!result || !result.success || !result.answer) {
@@ -14564,7 +14702,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 state.chatbotHistory = state.chatbotHistory.slice(-20);
                 saveChatbotHistoryForCurrentUser();
             }
-            renderMainContent();
+            renderChatbotSurface();
             const nextConversation = document.getElementById('chatbot-conversation');
             if (nextConversation) nextConversation.scrollTop = nextConversation.scrollHeight;
             const nextInput = document.getElementById('chatbot-input');

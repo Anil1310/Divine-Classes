@@ -1189,7 +1189,10 @@
             if (!launcher) return;
             const allowedRole = ['admin', 'teacher', 'student', 'developer'].includes(state.currentRole);
             launcher.hidden = !state.isAuthenticated || !isChatbotEnabled() ||
-                !allowedRole || !canRoleAccessTab(state.currentRole, 'chatbot');
+                !allowedRole || !canRoleAccessTab(state.currentRole, 'chatbot') || state.activeTab === 'chatbot';
+            if (launcher.hidden && typeof toggleChatbotOverlay === 'function') {
+                toggleChatbotOverlay(false);
+            }
         }
 
         function updateRoleUI() {

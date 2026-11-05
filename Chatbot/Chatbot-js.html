@@ -1,10 +1,54 @@
 <script>
     const CHATBOT_PROMPTS = [
-        { icon: 'fa-book-open', label: 'Find my assignments', prompt: 'Where can I find my assignments and study materials?' },
-        { icon: 'fa-calendar-check', label: 'Check attendance', prompt: 'Where can I view attendance in the portal?' },
-        { icon: 'fa-chart-line', label: 'View test marks', prompt: 'How do I view my test marks and results?' },
-        { icon: 'fa-building', label: 'Institute information', prompt: 'How can I find the institute contact information?' }
+        { icon: 'fa-microphone', label: 'Speak: Add Student', voice: true },
+        { icon: 'fa-indian-rupee-sign', label: 'Fee Structure', prompt: 'Where can I find the fee structure and my fee payment information?' },
+        { icon: 'fa-users-rectangle', label: 'Batches & Schedule', prompt: 'Where can I find the available batches and class schedule?' }
     ];
+
+    function isChatbotOverlayOpen() {
+        const overlay = document.getElementById('chatbot-overlay');
+        return !!overlay && !overlay.hidden;
+    }
+
+    function renderChatbotSurface() {
+        const overlayContent = document.getElementById('chatbot-overlay-content');
+        if (isChatbotOverlayOpen() && overlayContent) {
+            overlayContent.innerHTML = renderChatbotView();
+            updateChatbotComposer();
+            return;
+        }
+        renderMainContent();
+    }
+
+    function toggleChatbotOverlay(forceOpen) {
+        const overlay = document.getElementById('chatbot-overlay');
+        const launcher = document.getElementById('chatbot-launcher');
+        if (!overlay) return;
+        const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : overlay.hidden;
+        if (shouldOpen && (!state.isAuthenticated || !isChatbotEnabled() ||
+            !['admin', 'teacher', 'student', 'developer'].includes(state.currentRole) ||
+            !canRoleAccessTab(state.currentRole, 'chatbot') || state.activeTab === 'chatbot')) {
+            showToast('The chatbot is unavailable or you do not have access.', 'warning');
+            return;
+        }
+
+        overlay.hidden = !shouldOpen;
+        if (launcher) {
+            launcher.setAttribute('aria-expanded', String(shouldOpen));
+            launcher.setAttribute('aria-label', shouldOpen ? 'Close Divine Assistant' : 'Open Divine Classes AI assistant');
+            launcher.title = shouldOpen ? 'Close Divine Assistant' : 'Chat with Divine Classes AI';
+        }
+        if (!shouldOpen) {
+            stopChatbotVoiceInput();
+            return;
+        }
+
+        const content = document.getElementById('chatbot-overlay-content');
+        if (content) content.innerHTML = renderChatbotView();
+        updateChatbotComposer();
+        const input = document.getElementById('chatbot-input');
+        if (input) input.focus();
+    }
 
     function renderChatbotText(value) {
         return escapeHtml(value || '')
@@ -89,7 +133,7 @@
             return;
         }
         closeModal();
-        renderMainContent();
+        renderChatbotSurface();
         showToast('Your Gemini API key is connected in this browser.', 'success');
     }
 
@@ -107,7 +151,7 @@
             return;
         }
         closeModal();
-        renderMainContent();
+        renderChatbotSurface();
         showToast('Gemini disconnected for this portal account on this browser.', 'info');
     }
 
@@ -332,7 +376,7 @@
         microphoneStream.getTracks().forEach(function (track) { track.stop(); });
         chatbotMicPermissionPending = false;
         if (microphoneButton) microphoneButton.disabled = false;
-        if (!input.isConnected || state.activeTab !== 'chatbot' ||
+        if (!input.isConnected || (state.activeTab !== 'chatbot' && !isChatbotOverlayOpen()) ||
             permissionRequestUserKey !== getChatbotHistoryStorageKey()) return;
 
         const recognition = new Recognition();
@@ -427,10 +471,11 @@
         const suggestions = !hasMessages ? `<div class="chatbot-suggestions" aria-label="Suggested questions">
             <p class="chatbot-suggestions-label">Try asking</p>
             <div class="chatbot-suggestion-grid">${CHATBOT_PROMPTS.map(function (item) {
-                return `<button type="button" class="chatbot-suggestion" onclick="sendChatbotPrompt('${escapeAttr(item.prompt)}')">
+                const action = item.voice ? 'toggleChatbotVoiceInput()' : `sendChatbotPrompt('${escapeAttr(item.prompt)}')`;
+                return `<button type="button" class="chatbot-suggestion" onclick="${action}">
                     <span class="chatbot-suggestion-icon"><i class="fa-solid ${item.icon}" aria-hidden="true"></i></span>
                     <span>${item.label}</span>
-                    <i class="fa-solid fa-arrow-up-right-from-square chatbot-suggestion-arrow" aria-hidden="true"></i>
+                    <i class="fa-solid ${item.voice ? 'fa-microphone' : 'fa-arrow-up-right-from-square'} chatbot-suggestion-arrow" aria-hidden="true"></i>
                 </button>`;
             }).join('')}</div>
         </div>` : '';
@@ -450,8 +495,8 @@
                 <div class="chatbot-brand">
                     <span class="chatbot-brand-icon"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></span>
                     <div class="chatbot-brand-copy">
-                        <div class="chatbot-title-row"><h2>Divine Classes AI</h2><span class="chatbot-version-badge">BETA</span></div>
-                        <p><span class="chatbot-status-dot"></span> Your portal assistant <span class="chatbot-header-divider">·</span> Ready to help</p>
+                        <div class="chatbot-title-row"><h2>Divine Assistant</h2><span class="chatbot-version-badge">GEMINI AI</span></div>
+                        <p><span class="chatbot-status-dot ${connected ? '' : 'chatbot-status-dot-offline'}"></span> Gemini 2.5 Flash <span class="chatbot-header-divider">·</span> ${connected ? 'Connected' : 'Ready when connected'}</p>
                     </div>
                 </div>
                 <div class="chatbot-header-actions">
@@ -461,6 +506,7 @@
                     <button type="button" class="chatbot-new-chat chatbot-connect-button" onclick="openChatbotKeyDialog()" title="${connected ? 'Manage your Gemini API key' : 'Connect your Gemini API key'}" aria-label="${connected ? 'Manage connected Gemini API key' : 'Connect Gemini API key'}">
                         <i class="fa-solid ${connected ? 'fa-link' : 'fa-plug'}" aria-hidden="true"></i><span>${connected ? 'Gemini connected' : 'Connect Gemini'}</span>
                     </button>
+                    ${isChatbotOverlayOpen() ? '<button type="button" class="chatbot-new-chat chatbot-overlay-close" onclick="toggleChatbotOverlay(false)" aria-label="Close Divine Assistant" title="Close chat"><i class="fa-solid fa-xmark" aria-hidden="true"></i><span>Close</span></button>' : ''}
                 </div>
             </header>
 
@@ -468,8 +514,8 @@
                 ${!hasMessages ? `<div class="chatbot-welcome">
                     <span class="chatbot-welcome-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
                     <p class="chatbot-eyebrow">YOUR DIVINE CLASSES ASSISTANT</p>
-                    <h3>How can I help you today?</h3>
-                    <p class="chatbot-welcome-copy">Ask about navigating the portal, finding learning resources, or getting in touch with the institute.</p>
+                    <h3>Welcome to Divine Classes!</h3>
+                    <p class="chatbot-welcome-copy">Ask about fee structure, batches, and class schedules—or speak your question using the microphone.</p>
                     ${suggestions}
                 </div>` : `<div class="chatbot-thread">${messages}${typing}${errorMessage}</div>`}
             </div>
@@ -555,7 +601,7 @@
             state.chatbotHistory = [];
             state.chatbotError = '';
             saveChatbotHistoryForCurrentUser();
-            renderMainContent();
+            renderChatbotSurface();
             const input = document.getElementById('chatbot-input');
             if (input) input.focus();
         });
@@ -609,7 +655,7 @@
         state.chatbotRequestId = requestId;
         state.chatbotError = '';
         state.chatbotBusy = true;
-        renderMainContent();
+        renderChatbotSurface();
         const conversation = document.getElementById('chatbot-conversation');
         if (conversation) conversation.scrollTop = conversation.scrollHeight;
 
@@ -617,7 +663,7 @@
             if (state.chatbotRequestId !== requestId) return;
             state.chatbotBusy = false;
             if (requestUserKey !== getChatbotHistoryStorageKey()) {
-                renderMainContent();
+                renderChatbotSurface();
                 return;
             }
             if (!result || !result.success || !result.answer) {
@@ -628,7 +674,7 @@
                 state.chatbotHistory = state.chatbotHistory.slice(-20);
                 saveChatbotHistoryForCurrentUser();
             }
-            renderMainContent();
+            renderChatbotSurface();
             const nextConversation = document.getElementById('chatbot-conversation');
             if (nextConversation) nextConversation.scrollTop = nextConversation.scrollHeight;
             const nextInput = document.getElementById('chatbot-input');
