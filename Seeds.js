@@ -18,7 +18,7 @@ function getDefaultSeedData() {
         teacher: 'Er. Rajesh Chahar (Ex-IITian)',
         teacherId: 'tr1',
         teacherEmail: 'rajesh.chahar@divineclasses.in',
-        studentIds: ['s1', 's2', 's3', 's4', 's10']
+        studentIds: ['s1', 's2']
       },
       {
         id: 'b2',
@@ -29,7 +29,7 @@ function getDefaultSeedData() {
         teacher: 'Dr. Sunita Sharma (M.D. AIIMS)',
         teacherId: 'tr2',
         teacherEmail: 'dr.sunita@divineclasses.in',
-        studentIds: ['s5', 's6', 's7']
+        studentIds: ['s5', 's6']
       },
       {
         id: 'b3',
@@ -46,15 +46,10 @@ function getDefaultSeedData() {
     students: [
       { id: 's1', roll: 'DC-101', name: 'Aarav Sharma', phone: '+91 98765 43210', parentName: 'Rajesh Sharma', totalFee: 48000, paidFee: 32000, monthlyFee: 1000, dueDate: '2026-10-25', lastReminder: '2 days ago', password: 'password123', status: 'Active' },
       { id: 's2', roll: 'DC-102', name: 'Priya Patel', phone: '+91 98234 56789', parentName: 'Mukesh Patel', totalFee: 48000, paidFee: 48000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's3', roll: 'DC-103', name: 'Rohan Gupta', phone: '+91 97112 23344', parentName: 'Sanjay Gupta', totalFee: 48000, paidFee: 16000, monthlyFee: 1000, dueDate: '2026-10-18', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's4', roll: 'DC-104', name: 'Sneha Iyer', phone: '+91 98989 12345', parentName: 'Venkatesh Iyer', totalFee: 48000, paidFee: 48000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
       { id: 's5', roll: 'DC-201', name: 'Kabir Khan', phone: '+91 99110 02233', parentName: 'Imran Khan', totalFee: 52000, paidFee: 26000, monthlyFee: 1000, dueDate: '2026-10-20', lastReminder: '5 days ago', password: 'password123', status: 'Active' },
       { id: 's6', roll: 'DC-202', name: 'Ananya Singh', phone: '+91 96543 21098', parentName: 'Virendra Singh', totalFee: 52000, paidFee: 52000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's7', roll: 'DC-203', name: 'Devansh Joshi', phone: '+91 95551 12233', parentName: 'Prakash Joshi', totalFee: 52000, paidFee: 36000, monthlyFee: 1000, dueDate: '2026-10-28', lastReminder: 'Never', password: 'password123', status: 'Active' },
       { id: 's8', roll: 'DC-301', name: 'Ishita Das', phone: '+91 94443 32211', parentName: 'Subhash Das', totalFee: 30000, paidFee: 22000, monthlyFee: 1000, dueDate: '2026-10-22', lastReminder: 'Never', password: 'password123', status: 'Active' },
-      { id: 's9', roll: 'DC-302', name: 'Yashvardhan Chauhan', phone: '+91 93123 45678', parentName: 'Manoj Chauhan', totalFee: 30000, paidFee: 30000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' },
-      { id: 's10', roll: 'DC-110', name: 'Anil Kumar Chahar', phone: '+91 95556 78753', parentName: 'Rajesh Chahar', totalFee: 50000, paidFee: 25000, monthlyFee: 1000, dueDate: '2026-10-30', lastReminder: '1 day ago', password: 'password123', status: 'Active' },
-      { id: 's11', roll: 'DC-105', name: 'Radhika Chahar', phone: '+91 95556 78754', parentName: 'Anil Chahar', totalFee: 48000, paidFee: 48000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' }
+      { id: 's9', roll: 'DC-302', name: 'Yashvardhan Chauhan', phone: '+91 93123 45678', parentName: 'Manoj Chauhan', totalFee: 30000, paidFee: 30000, monthlyFee: 1000, dueDate: 'Paid', lastReminder: '-', password: 'password123', status: 'Active' }
     ],
     materials: [
       {
@@ -123,10 +118,7 @@ function getDefaultSeedData() {
         maxMarks: 100,
         marks: {
           's1': { score: 92, remarks: 'Outstanding conceptual clarity!' },
-          's2': { score: 96, remarks: 'Batch Topper • Flawless calculations' },
-          's3': { score: 72, remarks: 'Revise constraint motion relations' },
-          's4': { score: 86, remarks: 'Very consistent, good speed' },
-          's10': { score: 76, remarks: 'Account Blocked in Database' }
+          's2': { score: 96, remarks: 'Batch Topper • Flawless calculations' }
         }
       },
       {
@@ -138,9 +130,7 @@ function getDefaultSeedData() {
         maxMarks: 100,
         marks: {
           's1': { score: 89, remarks: 'Great improvement in thermodynamics' },
-          's2': { score: 94, remarks: 'Excellent stoichiometry work' },
-          's3': { score: 78, remarks: 'Good attempt, practice redox titration' },
-          's4': { score: 88, remarks: 'Strong accuracy throughout' }
+          's2': { score: 94, remarks: 'Excellent stoichiometry work' }
         }
       },
       {
@@ -152,8 +142,7 @@ function getDefaultSeedData() {
         maxMarks: 720,
         marks: {
           's5': { score: 628, remarks: 'Strong Botany score, revise meiosis stages' },
-          's6': { score: 680, remarks: 'Top Ranker in Divine Classes! AIIMS caliber' },
-          's7': { score: 595, remarks: 'Improve speed in assertion-reason' }
+          's6': { score: 680, remarks: 'Top Ranker in Divine Classes! AIIMS caliber' }
         }
       },
       {
@@ -353,6 +342,14 @@ function getDefaultSeedData() {
         comment: 'Very disciplined institute. Receiving regular offline test marks and updates gives us complete peace of mind about our ward’s exam prep.'
       }
     ],
+    notifications: [
+      { id: 'monthly_fee_s1_demo', title: 'Demo fee reminder', message: 'Sample fee reminder for Aarav Sharma.', time: 'Demo', timestamp: Date.now() - 6000, read: false, targetRole: 'student', targetStudentId: 's1', actionTab: 'fees', batchName: 'JEE Advanced Target 2027 (Alpha Batch)', isDummy: true },
+      { id: 'monthly_fee_s2_demo', title: 'Demo fee reminder', message: 'Sample fee reminder for Priya Patel.', time: 'Demo', timestamp: Date.now() - 5000, read: false, targetRole: 'student', targetStudentId: 's2', actionTab: 'fees', batchName: 'JEE Advanced Target 2027 (Alpha Batch)', isDummy: true },
+      { id: 'monthly_fee_s5_demo', title: 'Demo fee reminder', message: 'Sample fee reminder for Kabir Khan.', time: 'Demo', timestamp: Date.now() - 4000, read: false, targetRole: 'student', targetStudentId: 's5', actionTab: 'fees', batchName: 'NEET Medical Dropper & Foundation (Bio-Elite)', isDummy: true },
+      { id: 'monthly_fee_s6_demo', title: 'Demo fee reminder', message: 'Sample fee reminder for Ananya Singh.', time: 'Demo', timestamp: Date.now() - 3000, read: false, targetRole: 'student', targetStudentId: 's6', actionTab: 'fees', batchName: 'NEET Medical Dropper & Foundation (Bio-Elite)', isDummy: true },
+      { id: 'monthly_fee_s8_demo', title: 'Demo fee reminder', message: 'Sample fee reminder for Ishita Das.', time: 'Demo', timestamp: Date.now() - 2000, read: false, targetRole: 'student', targetStudentId: 's8', actionTab: 'fees', batchName: 'Class 10th CBSE Board Excellence & NTSE', isDummy: true },
+      { id: 'monthly_fee_s9_demo', title: 'Demo fee reminder', message: 'Sample fee reminder for Yashvardhan Chauhan.', time: 'Demo', timestamp: Date.now() - 1000, read: false, targetRole: 'student', targetStudentId: 's9', actionTab: 'fees', batchName: 'Class 10th CBSE Board Excellence & NTSE', isDummy: true }
+    ],
     settings: {
       instituteName: 'Divine Classes',
       tagline: 'Empowering Aspirants for JEE, NEET & Board Excellence',
@@ -366,28 +363,23 @@ function getDefaultSeedData() {
       youtubeUrl: 'https://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
       adminName: 'Ravi Shankar',
       adminPassword: 'admin123',
-      adminEmail: 'edivineclasses@gmail.com',
+      adminEmail: 'divineclasses1010@gmail.com',
       leadDevEmail: 'anil.chahar170@gmail.com',
-      leadDevPassword: 'Anil@1310',
+      leadDevPassword: '',
       showRequirementLabels: false,
+      chatbotEnabled: false,
       allowAdminFeedbackDelete: false,
       allowAdminLinkDelete: false,
       showDummyData: true,
       dummyDataWiped: false,
-      chatbotEnabled: true,
-      chatbotAdminEnabled: true,
-      chatbotTeacherEnabled: true,
-      chatbotStudentEnabled: true,
       supabaseEnabled: true,
       supabaseUrl: 'https://srjqsofkjizwskqnzyfn.supabase.co',
       supabaseKey: 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS'
     }
   };
 
-  // Pad every demo-backed sheet to at least ten sample records. These are
-  // deliberately generic examples so they are easy to distinguish from live
-  // records. Study-link entries remain visible per the hub's existing behavior.
-  for (let i = 4; i <= 10; i++) {
+  // Keep six demo rows per app data table; protected study links retain their curated set.
+  for (let i = 4; i <= 6; i++) {
     data.batches.push({
       id: 'b' + i,
       name: 'Demo Batch ' + String(i).padStart(2, '0'),
@@ -395,11 +387,11 @@ function getDefaultSeedData() {
       schedule: 'Demo schedule — Mon, Wed, Fri • 10:00 AM - 11:00 AM',
       room: 'Demo Classroom ' + String(i).padStart(2, '0'),
       teacher: 'Demo Faculty ' + String(i).padStart(2, '0'),
-      studentIds: ['s' + (((i - 1) % 11) + 1)]
+      studentIds: [['s1', 's2', 's5'][i - 4]]
     });
   }
 
-  for (let i = 6; i <= 10; i++) {
+  for (let i = 6; i <= 6; i++) {
     data.materials.push({
       id: 'm' + i,
       batchId: 'b' + (((i - 1) % 3) + 1),
@@ -413,8 +405,8 @@ function getDefaultSeedData() {
     });
   }
 
-  for (let i = 5; i <= 10; i++) {
-    const studentId = 's' + (((i - 1) % 11) + 1);
+  for (let i = 5; i <= 6; i++) {
+    const studentId = i === 5 ? 's1' : 's5';
     data.offlineTests.push({
       id: 't' + i,
       batchId: 'b' + (((i - 1) % 3) + 1),
@@ -431,7 +423,7 @@ function getDefaultSeedData() {
     };
   }
 
-  for (let i = 5; i <= 10; i++) {
+  for (let i = 5; i <= 6; i++) {
     const n = String(i).padStart(2, '0');
     data.teachers.push({
       id: 'tr' + i,
@@ -451,7 +443,7 @@ function getDefaultSeedData() {
   }
 
   const demoGalleryImage = 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80';
-  for (let i = 5; i <= 10; i++) {
+  for (let i = 5; i <= 6; i++) {
     const n = String(i).padStart(2, '0');
     data.gallery.push({
       id: 'g' + i,
@@ -464,7 +456,7 @@ function getDefaultSeedData() {
     });
   }
 
-  for (let i = 4; i <= 10; i++) {
+  for (let i = 4; i <= 6; i++) {
     const n = String(i).padStart(2, '0');
     data.feedbacks.push({
       id: 'f' + i,
@@ -498,8 +490,22 @@ function getDefaultSeedData() {
   ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (col) {
     (data[col] || []).forEach(function (rec) { rec.isDummy = true; });
   });
+  data.notifications.forEach(function (notification) { notification.isDummy = true; });
   // External links stay visible when demo data is hidden; demo placeholders are
   // still labeled so they can be identified in sheets and exports.
+  return data;
+}
+
+function getEmptyAppData_() {
+  const data = getDefaultSeedData();
+  ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks', 'notifications']
+    .forEach(function (table) { data[table] = []; });
+  data.externalLinks = (data.externalLinks || []).filter(function (link) {
+    return link && !isDummyRecord_(link);
+  });
+  data.settings.dummyDataWiped = true;
+  data.settings.showDummyData = false;
+  data.settings.studentSeedDataDisabled = true;
   return data;
 }
 
@@ -520,23 +526,20 @@ function getDefaultSettingsConfigRows_(settings, syncedAt) {
     ['YouTube Channel', s.youtubeUrl || seedSettings.youtubeUrl, 'Official Video Channel'],
     ['Admin Name', s.adminName || seedSettings.adminName, 'Display Name of Institute Admin'],
     ['Master Admin Password', s.adminPassword || seedSettings.adminPassword, 'Password to access Admin portal'],
-    ['Admin Email ID', s.adminEmail || seedSettings.adminEmail || 'edivineclasses@gmail.com', 'Official Admin Contact / Login Email'],
+    ['Admin Email ID', s.adminEmail || seedSettings.adminEmail, 'Official Admin Contact / Login Email'],
     ['Lead Developer Email', s.leadDevEmail || 'anil.chahar170@gmail.com', 'Lead Developer login email'],
-    ['Lead Developer Password', s.leadDevPassword || 'Anil@1310', 'Lead Developer login password'],
-    ['LEAD_DEV_EMAIL', s.leadDevEmail || 'anil.chahar170@gmail.com', 'Lead Developer Login Credentials'],
-    ['LEAD_DEV_PASSWORD', s.leadDevPassword || 'Anil@1310', 'Lead Developer login password'],
+    ['Lead Developer Password', s.leadDevPassword || '', 'Lead Developer login password'],
     ['UPI Payment ID', s.upiId || seedSettings.upiId, 'Fee Collection UPI'],
     ['Facebook Page', s.facebookUrl || seedSettings.facebookUrl, 'Social Channel'],
     ['Instagram Profile', s.instagramUrl || seedSettings.instagramUrl, 'Social Channel'],
     ['Show Requirement Labels', (s.showRequirementLabels === false || s.showRequirementLabels === 'Off' || s.showRequirementLabels === 'off' || s.showRequirementLabels === 'false' || s.showRequirementLabels === 0 || s.showRequirementLabels === '0') ? 'Off' : 'On', 'Page header Requirement #N tags (toggle in Settings)'],
+    ['Chatbot Enabled', (s.chatbotEnabled === true || s.chatbotEnabled === 'On' || s.chatbotEnabled === 'on' || s.chatbotEnabled === 'true' || s.chatbotEnabled === 1) ? 'On' : 'Off', 'Developer-controlled Gemini help chatbot visibility'],
     ['Admin Feedback Delete', (s.allowAdminFeedbackDelete === false || s.allowAdminFeedbackDelete === 'Off' || s.allowAdminFeedbackDelete === 'off' || s.allowAdminFeedbackDelete === 'false') ? 'Off' : 'On', 'Admin delete button on Feedback Wall (toggle in Settings)'],
     ['Study Link Delete', (s.allowAdminLinkDelete === false || s.allowAdminLinkDelete === 'Off' || s.allowAdminLinkDelete === 'off' || s.allowAdminLinkDelete === 'false') ? 'Off' : 'On', 'Admin delete button on Study Links cards (toggle in Settings)'],
-    ['Enable Floating Chatbot', (s.chatbotEnabled === false || s.chatbotEnabled === 'Off' || s.chatbotEnabled === 'off' || s.chatbotEnabled === 'false') ? 'Off' : 'On', 'Chatbot launcher & AI assistant visibility (toggle in Settings)'],
-    ['Chatbot Visible to Admin', (s.chatbotAdminEnabled === false || s.chatbotAdminEnabled === 'Off' || s.chatbotAdminEnabled === 'false') ? 'Off' : 'On', 'Chatbot visibility on Admin login'],
-    ['Chatbot Visible to Teachers', (s.chatbotTeacherEnabled === false || s.chatbotTeacherEnabled === 'Off' || s.chatbotTeacherEnabled === 'false') ? 'Off' : 'On', 'Chatbot visibility on Teacher login'],
-    ['Chatbot Visible to Students', (s.chatbotStudentEnabled === false || s.chatbotStudentEnabled === 'Off' || s.chatbotStudentEnabled === 'false') ? 'Off' : 'On', 'Chatbot visibility on Student login'],
     ['Show Dummy / Demo Data', (s.showDummyData === false || s.showDummyData === 'Off' || s.showDummyData === 'off' || s.showDummyData === 'false' || s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Off' : 'On', 'Seed demo students/batches/tests visibility'],
     ['Dummy Data Wiped', (s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Yes' : 'No', 'Permanent clearance status before client handover'],
+    ['Student Seed Data Disabled', (s.studentSeedDataDisabled === true || s.studentSeedDataDisabled === 'true') ? 'Yes' : 'No', 'Do not restore demo student rows after the student table is cleared'],
+    ['Student Table Cleared At', s.studentTableClearedAt || '', 'Reject stale student rows from before the developer clear action'],
     ['Supabase Enabled', (s.supabaseEnabled === false || s.supabaseEnabled === 'Off' || s.supabaseEnabled === 'off' || s.supabaseEnabled === 'false') ? 'Off' : 'On', 'Supabase primary database toggle'],
     ['Supabase URL', s.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co', 'Supabase Project REST URL'],
     ['Supabase Key', s.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS', 'Supabase API Key'],
@@ -574,7 +577,7 @@ function migrateLegacySeedSettings_(appData) {
 }
 
 /**
- * Ten clearly marked sample attendance rows for the Attendance_Register tab.
+ * Six clearly marked sample attendance rows for the Attendance_Register tab.
  * Dates follow the current month so the sample data is visible in attendance
  * views regardless of when the demo is opened.
  */
@@ -582,17 +585,18 @@ function getDefaultAttendanceDummySeeds_() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-  const statuses = ['Present', 'Present', 'Late', 'Absent', 'Present', 'Leave', 'Present', 'Late', 'Present', 'Absent'];
+  const statuses = ['Present', 'Present', 'Late', 'Absent', 'Present', 'Leave'];
+  const studentIds = ['s1', 's2', 's5', 's6', 's8', 's9'];
   const seeds = [];
-  for (let i = 0; i < 10; i++) {
-    const studentNum = i + 1;
-    const batchNum = studentNum <= 4 || studentNum === 10 ? 1 : studentNum <= 7 ? 2 : 3;
+  for (let i = 0; i < studentIds.length; i++) {
+    const studentId = studentIds[i];
+    const batchNum = i < 2 ? 1 : i < 4 ? 2 : 3;
     const day = Math.min(i + 1, new Date(year, month + 1, 0).getDate());
     const date = new Date(year, month, day, 9, 0, 0);
     seeds.push({
       date: Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
       batchId: 'b' + batchNum,
-      studentId: 's' + studentNum,
+      studentId: studentId,
       status: statuses[i],
       markedBy: '[DEMO] Seed data',
       updatedAt: date.toISOString()
@@ -603,16 +607,17 @@ function getDefaultAttendanceDummySeeds_() {
 
 function isDummyDataWiped_() {
   try {
-    const cur = dbLoadAll();
-    return !!(cur && cur.settings && (cur.settings.dummyDataWiped === true || cur.settings.dummyDataWiped === 'true'));
+    const propertyValue = PropertiesService.getScriptProperties().getProperty('DUMMY_DATA_WIPED');
+    if (propertyValue !== null) return propertyValue === 'true';
+    return true;
   } catch (e) {
-    return false;
+    return true;
   }
 }
 
 /**
- * Maintains the demo attendance rows in their sheet. This seed-only helper
- * refreshes existing demo rows or appends missing ones, leaving live rows as-is.
+ * Maintains six demo attendance rows, removing obsolete demo rows and leaving
+ * genuine attendance records untouched.
  */
 function ensureAttendanceDummySeeds_(sheet) {
   if (!sheet || typeof getDefaultAttendanceDummySeeds_ !== 'function') return;
@@ -624,6 +629,11 @@ function ensureAttendanceDummySeeds_(sheet) {
     : [];
   const seen = {};
   const demoRowsByStudent = {};
+  const allowedStudentIds = {};
+  getDefaultAttendanceDummySeeds_().forEach(function (record) {
+    allowedStudentIds[String(record.studentId)] = true;
+  });
+  const obsoleteRows = [];
   rows.forEach(function (row, index) {
     const date = row[0] instanceof Date
       ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'yyyy-MM-dd')
@@ -631,8 +641,16 @@ function ensureAttendanceDummySeeds_(sheet) {
     const key = [date, String(row[1] || ''), String(row[2] || '')].join('|');
     seen[key] = true;
     if (String(row[4] || '') === '[DEMO] Seed data' && row[2]) {
-      demoRowsByStudent[String(row[2])] = index + 2;
+      const studentId = String(row[2]);
+      if (!allowedStudentIds[studentId]) {
+        obsoleteRows.push(index + 2);
+      } else {
+        demoRowsByStudent[studentId] = index + 2;
+      }
     }
+  });
+  obsoleteRows.reverse().forEach(function (rowNumber) {
+    sheet.deleteRow(rowNumber);
   });
   const append = [];
   getDefaultAttendanceDummySeeds_().forEach(function (record) {
@@ -677,14 +695,23 @@ function mergeDefaultDummySeeds_(appData) {
   const seed = getDefaultSeedData();
   const blockedRolls = typeof getTombstones_ === 'function' ? getTombstones_('rolls') : [];
   const blockedUrls = typeof getTombstones_ === 'function' ? getTombstones_('linkUrls') : [];
+  const studentSeedsDisabled = appData.settings &&
+    (appData.settings.studentSeedDataDisabled === true || appData.settings.studentSeedDataDisabled === 'true');
   const tables = ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks', 'externalLinks'];
 
   tables.forEach(function (table) {
+    if (table === 'students' && studentSeedsDisabled) {
+      appData.students = (appData.students || []).filter(function (record) {
+        return !isDummyRecord_(record);
+      });
+      return;
+    }
     if (!Array.isArray(appData[table])) appData[table] = [];
     const have = {};
     appData[table].forEach(function (record) {
       if (record && record.id) have[String(record.id)] = true;
     });
+
     (seed[table] || []).forEach(function (record) {
       if (!record || !record.id || have[String(record.id)]) return;
       if (table === 'students' && blockedRolls.indexOf(String(record.roll || '').trim()) !== -1) return;
@@ -696,10 +723,24 @@ function mergeDefaultDummySeeds_(appData) {
     });
   });
 
+  if (!Array.isArray(appData.notifications)) appData.notifications = [];
+  const notificationIds = {};
+  appData.notifications.forEach(function (notification) {
+    if (notification && notification.id) notificationIds[String(notification.id)] = true;
+  });
+  (seed.notifications || []).forEach(function (notification) {
+    if (!notification || notificationIds[String(notification.id)]) return;
+    appData.notifications.push(JSON.parse(JSON.stringify(notification)));
+    notificationIds[String(notification.id)] = true;
+  });
+
   if (!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
   Object.keys(seed.settings || {}).forEach(function (key) {
     if (appData.settings[key] === undefined) appData.settings[key] = seed.settings[key];
   });
+  if (typeof enforceSixDummySeedRecordsPerTable_ === 'function') {
+    enforceSixDummySeedRecordsPerTable_(appData, seed);
+  }
   return appData;
 }
 
@@ -709,7 +750,10 @@ function createDefaultSeedRecords_(appData) {
   if (!appData.settings) appData.settings = {};
   appData.settings.dummyDataWiped = false;
   appData.settings.showDummyData = true;
+  appData.settings.studentSeedDataDisabled = false;
   try {
+    PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_WIPED', 'false');
+    PropertiesService.getScriptProperties().setProperty('STUDENT_SEED_DATA_DISABLED', 'false');
     PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
     PropertiesService.getScriptProperties().deleteProperty('DB_tomb_linkUrls');
   } catch (e) { }
@@ -720,9 +764,9 @@ function createDefaultSeedRecords_(appData) {
  * ============================================================================
  * DUMMY / DEMO DATA TOGGLE (Developer controlled via Settings)
  * ============================================================================
- * settings.showDummyData === false  → seed/demo records are hidden from the
- * portal but NEVER deleted from the database, so flipping the toggle back ON
- * restores them instantly.
+ * settings.showDummyData === false hides seed/demo records on reads.
+ * The developer Settings toggle explicitly deletes them when turned OFF;
+ * turning it ON recreates them through apiCreateDummyDataAndSheets().
  */
 
 const DUMMY_SEED_ID_SET = (function () {
@@ -733,9 +777,12 @@ const DUMMY_SEED_ID_SET = (function () {
     's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11',
     'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10',
     't1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 't10',
-    'tr5', 'tr6', 'tr7', 'tr8', 'tr9', 'tr10',
+    'tr1', 'tr2', 'tr3', 'tr4', 'tr5', 'tr6', 'tr7', 'tr8', 'tr9', 'tr10',
     'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8', 'g9', 'g10',
     'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10',
+    'monthly_fee_s1_demo', 'monthly_fee_s2_demo', 'monthly_fee_s5_demo',
+    'monthly_fee_s6_demo', 'monthly_fee_s8_demo', 'monthly_fee_s9_demo',
+    'DC-101', 'DC-102', 'DC-201', 'DC-202', 'DC-301', 'DC-302',
     'l6', 'l7', 'l8', 'l9', 'l10'
   ].forEach(function (id) { set[id] = true; });
   return set;
@@ -744,19 +791,39 @@ const DUMMY_SEED_ID_SET = (function () {
 function isDummyRecord_(rec) {
   if (!rec) return false;
   if (rec.isDummy === true) return true;
-  return DUMMY_SEED_ID_SET[rec.id] === true;
+  return DUMMY_SEED_ID_SET[rec.id] === true || DUMMY_SEED_ID_SET[rec.roll] === true;
 }
 
-// Removes seed/demo records from the data RETURNED to clients (DB untouched).
+// Removes seed/demo records from a locked dataset before it is returned or saved.
 // externalLinks (study links) are ALWAYS kept — never stripped.
 function stripDummyData_(appData) {
   if (!appData || !appData.settings || appData.settings.showDummyData !== false) return appData;
   const dummyStudentIds = {};
   (appData.students || []).forEach(function (s) {
-    if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
+    if (!s || !isDummyRecord_(s)) return;
+    if (s.id) dummyStudentIds[String(s.id)] = true;
+    if (s.roll) dummyStudentIds[String(s.roll)] = true;
   });
-  ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-    appData[tbl] = (appData[tbl] || []).filter(function (r) { return !isDummyRecord_(r); });
+  const dummyMaterialIds = {};
+  (appData.materials || []).forEach(function (material) {
+    if (material && isDummyRecord_(material)) dummyMaterialIds[String(material.id)] = true;
+  });
+  ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks', 'notifications'].forEach(function (tbl) {
+    appData[tbl] = (appData[tbl] || []).filter(function (r) {
+      if (!r) return false;
+      if (isDummyRecord_(r)) return false;
+      if (tbl !== 'notifications') return true;
+      const targetStudentId = String(r.targetStudentId || r.studentId || '');
+      const targetMaterialId = String(r.materialId || '');
+      if (dummyStudentIds[targetStudentId] || dummyMaterialIds[targetMaterialId]) return false;
+      const notificationId = String(r.id || '');
+      return !Object.keys(dummyStudentIds).some(function (id) {
+        return notificationId.indexOf('notif_fee_' + id + '_') === 0 ||
+          notificationId.indexOf('monthly_fee_' + id + '_') === 0;
+      }) && !Object.keys(dummyMaterialIds).some(function (id) {
+        return notificationId.indexOf('notif_mat_' + id) === 0;
+      });
+    });
   });
   (appData.batches || []).forEach(function (b) {
     if (Array.isArray(b.studentIds)) {
@@ -771,46 +838,54 @@ function stripDummyData_(appData) {
   return appData;
 }
 
-// Re-injects missing dummy records (from current DB or seed) so client syncs
-// that carry a stripped state can never permanently wipe demo data.
-function restoreDummyData_(incoming) {
-  if (!incoming) return incoming;
-  if (incoming.settings && (incoming.settings.dummyDataWiped === true || incoming.settings.dummyDataWiped === 'true')) {
-    return incoming;
-  }
-  // Keep existing databases up to date when new demo seeds are added.
-  mergeDefaultDummySeeds_(incoming);
-  let cur = null;
-  try { cur = dbLoadAll(); } catch (e) { }
-  const incomingOff = !incoming.settings || incoming.settings.showDummyData === false;
-  const dbWasOff = !!(cur && cur.settings && cur.settings.showDummyData === false);
-  // Restore when the client sends a stripped view (toggle OFF), or when the
-  // toggle was just flipped back ON from a previously-stripped session
-  // (client state is still missing the dummy records at that moment).
-  if (!incomingOff && !dbWasOff) return incoming;
-  const src = cur || getDefaultSeedData();
-  const dummyStudentIds = {};
-  // externalLinks excluded — study links are never stripped, so no restore needed
-  ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (tbl) {
-    if (!Array.isArray(incoming[tbl])) incoming[tbl] = [];
-    const have = {};
-    incoming[tbl].forEach(function (r) { if (r && r.id) have[r.id] = true; });
-    (src[tbl] || []).forEach(function (r) {
-      if (r && r.id && !have[r.id] && isDummyRecord_(r)) incoming[tbl].push(r);
+function applyDummySeedLocks_(appData, currentData) {
+  if (!appData) return appData;
+  if (!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
+
+  const properties = PropertiesService.getScriptProperties();
+  const dummyLockProperty = properties.getProperty('DUMMY_DATA_WIPED');
+  const studentLockProperty = properties.getProperty('STUDENT_SEED_DATA_DISABLED');
+  const currentSettings = currentData && currentData.settings || {};
+  const dummyDataWiped = dummyLockProperty !== null
+    ? dummyLockProperty === 'true'
+    : true;
+  const studentSeedsDisabled = studentLockProperty !== null
+    ? studentLockProperty === 'true'
+    : dummyDataWiped || !!(appData.settings.studentSeedDataDisabled === true ||
+      appData.settings.studentSeedDataDisabled === 'true' ||
+      currentSettings.studentSeedDataDisabled === true || currentSettings.studentSeedDataDisabled === 'true');
+
+  appData.settings.dummyDataWiped = dummyDataWiped;
+  appData.settings.showDummyData = dummyDataWiped ? false : appData.settings.showDummyData;
+  appData.settings.studentSeedDataDisabled = studentSeedsDisabled;
+  if (dummyDataWiped) {
+    appData.settings.showDummyData = false;
+    stripDummyData_(appData);
+  } else if (studentSeedsDisabled) {
+    const removedStudentIds = {};
+    appData.students = (appData.students || []).filter(function (student) {
+      if (!isDummyRecord_(student)) return true;
+      if (student.id) removedStudentIds[String(student.id)] = true;
+      return false;
     });
-  });
-  (src.students || []).forEach(function (s) {
-    if (s && isDummyRecord_(s)) dummyStudentIds[s.id] = true;
-  });
-  // Restore stripped dummy student references in batches/tests that still exist
-  (incoming.batches || []).forEach(function (b) {
-    if (!Array.isArray(b.studentIds)) b.studentIds = [];
-    Object.keys(dummyStudentIds).forEach(function (sid) {
-      const orig = (src.batches || []).find(function (ob) { return ob.id === b.id; });
-      if (orig && Array.isArray(orig.studentIds) && orig.studentIds.indexOf(sid) !== -1 && b.studentIds.indexOf(sid) === -1) {
-        b.studentIds.push(sid);
+    (appData.batches || []).forEach(function (batch) {
+      if (Array.isArray(batch.studentIds)) {
+        batch.studentIds = batch.studentIds.filter(function (id) { return !removedStudentIds[String(id)]; });
       }
     });
-  });
-  return incoming;
+    (appData.offlineTests || []).forEach(function (test) {
+      if (test && test.marks && typeof test.marks === 'object') {
+        Object.keys(removedStudentIds).forEach(function (id) { delete test.marks[id]; });
+      }
+    });
+  }
+  return appData;
+}
+
+// Seed restoration is intentionally limited to explicit developer actions.
+function restoreDummyData_(incoming) {
+  if (!incoming) return incoming;
+  let cur = null;
+  try { cur = dbLoadAll(); } catch (e) { Logger.log('Dummy seed lock lookup notice: ' + e.toString()); }
+  return applyDummySeedLocks_(incoming, cur);
 }

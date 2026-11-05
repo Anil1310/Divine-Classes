@@ -3,20 +3,20 @@
      * SUPABASE BACKEND CLIENT (developer opt-in)
      * Reads project URL + anon key from Settings (state.settings).
      * Enabled only when "Supabase Database" is ON in Settings.
-     * Used as a fallback backend when Apps Script (google.script.run) is unavailable.
+     * Keeps the web app and Supabase tables synchronized when enabled.
      ********************************************************************/
     function getSupabaseApiUrl() {
-        return (state.settings && state.settings.supabaseUrl) || 'https://srjqsofkjizwskqnzyfn.supabase.co';
+        return (state.settings && state.settings.supabaseUrl) || '';
     }
     function getSupabaseAnonKey() {
-        return (state.settings && state.settings.supabaseKey) || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+        return (state.settings && state.settings.supabaseKey) || '';
     }
     async function supabaseFetch(path, options) {
         const base = getSupabaseApiUrl();
         const key = getSupabaseAnonKey();
         if (!base) throw new Error('Supabase Project URL not set in Settings.');
         if (!key) throw new Error('Supabase Anon Key not set in Settings.');
-        if (state.settings && (state.settings.supabaseEnabled === false || state.settings.supabaseEnabled === 'false')) {
+        if (!state.settings || state.settings.supabaseEnabled !== true) {
             throw new Error('Supabase Database is disabled in Settings.');
         }
         const normalizedBase = base.replace(/\/+$/, '');
@@ -70,6 +70,7 @@
                 'fee_due_date': 'dueDate',
                 'last_reminder_sent': 'lastReminder',
                 'admission_date': 'admissionDate',
+                'created_at': 'createdAt',
                 'batch_id': 'batchId',
                 'monthly_paid_this_cycle': 'monthlyPaidThisCycle',
                 'payment_history': 'paymentHistory',
@@ -225,11 +226,12 @@
         return 'DIVINE_SUPABASE_SYNC_SNAPSHOT_' + supabaseStableFingerprint(getSupabaseApiUrl());
     }
 
-    function rememberSupabaseSyncSnapshot() {
+    function rememberSupabaseSyncSnapshot(data) {
+        const source = data || state;
         const snapshot = {};
-        ['batches', 'students', 'teachers', 'materials', 'offlineTests'].forEach(function (key) {
+        ['batches', 'students', 'teachers', 'materials', 'offlineTests', 'gallery', 'externalLinks', 'feedbacks'].forEach(function (key) {
             snapshot[key] = {};
-            (state[key] || []).forEach(function (record) {
+            (source[key] || []).forEach(function (record) {
                 if (record && (record.id != null || record.roll != null)) {
                     const idKey = String(record.id || record.roll);
                     snapshot[key][idKey] = supabaseStableFingerprint(record);
@@ -238,6 +240,76 @@
         });
         try { localStorage.setItem(getSupabaseSyncSnapshotKey(), JSON.stringify(snapshot)); }
         catch (e) { }
+    }
+
+    function getChangedSupabaseRecords(stateKey, records, previousSnapshot) {
+        const previousRecords = (previousSnapshot && previousSnapshot[stateKey]) || {};
+        return (records || []).filter(function (record) {
+            if (!record || (record.id == null && record.roll == null)) return false;
+            const id = String(record.id || record.roll);
+            return previousRecords[id] !== supabaseStableFingerprint(record);
+        });
+    }
+
+    async function deleteSupabaseRows(tableName, altTable, idColumns, ids) {
+        if (!ids.length) return;
+        const filter = ids.map(function (id) {
+            return encodeURIComponent(String(id));
+        }).join(',');
+        const failures = [];
+        let deleted = false;
+        const tables = [tableName, altTable].filter(Boolean);
+        for (const name of tables) {
+            for (const column of idColumns) {
+                try {
+                    const response = await supabaseFetch(name + '?' + column + '=in.(' + filter + ')', {
+                        method: 'DELETE',
+                        headers: { Prefer: 'return=minimal' }
+                    });
+                    if (response.ok) {
+                        deleted = true;
+                    } else {
+                        failures.push(name + '.' + column + ': HTTP ' + response.status + ' ' + await response.text().catch(function () { return ''; }));
+                    }
+                } catch (error) {
+                    failures.push(name + '.' + column + ': ' + ((error && error.message) || error));
+                }
+            }
+        }
+        if (!deleted) {
+            throw new Error('Could not delete removed rows from Supabase: ' + failures.join('; '));
+        }
+    }
+
+    async function deleteRowsRemovedInApp(data, previousSnapshot) {
+        const source = data || state;
+        const previous = previousSnapshot || getSupabaseSyncSnapshot();
+        const tables = {
+            batches: { stateKey: 'batches', aliases: ['batches', 'batches_roster'], columns: ['id', 'batch_id'] },
+            students: { stateKey: 'students', aliases: ['students', 'students_master'], columns: ['id', 'roll_no', 'roll'] },
+            teachers: { stateKey: 'teachers', aliases: ['teachers', 'teachers_roster'], columns: ['id', 'teacher_id'] },
+            materials: { stateKey: 'materials', aliases: ['materials', 'materials_repository'], columns: ['id', 'material_id'] },
+            offlineTests: { stateKey: 'offlineTests', aliases: ['offline_tests', 'offline_test_marks'], columns: ['id', 'test_id'] },
+            gallery: { stateKey: 'gallery', aliases: ['gallery', 'gallery_banners'], columns: ['id', 'banner_id'] },
+            externalLinks: { stateKey: 'externalLinks', aliases: ['external_links', 'external_links_hub'], columns: ['id', 'link_id'] },
+            feedbacks: { stateKey: 'feedbacks', aliases: ['feedbacks', 'feedback_responses'], columns: ['id', 'row_id'] }
+        };
+        for (const tableName of Object.keys(tables)) {
+            const config = tables[tableName];
+            const oldRows = previous[config.stateKey] || {};
+            const currentIds = {};
+            (source[config.stateKey] || []).forEach(function (record) {
+                if (record && (record.id != null || record.roll != null)) {
+                    currentIds[String(record.id || record.roll)] = true;
+                }
+            });
+            const removedIds = Object.keys(oldRows).filter(function (id) {
+                return !currentIds[id];
+            });
+            if (removedIds.length) {
+                await deleteSupabaseRows(config.aliases[0], config.aliases[1], config.columns, removedIds);
+            }
+        }
     }
 
     // DB metadata columns to strip from every row
@@ -279,12 +351,7 @@
                     out.teacherEmail = out.teacherEmail || 'arvind.verma@divineclasses.in';
                 }
             }
-            if (!Array.isArray(out.studentIds) || !out.studentIds.length) {
-                if (out.id === 'b1') out.studentIds = ['DC-101', 'DC-102', 'DC-103', 'DC-104', 'DC-105'];
-                else if (out.id === 'b2') out.studentIds = ['DC-106', 'DC-107', 'DC-108'];
-                else if (out.id === 'b3') out.studentIds = ['DC-109', 'DC-110', 'DC-111'];
-                else out.studentIds = [];
-            }
+            if (!Array.isArray(out.studentIds)) out.studentIds = [];
         }
         if (tableConfig.stateKey === 'students') {
             out.id = out.id || row.roll_no || row.id || row.roll || '';
@@ -341,81 +408,125 @@
         return out;
     }
 
-    /********************************************************************
-     * MIRROR-TABLE WRITER
-     * The relational mirror tables are secondary to the db_json snapshot,
-     * so a single unknown column must never block the whole row. PostgREST
-     * answers PGRST204 ("Could not find the 'x' column"), so drop that
-     * column and retry until the payload fits the live schema.
-     ********************************************************************/
-    const SUPABASE_REJECTED_COLUMNS = {};
-
-    async function postSupabaseRows(table, rows, conflictColumn) {
-        if (!Array.isArray(rows) || !rows.length) return { ok: true, skipped: true, count: 0 };
-
-        const rejected = SUPABASE_REJECTED_COLUMNS[table] || (SUPABASE_REJECTED_COLUMNS[table] = {});
-        let payload = rows.map(function (row) {
-            const copy = Object.assign({}, row);
-            Object.keys(rejected).forEach(function (col) { delete copy[col]; });
-            return copy;
-        });
-
-        let lastStatus = 0;
-        let lastBody = '';
-
-        for (let attempt = 0; attempt < 12; attempt++) {
-            let res;
-            try {
-                res = await supabaseFetch(table + '?on_conflict=' + encodeURIComponent(conflictColumn || 'id'), {
-                    method: 'POST',
-                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (err) {
-                return { ok: false, networkError: String(err && err.message || err), count: 0 };
-            }
-
-            if (res.ok || res.status === 204) {
-                return { ok: true, status: res.status, count: payload.length, droppedColumns: Object.keys(rejected) };
-            }
-
-            lastStatus = res.status;
-            lastBody = await res.text().catch(function () { return ''; });
-
-            // Schema drift only: remove the offending column and retry.
-            const missing = lastBody.match(/Could not find the '([^']+)' column/i);
-            if (!missing) break;
-            rejected[missing[1]] = true;
-            payload.forEach(function (row) { delete row[missing[1]]; });
-            console.warn('[Supabase] ' + table + ' has no column "' + missing[1] + '" — retrying without it');
-        }
-
-        console.warn('[Supabase] ' + table + ' mirror sync failed:', lastStatus, lastBody.slice(0, 200));
-        return { ok: false, status: lastStatus, body: lastBody, count: 0 };
-    }
-
     /**
      * Persist pending edits directly to Supabase
      */
-    async function syncPendingDataToSupabase() {
+    let supabaseSyncInFlight = null;
+    let supabaseSyncQueued = false;
+
+    async function performSupabaseSync() {
         if (!state.settings || state.settings.supabaseEnabled !== true) return { synced: false };
-        
-        // 1. Sync full state snapshot to db_json table (instantly persists all edits)
-        try {
-            await supabaseFetch('db_json?snapshot_key=eq.main', {
+        const previousSyncSnapshot = getSupabaseSyncSnapshot();
+
+        // An older open tab must not reinsert demo rows after they were wiped.
+        const snapshotResponse = await supabaseFetch('db_json?snapshot_key=eq.main&select=payload');
+        if (!snapshotResponse.ok) {
+            throw new Error('Could not verify the Supabase demo-data state before syncing.');
+        }
+        const snapshotRows = await snapshotResponse.json();
+        const savedSettings = snapshotRows[0] && snapshotRows[0].payload && snapshotRows[0].payload.settings;
+        if (savedSettings && (savedSettings.studentSeedDataDisabled === true || savedSettings.studentSeedDataDisabled === 'true')) {
+            if (!state.settings) state.settings = {};
+            state.settings.studentSeedDataDisabled = true;
+            const studentClearTime = Date.parse(savedSettings.studentTableClearedAt || '');
+            if (savedSettings.studentTableClearedAt) state.settings.studentTableClearedAt = savedSettings.studentTableClearedAt;
+            const removedStudentIds = {};
+            state.students = (state.students || []).filter(function (student) {
+                if (!student) return false;
+                const createdAt = Date.parse(student.createdAt || '');
+                if (!isDummySeedRecord(student) && (!savedSettings.studentTableClearedAt || (!isNaN(createdAt) && createdAt >= studentClearTime))) return true;
+                [student.id, student.roll].forEach(function (id) {
+                    if (id) removedStudentIds[String(id)] = true;
+                });
+                return false;
+            });
+            (state.batches || []).forEach(function (batch) {
+                if (Array.isArray(batch.studentIds)) {
+                    batch.studentIds = batch.studentIds.filter(function (id) { return !removedStudentIds[String(id)]; });
+                }
+            });
+            (state.offlineTests || []).forEach(function (test) {
+                if (!test || !test.marks || typeof test.marks !== 'object') return;
+                Object.keys(removedStudentIds).forEach(function (id) { delete test.marks[id]; });
+            });
+        }
+        if (savedSettings && (savedSettings.dummyDataWiped === true || savedSettings.dummyDataWiped === 'true')) {
+            if (!state.settings) state.settings = {};
+            state.settings.dummyDataWiped = true;
+            state.settings.showDummyData = false;
+
+            const dummyStudentIds = {};
+            const dummyMaterialIds = {};
+            ['students', 'materials'].forEach(function (table) {
+                state[table] = (state[table] || []).filter(function (record) {
+                    if (!record || !isDummySeedRecord(record)) return true;
+                    if (table === 'students') dummyStudentIds[String(record.id)] = true;
+                    if (table === 'materials') dummyMaterialIds[String(record.id)] = true;
+                    return false;
+                });
+            });
+            ['batches', 'offlineTests', 'teachers', 'gallery', 'feedbacks'].forEach(function (table) {
+                state[table] = (state[table] || []).filter(function (record) {
+                    return !isDummySeedRecord(record);
+                });
+            });
+            (state.batches || []).forEach(function (batch) {
+                if (Array.isArray(batch.studentIds)) {
+                    batch.studentIds = batch.studentIds.filter(function (id) { return !dummyStudentIds[String(id)]; });
+                }
+            });
+            (state.offlineTests || []).forEach(function (test) {
+                if (!test.marks || typeof test.marks !== 'object') return;
+                Object.keys(dummyStudentIds).forEach(function (id) { delete test.marks[id]; });
+            });
+            state.notifications = (state.notifications || []).filter(function (notification) {
+                if (!notification) return false;
+                const notificationId = String(notification.id || '');
+                return !isDummySeedRecord(notification) &&
+                    !dummyStudentIds[String(notification.targetStudentId || notification.studentId || '')] &&
+                    !dummyMaterialIds[String(notification.materialId || '')] &&
+                    !Object.keys(dummyStudentIds).some(function (id) {
+                        return notificationId.indexOf('notif_fee_' + id + '_') === 0 ||
+                            notificationId.indexOf('monthly_fee_' + id + '_') === 0;
+                    }) &&
+                    !Object.keys(dummyMaterialIds).some(function (id) {
+                        return notificationId.indexOf('notif_mat_' + id) === 0;
+                    });
+            });
+            if (typeof saveStateLocally === 'function') saveStateLocally();
+        }
+
+        const syncData = JSON.parse(JSON.stringify(state));
+        await deleteRowsRemovedInApp(syncData, previousSyncSnapshot);
+
+        // Start the full snapshot write before table upserts so independent
+        // requests complete concurrently instead of adding their latencies.
+        const snapshotWrite = (async function () {
+            const response = await supabaseFetch('db_json?snapshot_key=eq.main', {
                 method: 'PATCH',
                 headers: { Prefer: 'return=minimal' },
                 body: JSON.stringify({
-                    payload: state,
+                    payload: syncData,
                     updated_at: new Date().toISOString()
                 })
             });
-        } catch (dbJsonErr) {
-            console.warn('[Supabase] db_json update notice:', dbJsonErr);
-        }
+            if (!response.ok) {
+                throw new Error('db_json update failed (HTTP ' + response.status + '): ' +
+                    await response.text().catch(function () { return ''; }));
+            }
+        })();
 
         // 2. Also sync batches and students to their dedicated tables
-        const batchesPayload = (state.batches || []).map(function (b) {
+        const changedBatches = getChangedSupabaseRecords('batches', syncData.batches, previousSyncSnapshot);
+        const changedStudents = getChangedSupabaseRecords('students', syncData.students, previousSyncSnapshot);
+        const changedTeachers = getChangedSupabaseRecords('teachers', syncData.teachers, previousSyncSnapshot);
+        const changedMaterials = getChangedSupabaseRecords('materials', syncData.materials, previousSyncSnapshot);
+        const changedTests = getChangedSupabaseRecords('offlineTests', syncData.offlineTests, previousSyncSnapshot);
+        const changedGallery = getChangedSupabaseRecords('gallery', syncData.gallery, previousSyncSnapshot);
+        const changedLinks = getChangedSupabaseRecords('externalLinks', syncData.externalLinks, previousSyncSnapshot);
+        const changedFeedbacks = getChangedSupabaseRecords('feedbacks', syncData.feedbacks, previousSyncSnapshot);
+
+        const batchesPayload = changedBatches.map(function (b) {
             return {
                 batch_id: b.id,
                 batch_name: b.name,
@@ -426,7 +537,7 @@
                 student_count: (b.studentIds || []).length
             };
         });
-        const studentsPayload = (state.students || []).map(function (s) {
+        const studentsPayload = changedStudents.map(function (s) {
             return {
                 roll_no: s.roll || s.id,
                 student_name: s.name,
@@ -445,7 +556,7 @@
         });
 
         // 2. Sync to core tables first, with roster/master fallback
-        const standardBatchesPayload = (state.batches || []).map(function (b) {
+        const standardBatchesPayload = changedBatches.map(function (b) {
             return {
                 id: b.id,
                 name: b.name,
@@ -457,7 +568,7 @@
             };
         });
 
-        const standardStudentsPayload = (state.students || []).map(function (s) {
+        const standardStudentsPayload = changedStudents.map(function (s) {
             return {
                 id: s.id || s.roll,
                 roll: s.roll || s.id,
@@ -476,23 +587,74 @@
             };
         });
 
-        try {
-            const bSync = await postSupabaseRows('batches', standardBatchesPayload, 'id');
-            if (!bSync.ok) await postSupabaseRows('batches_roster', batchesPayload, 'batch_id');
-        } catch (e1) {
-            console.warn('[Supabase] batches sync error:', e1 && e1.message);
+        const coreWrites = [];
+        if (standardBatchesPayload.length) {
+            coreWrites.push((async function () {
+            try {
+                const bRes = await supabaseFetch('batches?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(standardBatchesPayload)
+                });
+                if (!bRes.ok) throw new Error('HTTP ' + bRes.status + ': ' + await bRes.text().catch(function () { return ''; }));
+            } catch (e1) {
+                try {
+                    const fallbackResponse = await supabaseFetch('batches_roster?on_conflict=batch_id', {
+                        method: 'POST',
+                        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                        body: JSON.stringify(batchesPayload)
+                    });
+                    if (!fallbackResponse.ok) throw new Error('HTTP ' + fallbackResponse.status + ': ' + await fallbackResponse.text().catch(function () { return ''; }));
+                } catch (e2) {
+                    throw new Error('Batch records could not be saved to Supabase. ' + ((e2 && e2.message) || e2));
+                }
+            }
+            })());
         }
 
-        try {
-            const sSync = await postSupabaseRows('students', standardStudentsPayload, 'id');
-            if (!sSync.ok) await postSupabaseRows('students_master', studentsPayload, 'roll_no');
-        } catch (e3) {
-            console.warn('[Supabase] students sync error:', e3 && e3.message);
+        let studentTable = '';
+        if (standardStudentsPayload.length) {
+            coreWrites.push((async function () {
+                let studentResponse;
+                try {
+                    studentResponse = await supabaseFetch('students?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(standardStudentsPayload)
+                });
+                if (studentResponse.ok) {
+                    studentTable = 'students';
+                }
+                } catch (e3) {
+                    console.warn('[Supabase] students sync request failed:', e3);
+                }
+                if (!studentTable) {
+                    const primaryError = studentResponse
+                        ? 'HTTP ' + studentResponse.status + ': ' + await studentResponse.text().catch(function(){return ''})
+                        : 'The students table request could not be completed.';
+                    try {
+                        const fallbackResponse = await supabaseFetch('students_master?on_conflict=roll_no', {
+                        method: 'POST',
+                        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                        body: JSON.stringify(studentsPayload)
+                    });
+                    if (!fallbackResponse.ok) {
+                        throw new Error('HTTP ' + fallbackResponse.status + ': ' + await fallbackResponse.text().catch(function(){return ''}));
+                    }
+                    studentTable = 'students_master';
+                } catch (e4) {
+                        throw new Error('Student records could not be saved to Supabase. ' + primaryError + ' Fallback failed: ' + ((e4 && e4.message) || e4));
+                    }
+                }
+            })());
         }
+
+        // Sync independent table upserts concurrently to reduce end-to-end delay.
+        const tableWrites = [];
 
         // 3. Teachers sync
-        if (Array.isArray(state.teachers) && state.teachers.length) {
-            const teachersPayload = state.teachers.map(function(t) {
+        if (changedTeachers.length) {
+            const teachersPayload = changedTeachers.map(function(t) {
                 return {
                     id: t.id,
                     name: t.name || '',
@@ -506,88 +668,108 @@
                     initials: t.initials || '',
                     password: t.password || 'teacher123',
                     status: t.status || 'Active',
+                    photo: t.photo || '',
                     avatar_color: t.avatarColor || 'from-indigo-600 to-blue-600'
                 };
             });
-            try {
-                await postSupabaseRows('teachers', teachersPayload, 'id');
-            } catch (et) {}
+            tableWrites.push(supabaseFetch('teachers?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(teachersPayload)
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('Teachers sync failed (HTTP ' + response.status + ').');
+                }));
         }
 
         // 4. Materials sync
-        if (Array.isArray(state.materials) && state.materials.length) {
-            const materialsPayload = state.materials.map(function(m) {
+        if (changedMaterials.length) {
+            const materialsPayload = changedMaterials.map(function(m) {
                 return {
                     id: m.id,
                     title: m.title || '',
+                    subject: m.subject || '',
                     batch_id: m.batchId || '',
                     category: m.category || '',
                     drive_url: m.driveUrl || m.downloadUrl || '',
-                    download_url: m.downloadUrl || m.driveUrl || '',
-                    description: m.description || '',
-                    upload_date: m.date || m.uploadDate || ''
+                    type: m.type || 'PDF',
+                    date: m.date || m.uploadDate || ''
                 };
             });
-            try {
-                await postSupabaseRows('materials', materialsPayload, 'id');
-            } catch (em) {}
+            tableWrites.push(supabaseFetch('materials?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(materialsPayload)
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('Materials sync failed (HTTP ' + response.status + ').');
+                }));
         }
 
         // 5. Offline Tests sync
-        if (Array.isArray(state.offlineTests) && state.offlineTests.length) {
-            const testsPayload = state.offlineTests.map(function(ot) {
+        if (changedTests.length) {
+            const testsPayload = changedTests.map(function(ot) {
                 return {
                     id: ot.id,
                     batch_id: ot.batchId || '',
+                    name: ot.name || ot.title || '',
                     title: ot.title || ot.name || '',
-                    test_date: ot.date || '',
+                    date: ot.date || '',
                     max_marks: Number(ot.maxMarks || 100),
                     subject: ot.subject || '',
+                    results: ot.results || [],
                     marks: ot.marks || {}
                 };
             });
-            try {
-                await postSupabaseRows('offline_tests', testsPayload, 'id');
-            } catch (eot) {}
+            tableWrites.push(supabaseFetch('offline_tests?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(testsPayload)
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('Offline tests sync failed (HTTP ' + response.status + ').');
+                }));
         }
 
         // 6. Gallery sync
-        if (Array.isArray(state.gallery) && state.gallery.length) {
-            const galleryPayload = state.gallery.map(function(g) {
+        if (changedGallery.length) {
+            const galleryPayload = changedGallery.map(function(g) {
                 return {
                     id: g.id,
                     title: g.title || '',
-                    image_url: g.imageUrl || g.url || '',
+                    url: g.url || '',
                     category: g.category || '',
-                    caption: g.caption || '',
-                    badge: g.badge || '',
                     date: g.date || ''
                 };
             });
-            try {
-                await postSupabaseRows('gallery', galleryPayload, 'id');
-            } catch (eg) {}
+            tableWrites.push(supabaseFetch('gallery?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(galleryPayload)
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('Gallery sync failed (HTTP ' + response.status + ').');
+                }));
         }
 
         // 7. External Links sync
-        if (Array.isArray(state.externalLinks) && state.externalLinks.length) {
-            const linksPayload = state.externalLinks.map(function(l) {
+        if (changedLinks.length) {
+            const linksPayload = changedLinks.map(function(l) {
                 return {
                     id: l.id,
                     title: l.title || '',
                     url: l.url || '',
-                    description: l.description || '',
-                    subject: l.subject || ''
+                    category: l.category || ''
                 };
             });
-            try {
-                await postSupabaseRows('external_links', linksPayload, 'id');
-            } catch (el) {}
+            tableWrites.push(supabaseFetch('external_links?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(linksPayload)
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('External links sync failed (HTTP ' + response.status + ').');
+                }));
         }
 
         // 8. Feedbacks sync
-        if (Array.isArray(state.feedbacks) && state.feedbacks.length) {
-            const feedbacksPayload = state.feedbacks.map(function(f) {
+        if (changedFeedbacks.length) {
+            const feedbacksPayload = changedFeedbacks.map(function(f) {
                 return {
                     id: f.id,
                     name: f.authorName || f.name || f.student_name || '',
@@ -597,13 +779,37 @@
                     created_at: f.date || f.created_at || ''
                 };
             });
-            try {
-                await postSupabaseRows('feedbacks', feedbacksPayload, 'id');
-            } catch (ef) {}
+            tableWrites.push(supabaseFetch('feedbacks?on_conflict=id', {
+                    method: 'POST',
+                    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify(feedbacksPayload)
+                }).then(function (response) {
+                    if (!response.ok) throw new Error('Feedback sync failed (HTTP ' + response.status + ').');
+                }));
         }
 
-        rememberSupabaseSyncSnapshot();
-        return { synced: true };
+        await Promise.all([snapshotWrite].concat(coreWrites, tableWrites));
+        rememberSupabaseSyncSnapshot(syncData);
+        return { synced: true, studentTable: studentTable || (syncData.students && syncData.students.length ? 'students' : '') };
+    }
+
+    function syncPendingDataToSupabase() {
+        if (supabaseSyncInFlight) {
+            supabaseSyncQueued = true;
+            return supabaseSyncInFlight;
+        }
+        supabaseSyncInFlight = (async function () {
+            let result;
+            do {
+                supabaseSyncQueued = false;
+                result = await performSupabaseSync();
+            } while (supabaseSyncQueued);
+            return result;
+        })();
+        const currentSync = supabaseSyncInFlight;
+        return currentSync.finally(function () {
+            if (supabaseSyncInFlight === currentSync) supabaseSyncInFlight = null;
+        });
     }
 
     function autoSyncToSupabase() {
@@ -636,31 +842,27 @@
     }
 
     async function loadDataFromSupabase() {
-        if (state.settings && (state.settings.supabaseEnabled === false || state.settings.supabaseEnabled === 'false')) return;
+        if (!state.settings || state.settings.supabaseEnabled !== true) return;
+        const startingLocalRevision = typeof localDataRevision === 'number' ? localDataRevision : null;
 
         const loadedData = {};
         const loadErrors = [];
         const emptyTables = [];
-        for (const tableName of Object.keys(SUPABASE_TABLE_MAP)) {
+        await Promise.all(Object.keys(SUPABASE_TABLE_MAP).map(async function (tableName) {
+            const config = SUPABASE_TABLE_MAP[tableName];
             try {
-                const config = SUPABASE_TABLE_MAP[tableName];
                 const rawData = await supabaseLoadTable(tableName, config.altTable);
                 if (Array.isArray(rawData)) {
-                    // Transform each row from snake_case → camelCase
-                    const transformed = rawData.map(function(row) {
+                    loadedData[config.stateKey] = rawData.map(function (row) {
                         return supabaseRowToAppFormat(row, config);
                     });
-                    const currentRows = Array.isArray(state[config.stateKey]) ? state[config.stateKey] : [];
-                    if (transformed.length === 0 && currentRows.length > 0) {
-                        emptyTables.push(tableName);
-                    } else {
-                        loadedData[config.stateKey] = transformed;
-                    }
+                    if (rawData.length === 0) emptyTables.push(tableName);
                 }
             } catch (e) {
+                loadErrors.push(tableName + ': ' + ((e && e.message) || e));
                 console.warn('Could not load ' + tableName + ' from Supabase (skipping):', e);
             }
-        }
+        }));
 
         // Handle settings (support both settings_config and settings key-value tables)
         try {
@@ -694,12 +896,17 @@
                     'Admin Feedback Delete': 'allowAdminFeedbackDelete',
                     'Study Link Delete': 'allowAdminLinkDelete',
                     'Show Dummy / Demo Data': 'showDummyData',
+                    'Dummy Data Wiped': 'dummyDataWiped',
+                    'Student Seed Data Disabled': 'studentSeedDataDisabled',
+                    'Student Table Cleared At': 'studentTableClearedAt',
                     'institute_name': 'instituteName',
                     'contact_display': 'contactDisplay',
                     'show_requirement_labels': 'showRequirementLabels',
                     'allow_admin_feedback_delete': 'allowAdminFeedbackDelete',
                     'allow_admin_link_delete': 'allowAdminLinkDelete',
                     'show_dummy_data': 'showDummyData',
+                    'student_seed_data_disabled': 'studentSeedDataDisabled',
+                    'student_table_cleared_at': 'studentTableClearedAt',
                     'supabase_enabled': 'supabaseEnabled',
                     'supabase_url': 'supabaseUrl',
                     'supabase_key': 'supabaseKey',
@@ -722,7 +929,7 @@
                         settingsObj[mappedKey] = s.value;
                     }
                 });
-                const boolKeys = ['showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'dummyDataWiped'];
+                const boolKeys = ['showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'dummyDataWiped', 'studentSeedDataDisabled'];
                 boolKeys.forEach(function(bk) {
                     if (settingsObj[bk] !== undefined) {
                         const str = String(settingsObj[bk]).trim().toLowerCase();
@@ -735,64 +942,152 @@
             console.warn('Failed to load settings from Supabase:', e);
         }
 
+        if (Array.isArray(loadedData.students)) {
+            let snapshotStudents = [];
+            try {
+                const snapshotRows = await supabaseLoadTable('db_json');
+                const snapshotRow = Array.isArray(snapshotRows) && snapshotRows.find(function (row) {
+                    return row && row.snapshot_key === 'main';
+                });
+                const snapshot = snapshotRow && snapshotRow.payload;
+                if (snapshot && Array.isArray(snapshot.students)) snapshotStudents = snapshot.students;
+            } catch (snapshotError) {
+                console.warn('Could not load student creation timestamps from the Supabase snapshot:', snapshotError);
+            }
+
+            const knownStudents = (state.students || []).concat(snapshotStudents);
+            loadedData.students.forEach(function (student) {
+                if (!student || student.createdAt) return;
+                const known = knownStudents.find(function (record) {
+                    if (!record) return false;
+                    return (student.id && (record.id === student.id || record.roll === student.id)) ||
+                        (student.roll && (record.id === student.roll || record.roll === student.roll));
+                });
+                if (known && known.createdAt) student.createdAt = known.createdAt;
+            });
+        }
+
+        if (startingLocalRevision !== null && startingLocalRevision !== localDataRevision) {
+            return { emptyTables: emptyTables, loadErrors: loadErrors, skipped: true };
+        }
+
         Object.keys(loadedData).forEach(function (key) {
-            if (loadedData[key] && (Array.isArray(loadedData[key]) ? loadedData[key].length > 0 : true)) {
+            if (loadedData[key] && (Array.isArray(loadedData[key]) || typeof loadedData[key] === 'object')) {
                 state[key] = loadedData[key];
             }
         });
-        if (!emptyTables.includes('batches') && !emptyTables.includes('students')) {
-            rememberSupabaseSyncSnapshot();
+        if (typeof applyClientDummyDataLocks === 'function') applyClientDummyDataLocks();
+        if (state.settings && state.settings.studentSeedDataDisabled && state.settings.studentTableClearedAt) {
+            const clearedAt = Date.parse(state.settings.studentTableClearedAt);
+            const removedStudentIds = {};
+            state.students = (state.students || []).filter(function (student) {
+                if (!student) return false;
+                const createdAt = Date.parse(student.createdAt || '');
+                if (!isDummySeedRecord(student) && !isNaN(createdAt) && createdAt >= clearedAt) return true;
+                [student.id, student.roll].forEach(function (id) {
+                    if (id) removedStudentIds[String(id)] = true;
+                });
+                return false;
+            });
+            (state.batches || []).forEach(function (batch) {
+                if (Array.isArray(batch.studentIds)) {
+                    batch.studentIds = batch.studentIds.filter(function (id) { return !removedStudentIds[String(id)]; });
+                }
+            });
+            (state.offlineTests || []).forEach(function (test) {
+                if (!test || !test.marks || typeof test.marks !== 'object') return;
+                Object.keys(removedStudentIds).forEach(function (id) { delete test.marks[id]; });
+            });
         }
-        return { emptyTables: emptyTables };
+        rememberSupabaseSyncSnapshot();
+        return { emptyTables: emptyTables, loadErrors: loadErrors };
     }
 
-    async function supabaseClearDummyData() {
+    async function supabaseClearDummyData(removedIds) {
         if (!state.settings || !state.settings.supabaseUrl || !state.settings.supabaseKey) return { success: false, reason: 'Supabase not configured' };
         const dummyTableIds = {
-            'batches': ['b1','b2','b3','b4','b5','b6','b7','b8','b9','b10'],
-            'students': ['s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11'],
-            'materials': ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10'],
-            'offline_tests': ['t1','t2','t3','t4','t5','t6','t7','t8','t9','t10'],
-            'teachers': ['tr1','tr2','tr3','tr4','tr5','tr6','tr7','tr8','tr9','tr10'],
-            'gallery': ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'],
-            'feedbacks': ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10']
+            batches: ['b1','b2','b3','b4','b5','b6','b7','b8','b9','b10'],
+            students: [
+                's1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11',
+                'DC-101','DC-102','DC-201','DC-202','DC-301','DC-302'
+            ],
+            materials: ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10'],
+            offline_tests: ['t1','t2','t3','t4','t5','t6','t7','t8','t9','t10'],
+            teachers: ['tr1','tr2','tr3','tr4','tr5','tr6','tr7','tr8','tr9','tr10'],
+            gallery: ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'],
+            feedbacks: ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10']
         };
+        const tableAliases = {
+            batches: ['batches', 'batches_roster'],
+            students: ['students', 'students_master'],
+            materials: ['materials', 'materials_repository'],
+            offline_tests: ['offline_tests', 'offline_test_marks'],
+            teachers: ['teachers', 'teachers_roster'],
+            gallery: ['gallery', 'gallery_banners'],
+            feedbacks: ['feedbacks', 'feedback_responses']
+        };
+        const idColumns = {
+            batches: ['id', 'batch_id'],
+            students: ['id', 'roll_no'],
+            materials: ['id', 'material_id'],
+            offline_tests: ['id', 'test_id'],
+            teachers: ['id', 'teacher_id'],
+            gallery: ['id', 'banner_id'],
+            feedbacks: ['id', 'row_id']
+        };
+        const failures = [];
         // CRITICAL: external_links and settings_config are NEVER deleted!
         for (const [tbl, ids] of Object.entries(dummyTableIds)) {
-            try {
-                await supabaseFetch(`${tbl}?id=in.(${ids.join(',')})`, {
-                    method: 'DELETE',
-                    headers: { 'Prefer': 'return=minimal' }
-                });
-            } catch (e) {
-                console.warn(`[Supabase] Error deleting dummy records from ${tbl}:`, e);
+            const allIds = ids.concat((removedIds && removedIds[tbl]) || []);
+            const uniqueIds = allIds.filter((id, index) => id && allIds.indexOf(id) === index);
+            if (!uniqueIds.length) continue;
+            let tableAvailable = false;
+            const tableFailures = [];
+            for (const tableName of tableAliases[tbl] || [tbl]) {
+                for (const column of idColumns[tbl] || ['id']) {
+                    const filter = uniqueIds.map(id => encodeURIComponent(String(id))).join(',');
+                    const response = await supabaseFetch(`${tableName}?${column}=in.(${filter})`, {
+                        method: 'DELETE',
+                        headers: { 'Prefer': 'return=minimal' }
+                    });
+                    if (response.ok) tableAvailable = true;
+                    else tableFailures.push(`${tableName}.${column}: ${response.status} ${await response.text()}`);
+                }
+            }
+            if (!tableAvailable) {
+                failures.push(`${tbl}: ${tableFailures.join('; ')}`);
             }
         }
-        // Clear notifications from Supabase
-        try {
-            await supabaseFetch('notifications?id=neq.placeholder', {
+        const notificationIds = (removedIds && removedIds.notifications) || [];
+        if (notificationIds.length) {
+            const filter = notificationIds.map(id => encodeURIComponent(String(id))).join(',');
+            const notificationResponse = await supabaseFetch(`notifications?id=in.(${filter})`, {
                 method: 'DELETE',
                 headers: { 'Prefer': 'return=minimal' }
             });
-        } catch (e) {
-            console.warn('[Supabase] Error deleting notifications:', e);
+            if (!notificationResponse.ok) {
+                failures.push(`notifications: ${notificationResponse.status} ${await notificationResponse.text()}`);
+            }
         }
-        // Update settings_config in Supabase
-        try {
-            await supabaseFetch('settings_config?setting_parameter=eq.Show Dummy / Demo Data', {
+        for (const setting of [
+            { parameter: 'Show Dummy / Demo Data', value: 'Off' },
+            { parameter: 'Dummy Data Wiped', value: 'Yes' },
+            { parameter: 'Student Seed Data Disabled', value: 'Yes' }
+        ]) {
+            const response = await supabaseFetch(`settings_config?setting_parameter=eq.${encodeURIComponent(setting.parameter)}`, {
                 method: 'PATCH',
                 headers: { 'Prefer': 'return=minimal' },
-                body: JSON.stringify({ configured_value: 'Off' })
+                body: JSON.stringify({ configured_value: setting.value })
             });
-        } catch (e) {}
-        // Update snapshot db_json
-        try {
-            await supabaseFetch('db_json?snapshot_key=eq.main', {
-                method: 'PATCH',
-                headers: { 'Prefer': 'return=minimal' },
-                body: JSON.stringify({ payload: state, updated_at: new Date().toISOString() })
-            });
-        } catch (e) {}
+            if (!response.ok) failures.push(`settings_config (${setting.parameter}): ${response.status} ${await response.text()}`);
+        }
+        const snapshotResponse = await supabaseFetch('db_json?snapshot_key=eq.main', {
+            method: 'PATCH',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ payload: state, updated_at: new Date().toISOString() })
+        });
+        if (!snapshotResponse.ok) failures.push(`db_json snapshot: ${snapshotResponse.status} ${await snapshotResponse.text()}`);
+        if (failures.length) throw new Error(`Supabase dummy-data cleanup failed: ${failures.join('; ')}`);
         return { success: true };
     }
 
@@ -819,11 +1114,9 @@
             { setting_parameter: 'YouTube Channel', configured_value: s.youtubeUrl || 'https://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8', description: 'Official Video Channel' },
             { setting_parameter: 'Admin Name', configured_value: s.adminName || 'Ravi Shankar', description: 'Display Name of Institute Admin' },
             { setting_parameter: 'Master Admin Password', configured_value: s.adminPassword || 'admin123', description: 'Password to access Admin portal' },
-            { setting_parameter: 'Admin Email ID', configured_value: s.adminEmail || 'edivineclasses@gmail.com', description: 'Official Admin Contact / Login Email' },
+            { setting_parameter: 'Admin Email ID', configured_value: s.adminEmail || 'divineclasses1010@gmail.com', description: 'Official Admin Contact / Login Email' },
             { setting_parameter: 'Lead Developer Email', configured_value: s.leadDevEmail || 'anil.chahar170@gmail.com', description: 'Lead Developer login email' },
             { setting_parameter: 'Lead Developer Password', configured_value: s.leadDevPassword || 'Anil@1310', description: 'Lead Developer login password' },
-            { setting_parameter: 'LEAD_DEV_EMAIL', configured_value: s.leadDevEmail || 'anil.chahar170@gmail.com', description: 'Lead Developer Login Credentials' },
-            { setting_parameter: 'LEAD_DEV_PASSWORD', configured_value: s.leadDevPassword || 'Anil@1310', description: 'Lead Developer login password' },
             { setting_parameter: 'UPI Payment ID', configured_value: s.upiId || 'divineclasses@upi', description: 'Fee Collection UPI' },
             { setting_parameter: 'Facebook Page', configured_value: s.facebookUrl || 'https://www.facebook.com/edivineclasses/?_rdr', description: 'Social Channel' },
             { setting_parameter: 'Instagram Profile', configured_value: s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq', description: 'Social Channel' },
@@ -832,6 +1125,8 @@
             { setting_parameter: 'Study Link Delete', configured_value: (s.allowAdminLinkDelete === false || s.allowAdminLinkDelete === 'Off' || s.allowAdminLinkDelete === 'off' || s.allowAdminLinkDelete === 'false') ? 'Off' : 'On', description: 'Admin delete button on Study Links cards (toggle in Settings)' },
             { setting_parameter: 'Show Dummy / Demo Data', configured_value: (s.showDummyData === false || s.showDummyData === 'Off' || s.showDummyData === 'off' || s.showDummyData === 'false' || s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Off' : 'On', description: 'Seed demo students/batches/tests visibility' },
             { setting_parameter: 'Dummy Data Wiped', configured_value: (s.dummyDataWiped === true || s.dummyDataWiped === 'true') ? 'Yes' : 'No', description: 'Permanent clearance status before client handover' },
+            { setting_parameter: 'Student Seed Data Disabled', configured_value: (s.studentSeedDataDisabled === true || s.studentSeedDataDisabled === 'true') ? 'Yes' : 'No', description: 'Do not restore demo student rows after the student table is cleared' },
+            { setting_parameter: 'Student Table Cleared At', configured_value: s.studentTableClearedAt || '', description: 'Reject stale student rows from before the developer clear action' },
             { setting_parameter: 'Supabase Enabled', configured_value: (s.supabaseEnabled === false || s.supabaseEnabled === 'Off' || s.supabaseEnabled === 'off' || s.supabaseEnabled === 'false') ? 'Off' : 'On', description: 'Supabase primary database toggle' },
             { setting_parameter: 'Supabase URL', configured_value: s.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co', description: 'Supabase Project REST URL' },
             { setting_parameter: 'Supabase Key', configured_value: s.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS', description: 'Supabase API Key' },
@@ -844,6 +1139,13 @@
                 headers: headers,
                 body: JSON.stringify(configUpdates)
             });
+            const duplicateRowsResponse = await fetch(
+                `${base}/settings_config?setting_parameter=in.(LEAD_DEV_EMAIL,LEAD_DEV_PASSWORD)`,
+                { method: 'DELETE', headers: headers }
+            );
+            if (!duplicateRowsResponse.ok) {
+                throw new Error(`Duplicate developer setting cleanup failed (${duplicateRowsResponse.status}).`);
+            }
         } catch (e) {
             console.warn('[Supabase] settings_config upsert notice:', e);
         }
@@ -864,9 +1166,111 @@
     }
 
     let supabaseSettingsPollTimer = null;
+    let supabaseRefreshInProgress = false;
+    let supabaseRealtimeClient = null;
+    let supabaseRealtimeChannel = null;
+    let supabaseRealtimeConfig = '';
+    let supabaseRealtimeRefreshTimer = null;
+    let supabaseRenderTimer = null;
+    let supabaseRealtimeActive = false;
+
+    function renderSupabaseCloudUpdate() {
+        clearTimeout(supabaseRenderTimer);
+        supabaseRenderTimer = setTimeout(function () {
+            if (typeof saveStateLocally === 'function') saveStateLocally(true, true);
+            if (typeof savePersistentSettingsToLocal === 'function') savePersistentSettingsToLocal();
+            if (typeof updateRoleUI === 'function') updateRoleUI();
+            if (typeof renderSidebar === 'function') renderSidebar();
+            if (typeof renderMainContentPreservingScroll === 'function') {
+                renderMainContentPreservingScroll();
+            } else if (typeof renderMainContent === 'function') {
+                renderMainContent();
+            }
+            if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+            if (typeof checkNewNotificationSound === 'function') checkNewNotificationSound();
+            updateSyncBadge('✓ Cloud Synced', 'success');
+        }, 100);
+    }
+
+    function applySupabaseSnapshot(snapshot) {
+        if (!snapshot || typeof snapshot !== 'object') return false;
+        const keys = Object.keys(SUPABASE_TABLE_MAP).map(function (tableName) {
+            return SUPABASE_TABLE_MAP[tableName].stateKey;
+        }).concat(['settings']);
+        const before = {};
+        keys.forEach(function (key) { before[key] = state[key]; });
+        const beforeFingerprint = supabaseStableFingerprint(before);
+
+        keys.forEach(function (key) {
+            if (key === 'settings') {
+                if (snapshot.settings && typeof snapshot.settings === 'object') {
+                    state.settings = Object.assign({}, state.settings, snapshot.settings, {
+                        supabaseEnabled: true,
+                        supabaseUrl: getSupabaseApiUrl(),
+                        supabaseKey: getSupabaseAnonKey()
+                    });
+                }
+            } else if (Array.isArray(snapshot[key])) {
+                state[key] = snapshot[key];
+            }
+        });
+        if (typeof applyClientDummyDataLocks === 'function') applyClientDummyDataLocks();
+
+        const after = {};
+        keys.forEach(function (key) { after[key] = state[key]; });
+        if (beforeFingerprint === supabaseStableFingerprint(after)) return false;
+        renderSupabaseCloudUpdate();
+        return true;
+    }
+
+    function getRealtimeRecordIdentity(record, stateKey) {
+        if (!record) return '';
+        if (stateKey === 'students') return String(record.id || record.roll || '');
+        return String(record.id || record.roll || '');
+    }
+
+    function applySupabaseTableChange(tableName, change) {
+        if (!state.settings || state.settings.supabaseEnabled !== true || !change) return;
+        if (tableName === 'db_json') {
+            const snapshot = change.new && change.new.payload;
+            if (snapshot) applySupabaseSnapshot(snapshot);
+            return;
+        }
+        if (tableName === 'settings_config' || tableName === 'settings') {
+            clearTimeout(supabaseRealtimeRefreshTimer);
+            supabaseRealtimeRefreshTimer = setTimeout(pollSupabaseSettings, 150);
+            return;
+        }
+
+        const config = SUPABASE_TABLE_MAP[tableName];
+        if (!config) return;
+        const deleted = change.eventType === 'DELETE';
+        const rawRecord = deleted ? change.old : change.new;
+        if (!rawRecord || typeof rawRecord !== 'object') return;
+        const record = supabaseRowToAppFormat(rawRecord, config);
+        const identity = getRealtimeRecordIdentity(record, config.stateKey);
+        if (!identity) return;
+
+        const collection = Array.isArray(state[config.stateKey]) ? state[config.stateKey].slice() : [];
+        const index = collection.findIndex(function (item) {
+            return getRealtimeRecordIdentity(item, config.stateKey) === identity ||
+                (record.roll && item && String(item.roll || '') === String(record.roll));
+        });
+        if (deleted) {
+            if (index < 0) return;
+            collection.splice(index, 1);
+        } else if (index >= 0) {
+            collection[index] = Object.assign({}, collection[index], record);
+        } else {
+            collection.unshift(record);
+        }
+        state[config.stateKey] = collection;
+        if (typeof applyClientDummyDataLocks === 'function') applyClientDummyDataLocks();
+        renderSupabaseCloudUpdate();
+    }
 
     async function pollSupabaseSettings() {
-        if (state.settings && (state.settings.supabaseEnabled === false || state.settings.supabaseEnabled === 'false')) return;
+        if (!state.settings || state.settings.supabaseEnabled !== true) return;
         try {
             const rawData = await supabaseLoadTable('settings_config');
             if (!Array.isArray(rawData) || rawData.length === 0) return;
@@ -893,9 +1297,11 @@
                 'Admin Feedback Delete': 'allowAdminFeedbackDelete',
                 'Study Link Delete': 'allowAdminLinkDelete',
                 'Show Dummy / Demo Data': 'showDummyData',
-                'Dummy Data Wiped': 'dummyDataWiped'
+                'Dummy Data Wiped': 'dummyDataWiped',
+                'Student Seed Data Disabled': 'studentSeedDataDisabled',
+                'Student Table Cleared At': 'studentTableClearedAt'
             };
-            const boolKeys = ['showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'dummyDataWiped'];
+            const boolKeys = ['showRequirementLabels', 'allowAdminFeedbackDelete', 'allowAdminLinkDelete', 'showDummyData', 'dummyDataWiped', 'studentSeedDataDisabled'];
             let changed = false;
             rawData.forEach(function(item) {
                 if (!item || !item.setting_parameter) return;
@@ -913,7 +1319,7 @@
             });
             if (changed) {
                 console.log('[Supabase] Live settings updated from cloud (multi-device sync)');
-                saveStateLocally();
+                saveStateLocally(true, true);
                 if (typeof savePersistentSettingsToLocal === 'function') {
                     savePersistentSettingsToLocal();
                 }
@@ -926,18 +1332,118 @@
                 }
             }
         } catch (e) {
-            // silent polling
+            console.warn('[Supabase] Live settings refresh failed:', e);
+        }
+    }
+
+    async function refreshSupabaseDataFromCloud() {
+        if (!state.settings || state.settings.supabaseEnabled !== true || document.hidden || supabaseRefreshInProgress) return;
+        supabaseRefreshInProgress = true;
+        try {
+            const keys = Object.keys(SUPABASE_TABLE_MAP).map(function (tableName) {
+                return SUPABASE_TABLE_MAP[tableName].stateKey;
+            }).concat(['settings']);
+            const before = {};
+            keys.forEach(function (key) { before[key] = state[key]; });
+            const beforeFingerprint = supabaseStableFingerprint(before);
+            if (supabaseRealtimeActive) {
+                const response = await supabaseFetch('db_json?select=payload&snapshot_key=eq.main');
+                if (response.ok) {
+                    const rows = await response.json();
+                    if (Array.isArray(rows) && rows[0] && rows[0].payload) {
+                        applySupabaseSnapshot(rows[0].payload);
+                        return;
+                    }
+                }
+            }
+
+            const result = await loadDataFromSupabase();
+            if (result && result.skipped) return;
+            const after = {};
+            keys.forEach(function (key) { after[key] = state[key]; });
+            if (beforeFingerprint === supabaseStableFingerprint(after)) return;
+
+            if (typeof saveStateLocally === 'function') saveStateLocally(true, true);
+            if (typeof savePersistentSettingsToLocal === 'function') savePersistentSettingsToLocal();
+            if (typeof updateRoleUI === 'function') updateRoleUI();
+            if (typeof renderSidebar === 'function') renderSidebar();
+            if (typeof renderMainContentPreservingScroll === 'function') {
+                renderMainContentPreservingScroll();
+            } else if (typeof renderMainContent === 'function') {
+                renderMainContent();
+            }
+            if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+            updateSyncBadge('✓ Cloud Synced', 'success');
+        } catch (e) {
+            console.warn('[Supabase] Live data refresh failed:', e);
+            updateSyncBadge('Cloud refresh failed', 'error');
+        } finally {
+            supabaseRefreshInProgress = false;
         }
     }
 
     function startSupabaseLiveSync() {
-        if (supabaseSettingsPollTimer) return;
-        supabaseSettingsPollTimer = setInterval(pollSupabaseSettings, 4000);
+        if (!state.settings || state.settings.supabaseEnabled !== true ||
+            !state.settings.supabaseUrl || !state.settings.supabaseKey) return;
+
+        const configKey = getSupabaseApiUrl() + '|' + getSupabaseAnonKey();
+        if (supabaseRealtimeConfig !== configKey) {
+            if (supabaseRealtimeChannel && supabaseRealtimeClient) {
+                supabaseRealtimeClient.removeChannel(supabaseRealtimeChannel);
+            }
+            supabaseRealtimeChannel = null;
+            supabaseRealtimeClient = null;
+            supabaseRealtimeConfig = configKey;
+            supabaseRealtimeActive = false;
+        }
+
+        if (!supabaseRealtimeChannel && window.supabase && window.supabase.createClient) {
+            const projectUrl = getSupabaseApiUrl().replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+            supabaseRealtimeClient = window.supabase.createClient(projectUrl, getSupabaseAnonKey());
+            let channel = supabaseRealtimeClient.channel('app-data-live-sync');
+            Object.keys(SUPABASE_TABLE_MAP).forEach(function (tableName) {
+                channel = channel.on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: tableName
+                }, function (change) {
+                    applySupabaseTableChange(tableName, change);
+                });
+            });
+            const snapshotChange = {
+                event: '*',
+                schema: 'public',
+                table: 'db_json',
+                filter: 'snapshot_key=eq.main'
+            };
+            const settingsChange = {
+                event: '*',
+                schema: 'public',
+                table: 'settings_config'
+            };
+            [snapshotChange, settingsChange].forEach(function (binding) {
+                channel = channel.on('postgres_changes', binding, function (change) {
+                    applySupabaseTableChange(binding.table, change);
+                });
+            });
+            supabaseRealtimeChannel = channel.subscribe(function (status) {
+                supabaseRealtimeActive = status === 'SUBSCRIBED';
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    console.warn('[Supabase] Realtime unavailable; using periodic refresh fallback:', status);
+                }
+            });
+        } else if (!window.supabase || !window.supabase.createClient) {
+            console.warn('[Supabase] Realtime client library is unavailable; using periodic refresh fallback.');
+        }
+
+        if (!supabaseSettingsPollTimer) {
+            supabaseSettingsPollTimer = setInterval(refreshSupabaseDataFromCloud, 60000 + Math.floor(Math.random() * 15000));
+        }
         document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) pollSupabaseSettings();
+            if (!document.hidden) refreshSupabaseDataFromCloud();
         });
         window.addEventListener('focus', function() {
-            pollSupabaseSettings();
+            refreshSupabaseDataFromCloud();
         });
     }
 </script>

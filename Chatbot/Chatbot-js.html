@@ -1,0 +1,651 @@
+<script>
+    const CHATBOT_PROMPTS = [
+        { icon: 'fa-book-open', label: 'Find my assignments', prompt: 'Where can I find my assignments and study materials?' },
+        { icon: 'fa-calendar-check', label: 'Check attendance', prompt: 'Where can I view attendance in the portal?' },
+        { icon: 'fa-chart-line', label: 'View test marks', prompt: 'How do I view my test marks and results?' },
+        { icon: 'fa-building', label: 'Institute information', prompt: 'How can I find the institute contact information?' }
+    ];
+
+    function renderChatbotText(value) {
+        return escapeHtml(value || '')
+            .replace(/`([^`\n]+)`/g, '<code class="chatbot-inline-code">$1</code>')
+            .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+    }
+
+    function getChatbotHistoryStorageKey() {
+        const user = state.isAuthenticated && state.currentUser;
+        if (!user) return '';
+        const identity = user.id || user.identifier || user.name;
+        if (!identity) return '';
+        return 'DIVINE_CHATBOT_HISTORY_' + encodeURIComponent(String(user.role || state.currentRole) + ':' + String(identity).trim().toLowerCase());
+    }
+
+    function getChatbotApiKeyStorageKey() {
+        const historyKey = getChatbotHistoryStorageKey();
+        return historyKey ? historyKey.replace('DIVINE_CHATBOT_HISTORY_', 'DIVINE_CHATBOT_API_KEY_') : '';
+    }
+
+    function getChatbotApiKey() {
+        const key = getChatbotApiKeyStorageKey();
+        if (!key) return '';
+        try {
+            return localStorage.getItem(key) || '';
+        } catch (error) {
+            console.warn('Could not read the Gemini API key from this browser.', error);
+            return '';
+        }
+    }
+
+    function openChatbotKeyDialog() {
+        if (!state.isAuthenticated || !state.currentUser) {
+            showToast('Sign in to connect your Gemini API key.', 'error');
+            return;
+        }
+        const connected = !!getChatbotApiKey();
+        openModal(`
+            <form onsubmit="saveChatbotApiKey(event)" class="w-full max-w-lg">
+                <div class="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">Connect your Gemini account</h2>
+                        <p class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Create a Gemini API key in Google AI Studio while signed in with your Google account. Eligible free-tier use is subject to Google's quotas and terms; exceeding free limits may require waiting or a paid plan. This is not Google OAuth or Vertex AI.</p>
+                    </div>
+                    <button type="button" onclick="closeModal()" aria-label="Close" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="mb-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
+                    <i class="fa-brands fa-google"></i> Create a Gemini API key in Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                </a>
+                <label for="chatbot-user-api-key" class="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">Your Gemini API key</label>
+                <input id="chatbot-user-api-key" type="password" autocomplete="new-password" spellcheck="false" maxlength="500" placeholder="${connected ? 'Enter a new key to replace your saved key' : 'Paste your AI Studio key'}" class="mb-2 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-mono text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                <p class="mb-4 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">Saved only in this browser profile for your portal account. It is sent through Apps Script only to forward your request to Gemini and is not saved in the shared app database. Anyone using this browser profile may access it. Google AI Studio free-tier quotas apply.</p>
+                <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+                    ${connected ? '<button type="button" onclick="removeChatbotApiKey()" class="mr-auto rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">Disconnect</button>' : ''}
+                    <button type="button" onclick="closeModal()" class="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+                    <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save key</button>
+                </div>
+            </form>
+        `);
+    }
+
+    function saveChatbotApiKey(event) {
+        event.preventDefault();
+        const input = document.getElementById('chatbot-user-api-key');
+        const apiKey = input ? input.value.trim() : '';
+        if (apiKey.length < 20 || apiKey.length > 500 || /\s/.test(apiKey)) {
+            showToast('Paste a valid Gemini API key from Google AI Studio.', 'warning');
+            return;
+        }
+        const storageKey = getChatbotApiKeyStorageKey();
+        if (!storageKey) {
+            showToast('Sign in again before saving your Gemini key.', 'error');
+            return;
+        }
+        try {
+            localStorage.setItem(storageKey, apiKey);
+        } catch (error) {
+            console.error('Could not save the Gemini API key in this browser.', error);
+            showToast('The key could not be saved in this browser. Check storage availability and try again.', 'error');
+            return;
+        }
+        closeModal();
+        renderMainContent();
+        showToast('Your Gemini API key is connected in this browser.', 'success');
+    }
+
+    function removeChatbotApiKey() {
+        const storageKey = getChatbotApiKeyStorageKey();
+        if (!storageKey) {
+            showToast('Sign in again before disconnecting your Gemini key.', 'error');
+            return;
+        }
+        try {
+            localStorage.removeItem(storageKey);
+        } catch (error) {
+            console.error('Could not remove the Gemini API key from this browser.', error);
+            showToast('The key could not be removed from this browser.', 'error');
+            return;
+        }
+        closeModal();
+        renderMainContent();
+        showToast('Gemini disconnected for this portal account on this browser.', 'info');
+    }
+
+    function loadChatbotHistoryForCurrentUser() {
+        const key = getChatbotHistoryStorageKey();
+        if (!key || state.chatbotHistoryStorageKey === key) return;
+        state.chatbotHistoryStorageKey = key;
+        state.chatbotHistory = [];
+        state.chatbotError = '';
+        try {
+            const saved = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(saved)) {
+                state.chatbotHistory = saved.filter(function (message) {
+                    return message && (message.role === 'user' || message.role === 'model') &&
+                        typeof message.text === 'string' && message.text.length <= 4000;
+                }).slice(-20);
+            }
+        } catch (error) {
+            console.warn('Could not load this account’s local chatbot history.', error);
+            showToast('Saved chat history could not be loaded from this browser.', 'warning');
+        }
+    }
+
+    function saveChatbotHistoryForCurrentUser() {
+        const key = getChatbotHistoryStorageKey();
+        if (!key || key !== state.chatbotHistoryStorageKey) return;
+        try {
+            localStorage.setItem(key, JSON.stringify((state.chatbotHistory || []).slice(-20)));
+        } catch (error) {
+            console.warn('Could not save this account’s local chatbot history.', error);
+            showToast('Chat history could not be saved in this browser.', 'warning');
+        }
+    }
+
+    let chatbotSpeechRecognition = null;
+    let chatbotMicPermissionPending = false;
+    let chatbotSpeechBaseText = '';
+    let chatbotSpeechLimitNotified = false;
+    const chatbotNativeAndroidApp = /DivineClassesAndroid\//.test(navigator.userAgent || '');
+    let chatbotNativeSpeechActive = false;
+    let chatbotNativeSpeechBaseText = '';
+    let chatbotNativeSpeechInput = null;
+    let chatbotNativeSpeechUserKey = '';
+
+    function handleChatbotNativeVoiceMessage(event) {
+        const message = event.detail;
+        if (!message || typeof message !== 'object') return;
+        if (message.type === 'listening') {
+            showToast('Listening… speak now. Your words will appear in the message box.', 'info');
+            return;
+        }
+        if (message.type === 'result') {
+            const input = chatbotNativeSpeechInput;
+            if (input && input.isConnected && chatbotNativeSpeechUserKey === getChatbotHistoryStorageKey()) {
+                const transcript = String(message.transcript || '').trim();
+                const separator = chatbotNativeSpeechBaseText && transcript ? ' ' : '';
+                const candidate = chatbotNativeSpeechBaseText + separator + transcript;
+                if (candidate.length > 1000) {
+                    showToast('Voice input was shortened to the 1,000-character message limit.', 'warning');
+                }
+                input.value = candidate.slice(0, 1000);
+                updateChatbotComposer();
+            }
+            chatbotNativeSpeechActive = false;
+            chatbotNativeSpeechInput = null;
+            updateChatbotMicrophoneButton(false);
+            if (input && input.isConnected) input.focus();
+            return;
+        }
+        if (message.type === 'error') {
+            chatbotNativeSpeechActive = false;
+            chatbotNativeSpeechInput = null;
+            updateChatbotMicrophoneButton(false);
+            const errorMessage = message.code === 'permission'
+                ? 'Allow microphone permission for Divine Classes in your Android app settings, then try again.'
+                : message.code === 'unavailable'
+                    ? 'Speech recognition is unavailable on this device. Install or enable a speech recognition service and try again.'
+                    : message.code === 'recognition'
+                        ? 'Android speech recognition could not complete. Check that Google voice typing is installed and try again.'
+                        : 'Voice typing could not start. Check your microphone and try again.';
+            showToast(errorMessage, 'error');
+            return;
+        }
+        if (message.type === 'stopped') {
+            chatbotNativeSpeechActive = false;
+            chatbotNativeSpeechInput = null;
+            updateChatbotMicrophoneButton(false);
+        }
+    }
+
+    window.addEventListener('divine-android-voice', handleChatbotNativeVoiceMessage);
+
+    function sendChatbotNativeVoiceCommand(command) {
+        const bridge = window.androidVoiceInput;
+        const method = command === 'start' ? 'startListening' : 'stopListening';
+        if (!bridge || typeof bridge[method] !== 'function') return false;
+        try {
+            bridge[method]();
+            return true;
+        } catch (error) {
+            console.warn('Android voice input bridge could not receive a command.', error);
+            return false;
+        }
+    }
+
+    function showChatbotMicrophoneHelp(reason) {
+        const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+        const isMac = !chatbotNativeAndroidApp && /mac|iphone|ipad|ipod/i.test(platform);
+        const isAndroid = chatbotNativeAndroidApp || /android/i.test(platform);
+        const systemPermissionStep = isMac
+            ? '<li>On your Mac, open <strong>Apple menu → System Settings → Privacy &amp; Security → Microphone</strong> and enable Microsoft Edge. Quit and reopen Edge if you change this setting.</li>'
+            : isAndroid
+                ? '<li>On Android, open <strong>Settings → Apps → Divine Classes → Permissions → Microphone</strong> and choose <strong>Allow</strong>.</li>'
+                : '<li>If blocked by Windows, open <strong>Settings → Privacy &amp; security → Microphone</strong> and allow microphone access for apps.</li>';
+        openModal(`
+            <div class="w-full max-w-md">
+                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">${isAndroid ? 'Allow microphone on Android' : 'Allow microphone in Microsoft Edge'}</h2>
+                <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">${escapeHtml(reason)}</p>
+                <ol class="mt-3 list-decimal space-y-2 pl-5 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    <li>Select the site permissions icon beside the address bar.</li>
+                    <li>Set <strong>Microphone</strong> to <strong>Allow</strong>, then reload this page.</li>
+                    ${systemPermissionStep}
+                </ol>
+                <p class="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">If this portal is embedded inside another site, open the deployed portal directly in an Edge tab. The hosting site must also permit microphone access.</p>
+                <div class="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700">
+                    <button type="button" onclick="closeModal()" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700">Got it</button>
+                </div>
+            </div>
+        `);
+    }
+
+    function updateChatbotMicrophoneButton(active) {
+        const button = document.getElementById('chatbot-mic');
+        if (button) {
+            button.classList.toggle('chatbot-mic-active', active);
+            button.setAttribute('aria-pressed', String(active));
+            button.setAttribute('aria-label', active ? 'Stop voice typing' : 'Start voice typing');
+            button.title = active ? 'Stop voice typing' : 'Type by voice';
+            const icon = button.querySelector('i');
+            if (icon) icon.className = 'fa-solid ' + (active ? 'fa-stop' : 'fa-microphone');
+        }
+        const sendButton = document.getElementById('chatbot-send');
+        if (sendButton) sendButton.disabled = active || !!state.chatbotBusy;
+    }
+
+    function stopChatbotVoiceInput() {
+        if (chatbotSpeechRecognition) chatbotSpeechRecognition.stop();
+        if (chatbotNativeSpeechActive && window.androidVoiceInput) {
+            chatbotNativeSpeechActive = false;
+            sendChatbotNativeVoiceCommand('stop');
+            updateChatbotMicrophoneButton(false);
+        }
+    }
+
+    async function toggleChatbotVoiceInput() {
+        if (chatbotNativeSpeechActive && window.androidVoiceInput) {
+            chatbotNativeSpeechActive = false;
+            sendChatbotNativeVoiceCommand('stop');
+            updateChatbotMicrophoneButton(false);
+            return;
+        }
+        if (chatbotSpeechRecognition) {
+            chatbotSpeechRecognition.stop();
+            return;
+        }
+        if (chatbotMicPermissionPending) return;
+        loadChatbotHistoryForCurrentUser();
+        const input = document.getElementById('chatbot-input');
+        if (!input || input.disabled) return;
+        if (chatbotNativeAndroidApp &&
+            (!window.androidVoiceInput || typeof window.androidVoiceInput.startListening !== 'function')) {
+            showToast('Android voice input is unavailable in this app version. Update or reinstall the latest Divine Classes app.', 'error');
+            return;
+        }
+        if (window.androidVoiceInput && typeof window.androidVoiceInput.startListening === 'function') {
+            chatbotNativeSpeechInput = input;
+            chatbotNativeSpeechBaseText = input.value.trim();
+            chatbotNativeSpeechUserKey = getChatbotHistoryStorageKey();
+            chatbotNativeSpeechActive = true;
+            updateChatbotMicrophoneButton(true);
+            if (!sendChatbotNativeVoiceCommand('start')) {
+                chatbotNativeSpeechActive = false;
+                chatbotNativeSpeechInput = null;
+                updateChatbotMicrophoneButton(false);
+                showToast('Android voice input could not start. Try again.', 'error');
+            }
+            return;
+        }
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!Recognition) {
+            showToast('Voice typing is not supported in this browser. Try Chrome or use your device keyboard microphone.', 'warning');
+            return;
+        }
+
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            showChatbotMicrophoneHelp('This page cannot request microphone access from the current browser context. Check that you are using the secure, deployed portal in Edge.');
+            return;
+        }
+
+        chatbotMicPermissionPending = true;
+        const permissionRequestUserKey = getChatbotHistoryStorageKey();
+        const microphoneButton = document.getElementById('chatbot-mic');
+        if (microphoneButton) microphoneButton.disabled = true;
+        let microphoneStream;
+        try {
+            microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (error) {
+            const reason = error && error.name === 'NotFoundError'
+                ? 'No microphone was found. Connect a microphone, then try again.'
+                : error && error.name === 'NotReadableError'
+                    ? 'The microphone is busy or unavailable. Close other apps using it, then try again.'
+                    : error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')
+                        ? 'Microsoft Edge or your system has blocked microphone access.'
+                        : error && error.name === 'SecurityError'
+                            ? 'The current page or embedded frame is not permitted to use the microphone.'
+                            : 'Microphone access could not be started in this browser.';
+            chatbotMicPermissionPending = false;
+            if (microphoneButton) microphoneButton.disabled = false;
+            showChatbotMicrophoneHelp(reason);
+            return;
+        }
+        microphoneStream.getTracks().forEach(function (track) { track.stop(); });
+        chatbotMicPermissionPending = false;
+        if (microphoneButton) microphoneButton.disabled = false;
+        if (!input.isConnected || state.activeTab !== 'chatbot' ||
+            permissionRequestUserKey !== getChatbotHistoryStorageKey()) return;
+
+        const recognition = new Recognition();
+        chatbotSpeechRecognition = recognition;
+        chatbotSpeechBaseText = input.value.trim();
+        chatbotSpeechLimitNotified = false;
+        recognition.lang = navigator.language || 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        recognition.onstart = function () {
+            updateChatbotMicrophoneButton(true);
+            showToast('Listening… speak now. Your words will appear in the message box.', 'info');
+        };
+        recognition.onresult = function (event) {
+            if (!input.isConnected || getChatbotHistoryStorageKey() !== state.chatbotHistoryStorageKey) {
+                recognition.stop();
+                return;
+            }
+            let finalTranscript = '';
+            let interimTranscript = '';
+            for (let i = 0; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (!result || !result[0]) continue;
+                if (result.isFinal) finalTranscript += result[0].transcript;
+                else interimTranscript += result[0].transcript;
+            }
+            const spokenText = (finalTranscript + interimTranscript).trim();
+            const separator = chatbotSpeechBaseText && spokenText ? ' ' : '';
+            const candidate = chatbotSpeechBaseText + separator + spokenText;
+            if (candidate.length > 1000 && !chatbotSpeechLimitNotified) {
+                chatbotSpeechLimitNotified = true;
+                showToast('Voice input was shortened to the 1,000-character message limit.', 'warning');
+            }
+            input.value = candidate.slice(0, 1000);
+            updateChatbotComposer();
+        };
+        recognition.onerror = function (event) {
+            if (event.error === 'no-speech' || event.error === 'aborted') return;
+            if (event.error === 'not-allowed') {
+                showChatbotMicrophoneHelp('Edge denied microphone access to voice recognition. Check the site permission below. If Microphone is already set to Allow, the browser or the page hosting this portal may still be blocking speech recognition.');
+                return;
+            }
+            if (event.error === 'service-not-allowed') {
+                showChatbotMicrophoneHelp('Edge could not authorize its speech recognition service. The microphone permission may already be allowed; try opening the deployed portal directly in an Edge tab instead of inside an embedded page.');
+                return;
+            }
+            showToast('Voice typing could not start. Check your microphone connection and try again.', 'error');
+        };
+        recognition.onend = function () {
+            if (chatbotSpeechRecognition === recognition) chatbotSpeechRecognition = null;
+            updateChatbotMicrophoneButton(false);
+            if (input.isConnected) input.focus();
+        };
+        try {
+            recognition.start();
+        } catch (error) {
+            chatbotSpeechRecognition = null;
+            updateChatbotMicrophoneButton(false);
+            console.warn('Chatbot speech recognition could not start.', error);
+            showToast('Voice typing could not start. Try again or use your device keyboard microphone.', 'error');
+        }
+    }
+
+    function renderChatbotView() {
+        if (!isChatbotEnabled()) {
+            return '<div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">The chatbot is currently disabled by the developer.</div>';
+        }
+
+        loadChatbotHistoryForCurrentUser();
+        const history = Array.isArray(state.chatbotHistory) ? state.chatbotHistory : [];
+        const hasMessages = history.length > 0;
+        const connected = !!getChatbotApiKey();
+        const voiceTypingNote = chatbotNativeAndroidApp
+            ? 'Voice typing uses Android speech recognition and puts the transcript in the message box; it is not sent until you submit.'
+            : 'Voice typing uses your browser’s speech recognition and puts the transcript in the message box; it is not sent until you submit.';
+        const messages = history.map(function (message, index) {
+            const isUser = message.role === 'user';
+            const time = message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+            const text = renderChatbotText(message.text);
+            return `<article class="chatbot-message ${isUser ? 'chatbot-message-user' : 'chatbot-message-assistant'}">
+                ${!isUser ? '<span class="chatbot-avatar chatbot-avatar-assistant" aria-hidden="true"><i class="fa-solid fa-sparkles"></i></span>' : ''}
+                <div class="chatbot-message-content">
+                    <div class="chatbot-message-meta"><span>${isUser ? 'You' : 'Divine Classes AI'}</span>${time ? `<time>${escapeHtml(time)}</time>` : ''}</div>
+                    <div class="chatbot-bubble ${isUser ? 'chatbot-bubble-user' : 'chatbot-bubble-assistant'}">${text}</div>
+                    ${!isUser ? `<button type="button" class="chatbot-copy-button" onclick="copyChatbotMessage(${index}, this)" aria-label="Copy response"><i class="fa-regular fa-copy"></i><span>Copy</span></button>` : ''}
+                </div>
+                ${isUser ? '<span class="chatbot-avatar chatbot-avatar-user" aria-hidden="true"><i class="fa-solid fa-user"></i></span>' : ''}
+            </article>`;
+        }).join('');
+
+        const suggestions = !hasMessages ? `<div class="chatbot-suggestions" aria-label="Suggested questions">
+            <p class="chatbot-suggestions-label">Try asking</p>
+            <div class="chatbot-suggestion-grid">${CHATBOT_PROMPTS.map(function (item) {
+                return `<button type="button" class="chatbot-suggestion" onclick="sendChatbotPrompt('${escapeAttr(item.prompt)}')">
+                    <span class="chatbot-suggestion-icon"><i class="fa-solid ${item.icon}" aria-hidden="true"></i></span>
+                    <span>${item.label}</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square chatbot-suggestion-arrow" aria-hidden="true"></i>
+                </button>`;
+            }).join('')}</div>
+        </div>` : '';
+
+        const errorMessage = state.chatbotError
+            ? `<div class="chatbot-inline-error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>${escapeHtml(state.chatbotError)}</span></div>`
+            : '';
+        const typing = state.chatbotBusy ? `<div class="chatbot-message chatbot-message-assistant" role="status" aria-label="Assistant is responding">
+            <span class="chatbot-avatar chatbot-avatar-assistant" aria-hidden="true"><i class="fa-solid fa-sparkles"></i></span>
+            <div class="chatbot-message-content"><div class="chatbot-message-meta"><span>Divine Classes AI</span><span>Thinking</span></div>
+                <div class="chatbot-bubble chatbot-bubble-assistant chatbot-typing"><i></i><i></i><i></i></div>
+            </div>
+        </div>` : '';
+
+        return `<section id="chatbot-shell" class="chatbot-shell" aria-label="Divine Classes AI assistant">
+            <header class="chatbot-header">
+                <div class="chatbot-brand">
+                    <span class="chatbot-brand-icon"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></span>
+                    <div class="chatbot-brand-copy">
+                        <div class="chatbot-title-row"><h2>Divine Classes AI</h2><span class="chatbot-version-badge">BETA</span></div>
+                        <p><span class="chatbot-status-dot"></span> Your portal assistant <span class="chatbot-header-divider">·</span> Ready to help</p>
+                    </div>
+                </div>
+                <div class="chatbot-header-actions">
+                    <button type="button" class="chatbot-new-chat" onclick="startNewChatbotConversation()" ${!hasMessages || state.chatbotBusy ? 'disabled' : ''}>
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i><span>New chat</span>
+                    </button>
+                    <button type="button" class="chatbot-new-chat chatbot-connect-button" onclick="openChatbotKeyDialog()" title="${connected ? 'Manage your Gemini API key' : 'Connect your Gemini API key'}" aria-label="${connected ? 'Manage connected Gemini API key' : 'Connect Gemini API key'}">
+                        <i class="fa-solid ${connected ? 'fa-link' : 'fa-plug'}" aria-hidden="true"></i><span>${connected ? 'Gemini connected' : 'Connect Gemini'}</span>
+                    </button>
+                </div>
+            </header>
+
+            <div id="chatbot-conversation" class="chatbot-conversation" aria-live="polite" aria-relevant="additions text">
+                ${!hasMessages ? `<div class="chatbot-welcome">
+                    <span class="chatbot-welcome-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+                    <p class="chatbot-eyebrow">YOUR DIVINE CLASSES ASSISTANT</p>
+                    <h3>How can I help you today?</h3>
+                    <p class="chatbot-welcome-copy">Ask about navigating the portal, finding learning resources, or getting in touch with the institute.</p>
+                    ${suggestions}
+                </div>` : `<div class="chatbot-thread">${messages}${typing}${errorMessage}</div>`}
+            </div>
+
+            <div class="chatbot-composer-wrap">
+                ${hasMessages && errorMessage ? `<div class="chatbot-error-actions"><button type="button" onclick="retryLastChatbotMessage()"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Retry message</button></div>` : ''}
+                <form id="chatbot-form" onsubmit="sendChatbotMessage(event)" class="chatbot-composer">
+                    <label class="sr-only" for="chatbot-input">Message Divine Classes AI</label>
+                    <textarea id="chatbot-input" rows="1" maxlength="1000" autocomplete="off" placeholder="Message Divine Classes AI…" onkeydown="handleChatbotInputKeydown(event)" oninput="updateChatbotComposer()" ${state.chatbotBusy ? 'disabled' : ''}></textarea>
+                    <div class="chatbot-composer-actions">
+                        <span id="chatbot-character-count" class="chatbot-character-count">0 / 1,000</span>
+                        <button id="chatbot-mic" type="button" class="chatbot-mic-button" onclick="toggleChatbotVoiceInput()" aria-label="Start voice typing" title="Type by voice" aria-pressed="false" ${state.chatbotBusy ? 'disabled' : ''}>
+                            <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+                        </button>
+                        <button id="chatbot-send" type="submit" class="chatbot-send-button" ${state.chatbotBusy ? 'disabled' : ''} aria-label="Send message" title="Send message">
+                            <i class="fa-solid ${state.chatbotBusy ? 'fa-spinner fa-spin' : 'fa-arrow-up'}" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </form>
+                <p class="chatbot-privacy-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> ${voiceTypingNote} Chat history stays in this browser profile. Avoid sharing passwords or sensitive personal information.</p>
+            </div>
+        </section>`;
+    }
+
+    function updateChatbotComposer() {
+        const input = document.getElementById('chatbot-input');
+        const count = document.getElementById('chatbot-character-count');
+        if (input) {
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 144) + 'px';
+        }
+        if (count) count.textContent = (input ? input.value.length : 0).toLocaleString() + ' / 1,000';
+    }
+
+    function handleChatbotInputKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+            event.preventDefault();
+            if (chatbotSpeechRecognition) {
+                showToast('Wait for voice typing to finish before sending.', 'info');
+                return;
+            }
+            const form = document.getElementById('chatbot-form');
+            if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
+        }
+    }
+
+    function sendChatbotPrompt(text) {
+        const input = document.getElementById('chatbot-input');
+        if (!input) return;
+        input.value = text;
+        updateChatbotComposer();
+        const form = document.getElementById('chatbot-form');
+        if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
+    }
+
+    async function copyChatbotMessage(index, button) {
+        const message = state.chatbotHistory && state.chatbotHistory[index];
+        if (!message || message.role !== 'model') return;
+        try {
+            await navigator.clipboard.writeText(message.text);
+            if (button) {
+                const original = button.innerHTML;
+                button.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i><span>Copied</span>';
+                setTimeout(function () {
+                    if (button.isConnected) button.innerHTML = original;
+                }, 1400);
+            }
+        } catch (error) {
+            showToast('Could not copy this response. Please select and copy it manually.', 'error');
+        }
+    }
+
+    function startNewChatbotConversation() {
+        if (!state.chatbotHistory || !state.chatbotHistory.length || state.chatbotBusy) return;
+        showConfirmDialog({
+            title: 'Start a new chat?',
+            message: 'This clears the current conversation saved for your portal account in this browser.',
+            confirmText: 'Start new chat',
+            cancelText: 'Keep chatting',
+            danger: false
+        }).then(function (confirmed) {
+            if (!confirmed) return;
+            state.chatbotHistory = [];
+            state.chatbotError = '';
+            saveChatbotHistoryForCurrentUser();
+            renderMainContent();
+            const input = document.getElementById('chatbot-input');
+            if (input) input.focus();
+        });
+    }
+
+    function retryLastChatbotMessage() {
+        if (state.chatbotBusy || !Array.isArray(state.chatbotHistory)) return;
+        const lastMessage = state.chatbotHistory[state.chatbotHistory.length - 1];
+        if (!lastMessage || lastMessage.role !== 'user') return;
+        const text = lastMessage.text;
+        state.chatbotHistory.pop();
+        saveChatbotHistoryForCurrentUser();
+        state.chatbotError = '';
+        sendChatbotPrompt(text);
+    }
+
+    function sendChatbotMessage(event) {
+        event.preventDefault();
+        if (!state.isAuthenticated || !isChatbotEnabled() ||
+            !['admin', 'teacher', 'student', 'developer'].includes(state.currentRole)) {
+            showToast('The chatbot is unavailable or you do not have access.', 'error');
+            return;
+        }
+        if (state.chatbotBusy) return;
+        loadChatbotHistoryForCurrentUser();
+
+        const input = document.getElementById('chatbot-input');
+        const text = input ? input.value.trim() : '';
+        if (!text) return;
+        if (text.length > 1000) {
+            showToast('Please keep your message under 1,000 characters.', 'warning');
+            return;
+        }
+        const apiKey = getChatbotApiKey();
+        if (!apiKey) {
+            showToast('Connect your Gemini API key before starting a chat.', 'warning');
+            openChatbotKeyDialog();
+            return;
+        }
+
+        if (!Array.isArray(state.chatbotHistory)) state.chatbotHistory = [];
+        if (state.chatbotError && state.chatbotHistory.length &&
+            state.chatbotHistory[state.chatbotHistory.length - 1].role === 'user') {
+            state.chatbotHistory.pop();
+        }
+        state.chatbotHistory.push({ role: 'user', text: text, createdAt: Date.now() });
+        state.chatbotHistory = state.chatbotHistory.slice(-20);
+        saveChatbotHistoryForCurrentUser();
+        const requestUserKey = getChatbotHistoryStorageKey();
+        const requestId = (state.chatbotRequestId || 0) + 1;
+        state.chatbotRequestId = requestId;
+        state.chatbotError = '';
+        state.chatbotBusy = true;
+        renderMainContent();
+        const conversation = document.getElementById('chatbot-conversation');
+        if (conversation) conversation.scrollTop = conversation.scrollHeight;
+
+        const finish = function (result) {
+            if (state.chatbotRequestId !== requestId) return;
+            state.chatbotBusy = false;
+            if (requestUserKey !== getChatbotHistoryStorageKey()) {
+                renderMainContent();
+                return;
+            }
+            if (!result || !result.success || !result.answer) {
+                state.chatbotError = (result && result.error) || 'The assistant could not answer. Please try again.';
+                showToast(state.chatbotError, 'error');
+            } else {
+                state.chatbotHistory.push({ role: 'model', text: result.answer, createdAt: Date.now() });
+                state.chatbotHistory = state.chatbotHistory.slice(-20);
+                saveChatbotHistoryForCurrentUser();
+            }
+            renderMainContent();
+            const nextConversation = document.getElementById('chatbot-conversation');
+            if (nextConversation) nextConversation.scrollTop = nextConversation.scrollHeight;
+            const nextInput = document.getElementById('chatbot-input');
+            if (nextInput) {
+                if (!result || !result.success) nextInput.value = text;
+                nextInput.focus();
+                updateChatbotComposer();
+            }
+        };
+
+        google.script.run
+            .withSuccessHandler(finish)
+            .withFailureHandler(function (error) {
+                finish({ success: false, error: (error && error.message) || 'Chat service is temporarily unavailable.' });
+            })
+            .apiChatbotReply(state.chatbotHistory.slice(-8).map(function (message) {
+                return { role: message.role, text: message.text };
+            }), apiKey);
+    }
+</script>

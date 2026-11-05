@@ -21,7 +21,7 @@ function doGet(e) {
           return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Database sheet unavailable' })).setMimeType(ContentService.MimeType.JSON);
         }
         let appData = apiGetInitialData();
-        if (!appData) appData = getDefaultSeedData();
+        if (!appData) appData = getEmptyAppData_();
         if (!appData.settings) appData.settings = {};
         let setSheet = ss.getSheetByName('Settings_Config');
         if (!setSheet) {
@@ -39,15 +39,14 @@ function doGet(e) {
         const res = apiCreateDummyDataAndSheets();
         return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
       }
+
     }
 
     const page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'index';
     const routeConfig = typeof ROUTE_MODULES !== 'undefined' ? ROUTE_MODULES : {
-      index: { template: 'Routes/Home/page', title: 'Divine Classes - Institute Management System' },
-      login: { template: 'Routes/Home/page', title: 'Sign In - Divine Classes Portal' },
-      logout: { template: 'Routes/Logout/page', title: 'Signed Out - Divine Classes Portal' },
-      loading: { template: 'Routes/Home/page', title: 'Connecting to Divine Classes...' },
-      chatbot: { template: 'Routes/Chatbot/page', title: 'Divine AI Assistant - Divine Classes' }
+      index: { template: 'index', title: 'Divine Classes - Institute Management System' },
+      login: { template: 'login', title: 'Sign In - Divine Classes Portal' },
+      logout: { template: 'logout', title: 'Signed Out - Divine Classes Portal' }
     };
     const route = routeConfig[page] || routeConfig.index;
     const templateName = route.template;
@@ -331,6 +330,8 @@ function saveProfilePhotoToDrive_(record, folderName, label) {
  * @return {Object} { success, material, driveUrl, downloadUrl, fileId } | { success:false, error }
  */
 function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadata) {
+  let uploadedDriveFile = null;
+  let materialSaved = false;
   try {
     if (!fileBase64OrDataUrl) {
       return { success: false, error: 'No file data received' };
@@ -357,6 +358,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
     const blob = Utilities.newBlob(decodedBytes, mimeType, fileName);
 
     const driveFile = folder.createFile(blob);
+    uploadedDriveFile = driveFile;
     try {
       driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     } catch (shareErr) {
@@ -368,7 +370,7 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
     // Mobile-friendly direct download endpoint — opens PDFs in the browser's
     // viewer on phones and downloads DOC/XLS to the Files/Downloads app
     const downloadUrl = 'https://drive.usercontent.google.com/download?id=' + fileId + '&export=download&confirm=t';
-    const fileSizeMB = (driveFile.getSize() / (1024 * 1024)).toFixed(1) + ' MB';
+    const fileSizeMB = (decodedBytes.length / (1024 * 1024)).toFixed(1) + ' MB';
 
     const meta = metadata || {};
     const newMaterial = {
@@ -388,17 +390,26 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       fileName: fileName
     };
 
-    // Persist to Cloud Database + Google Sheet (URL included in Materials_Repository)
-    const data = dbLoadAll() || apiGetInitialData();
-    if (!data.materials) data.materials = [];
-    data.materials.unshift(newMaterial);
+    // Only the affected collections are needed for a material upload.
+    let materials = dbGetTable('materials');
+    let notifications = dbGetTable('notifications');
+    let batches = dbGetTable('batches');
+    if (materials === null && notifications === null && batches === null) {
+      const initialData = apiGetInitialData();
+      materials = initialData.materials || [];
+      notifications = initialData.notifications || [];
+      batches = initialData.batches || [];
+    }
+    if (!Array.isArray(materials)) materials = [];
+    if (!Array.isArray(notifications)) notifications = [];
+    if (!Array.isArray(batches)) batches = [];
+    materials.unshift(newMaterial);
 
     // In-app notification: alert every student/teacher that a new material is live
-    if (!data.notifications || !Array.isArray(data.notifications)) data.notifications = [];
-    const batchObj = (data.batches || []).find(b => b.id === newMaterial.batchId);
+    const batchObj = batches.find(b => b.id === newMaterial.batchId);
     const batchLabel = batchObj ? batchObj.name : 'General';
-    data.notifications.unshift({
-      id: 'notif_mat_' + newMaterial.id + '_' + Date.now(),
+    notifications.unshift({
+      id: 'notif_mat_' + newMaterial.id,
       title: 'New ' + newMaterial.category + ' Uploaded',
       message: '"' + newMaterial.title + '" (' + newMaterial.fileSize + ') for ' + batchLabel + ' is now available in Assignments & DPPs. Download link saved to the database.',
       time: 'Just now',
@@ -414,10 +425,16 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       materialId: newMaterial.id,
       batchName: batchLabel
     });
-    data.notifications = data.notifications.slice(0, 100);
-    dbSaveAll(data);
+    notifications = notifications.slice(0, 100);
+    if (!dbSetTable('materials', materials)) {
+      throw new Error('The material record could not be saved to the cloud database.');
+    }
+    materialSaved = true;
+    if (!dbSetTable('notifications', notifications)) {
+      Logger.log('Material notification could not be saved to the cloud database.');
+    }
     try {
-      syncMaterialsRepository_(data.materials, data.batches);
+      prependMaterialToRepository_(newMaterial, batchLabel);
     } catch (sheetErr) {
       // The uploaded Drive file and primary database record are already saved.
       // A secondary sheet mirror problem must not report the upload as failed.
@@ -435,9 +452,34 @@ function apiUploadMaterialToDrive(fileBase64OrDataUrl, originalFileName, metadat
       uploadTargetFolder: folder.getUrl()
     };
   } catch (err) {
+    if (uploadedDriveFile && !materialSaved) {
+      try { uploadedDriveFile.setTrashed(true); } catch (cleanupErr) {
+        Logger.log('Uncommitted material Drive file cleanup failed: ' + cleanupErr.toString());
+      }
+    }
     Logger.log('apiUploadMaterialToDrive error: ' + err.toString());
     return { success: false, error: err.toString() };
   }
+}
+
+function prependMaterialToRepository_(material, batchName) {
+  const ss = getDbSpreadsheet();
+  if (!ss) return;
+  let sheet = ss.getSheetByName('Materials_Repository');
+  if (!sheet) sheet = ss.insertSheet('Materials_Repository');
+
+  const headers = ['Material ID', 'Title', 'Batch Name', 'Category', 'Upload Date', 'Uploaded By', 'File Size', 'Downloads', 'Description', 'Download URL', 'Google Drive Link'];
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#2563eb').setFontColor('#ffffff');
+  }
+  sheet.insertRowBefore(2);
+  sheet.getRange(2, 1, 1, headers.length).setValues([[
+    material.id || '', material.title || '', batchName || material.batchId || 'All Batches',
+    material.category || 'Assignment PDF', material.uploadDate || '', material.uploadedBy || '',
+    material.fileSize || '', material.downloads || 0, material.description || '',
+    material.downloadUrl || material.driveUrl || '', material.driveUrl || ''
+  ]]);
 }
 
 function syncMaterialsRepository_(materials, batches) {
@@ -618,7 +660,7 @@ function applyTombstones_(appData) {
     const removedIds = {};
     appData.students = appData.students.filter(function (s) {
       if (s && s.roll && rollSet[String(s.roll).trim()]) {
-        if (appData.settings && (appData.settings.showDummyData === true || appData.settings.showDummyData === 'On') && !appData.settings.dummyDataWiped && isDummyRecord_(s)) {
+        if (appData.settings && (appData.settings.showDummyData === true || appData.settings.showDummyData === 'On') && !appData.settings.dummyDataWiped && !appData.settings.studentSeedDataDisabled && isDummyRecord_(s)) {
           return true;
         }
         if (s.id) removedIds[s.id] = true;
@@ -737,6 +779,7 @@ function mergeStudentsFromSheet_(appData, spreadsheet) {
         const slug = roll ? roll.toLowerCase().replace(/[^a-z0-9]/g, '') : Date.now().toString(36);
         appData.students.push({
           id: 's_' + slug + '_' + i,
+          createdAt: new Date().toISOString(),
           roll: roll || ('DC-' + (100 + appData.students.length + 1)),
           name: name || 'Unnamed Student',
           password: password,
@@ -776,7 +819,7 @@ function mergeStudentsFromSheet_(appData, spreadsheet) {
         // Keep if the student's roll row exists; name fallback only for roll-less records
         if ((roll && keepRolls[roll]) || (!roll && name && keepNames[name])) {
           kept.push(s);
-        } else if (isDummyRecord_(s) && appData.settings && (appData.settings.showDummyData === true || appData.settings.showDummyData === 'On') && !appData.settings.dummyDataWiped) {
+        } else if (isDummyRecord_(s) && appData.settings && (appData.settings.showDummyData === true || appData.settings.showDummyData === 'On') && !appData.settings.dummyDataWiped && !appData.settings.studentSeedDataDisabled) {
           kept.push(s);
         } else {
           if (s.id) removedIds[s.id] = true;
@@ -798,6 +841,35 @@ function mergeStudentsFromSheet_(appData, spreadsheet) {
         // PERMANENT: tombstone deleted rolls so no future save can resurrect them
         addTombstones_('rolls', removedRolls);
         Logger.log('Students_Master deletions honored: ' + Object.keys(removedIds).length + ' student(s) removed (tombstoned)');
+      }
+    }
+
+    if (appData.settings && (appData.settings.studentSeedDataDisabled === true || appData.settings.studentSeedDataDisabled === 'true')) {
+      const clearedAt = Date.parse(appData.settings.studentTableClearedAt || '');
+      const removedIds = {};
+      appData.students = (appData.students || []).filter(function (student) {
+        if (!student || isDummyRecord_(student)) {
+          if (student && student.id) removedIds[String(student.id)] = true;
+          if (student && student.roll) removedIds[String(student.roll)] = true;
+          return false;
+        }
+        if (isNaN(clearedAt)) return true;
+        const createdAt = Date.parse(student.createdAt || '');
+        if (!isNaN(createdAt) && createdAt >= clearedAt) return true;
+        if (student.id) removedIds[String(student.id)] = true;
+        if (student.roll) removedIds[String(student.roll)] = true;
+        return false;
+      });
+      if (Object.keys(removedIds).length) {
+        (appData.batches || []).forEach(function (batch) {
+          if (Array.isArray(batch.studentIds)) {
+            batch.studentIds = batch.studentIds.filter(function (id) { return !removedIds[String(id)]; });
+          }
+        });
+        (appData.offlineTests || []).forEach(function (test) {
+          if (!test || !test.marks || typeof test.marks !== 'object') return;
+          Object.keys(removedIds).forEach(function (id) { delete test.marks[id]; });
+        });
       }
     }
 
@@ -947,6 +1019,38 @@ function mergeSettingsFromSheet_(appData, spreadsheet) {
     const sheet = ss.getSheetByName('Settings_Config');
     if (!sheet || sheet.getLastRow() < 2) return appData;
 
+    let rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getDisplayValues();
+    const duplicateSettingRows = [
+      { canonical: 'Lead Developer Email', aliases: ['LEAD_DEV_EMAIL', 'Lead Dev Email'] },
+      { canonical: 'Lead Developer Password', aliases: ['LEAD_DEV_PASSWORD', 'Lead Dev Password'] }
+    ];
+    const rowsToDelete = [];
+    duplicateSettingRows.forEach(function (setting) {
+      const matchingIndexes = [];
+      let canonicalIndex = -1;
+      rows.forEach(function (row, index) {
+        const parameter = String(row[0] || '').trim();
+        if (parameter === setting.canonical) {
+          if (canonicalIndex < 0) canonicalIndex = index;
+          matchingIndexes.push(index);
+        } else if (setting.aliases.indexOf(parameter) >= 0) {
+          matchingIndexes.push(index);
+        }
+      });
+      if (!matchingIndexes.length) return;
+
+      const keepIndex = canonicalIndex >= 0 ? canonicalIndex : matchingIndexes[0];
+      if (canonicalIndex < 0) {
+        sheet.getRange(keepIndex + 2, 1).setValue(setting.canonical);
+      }
+      matchingIndexes.forEach(function (index) {
+        if (index !== keepIndex) rowsToDelete.push(index + 2);
+      });
+    });
+    rowsToDelete.sort(function (a, b) { return b - a; }).forEach(function (rowNumber) {
+      sheet.deleteRow(rowNumber);
+    });
+
     if (!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
     const settingKeys = {
       'Institute Name': 'instituteName',
@@ -969,31 +1073,124 @@ function mergeSettingsFromSheet_(appData, spreadsheet) {
       'Facebook Page': 'facebookUrl',
       'Instagram Profile': 'instagramUrl',
       'Show Requirement Labels': 'showRequirementLabels',
+      'Chatbot Enabled': 'chatbotEnabled',
       'Admin Feedback Delete': 'allowAdminFeedbackDelete',
       'Study Link Delete': 'allowAdminLinkDelete',
       'Show Dummy / Demo Data': 'showDummyData',
       'Dummy Data Wiped': 'dummyDataWiped',
+      'Student Seed Data Disabled': 'studentSeedDataDisabled',
+      'Student Table Cleared At': 'studentTableClearedAt',
       'Supabase Enabled': 'supabaseEnabled',
       'Supabase URL': 'supabaseUrl',
       'Supabase Key': 'supabaseKey'
     };
     const booleanKeys = {
       showRequirementLabels: true,
+      chatbotEnabled: true,
       allowAdminFeedbackDelete: true,
       allowAdminLinkDelete: true,
       showDummyData: true,
       dummyDataWiped: true,
+      studentSeedDataDisabled: true,
       supabaseEnabled: true
     };
-    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
+    rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
     rows.forEach(function (row) {
       const key = settingKeys[String(row[0] || '').trim()];
       if (!key) return;
       const value = String(row[1] || '').trim();
-      appData.settings[key] = booleanKeys[key] ? /^on\b/i.test(value) : value;
+      appData.settings[key] = booleanKeys[key] ? /^(on|true|yes|1)$/i.test(value) : value;
     });
   } catch (e) {
     Logger.log('Settings_Config read notice: ' + e.toString());
+  }
+  return appData;
+}
+
+function removeDuplicateDeveloperSettingsFromSupabase_(settings) {
+  const config = settings || {};
+  const supabaseUrl = config.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
+  const supabaseKey = config.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+  if (!supabaseUrl || !supabaseKey) return;
+
+  const base = supabaseUrl.replace(/\/+$/, '') + (/\/rest\/v1$/i.test(supabaseUrl) ? '' : '/rest/v1');
+  try {
+    const response = UrlFetchApp.fetch(
+      base + '/settings_config?setting_parameter=in.(LEAD_DEV_EMAIL,LEAD_DEV_PASSWORD)',
+      {
+        method: 'delete',
+        headers: {
+          apikey: supabaseKey,
+          Authorization: 'Bearer ' + supabaseKey,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        muteHttpExceptions: true
+      }
+    );
+    if (response.getResponseCode() >= 300) {
+      Logger.log('Supabase duplicate developer setting cleanup failed: ' +
+        response.getContentText());
+    }
+  } catch (e) {
+    Logger.log('Supabase duplicate developer setting cleanup error: ' + e.toString());
+  }
+}
+
+function migrateAdminEmailSetting_(appData, spreadsheet) {
+  const propertyKey = 'ADMIN_EMAIL_ID_MIGRATED_20261104';
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(propertyKey) === 'done') return appData;
+
+  const adminEmail = 'divineclasses1010@gmail.com';
+  if (!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
+  appData.settings.adminEmail = adminEmail;
+
+  try {
+    const ss = spreadsheet || getDbSpreadsheet();
+    const sheet = ss && ss.getSheetByName('Settings_Config');
+    if (sheet) {
+      const lastRow = sheet.getLastRow();
+      const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues() : [];
+      let rowNumber = rows.findIndex(function (row) {
+        return String(row[0] || '').trim() === 'Admin Email ID';
+      });
+      if (rowNumber >= 0) {
+        sheet.getRange(rowNumber + 2, 2).setValue(adminEmail);
+      } else {
+        sheet.appendRow(['Admin Email ID', adminEmail, 'Official Admin Contact / Login Email']);
+      }
+    } else {
+      Logger.log('Admin Email ID migration notice: Settings_Config sheet was not available.');
+    }
+
+    const settings = appData.settings;
+    const supabaseUrl = settings.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
+    const supabaseKey = settings.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+    const base = supabaseUrl.replace(/\/+$/, '') + (/\/rest\/v1$/i.test(supabaseUrl) ? '' : '/rest/v1');
+    const response = UrlFetchApp.fetch(base + '/settings_config?on_conflict=setting_parameter', {
+      method: 'post',
+      headers: {
+        apikey: supabaseKey,
+        Authorization: 'Bearer ' + supabaseKey,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+      },
+      payload: JSON.stringify([{
+        setting_parameter: 'Admin Email ID',
+        configured_value: adminEmail,
+        description: 'Official Admin Contact / Login Email'
+      }]),
+      muteHttpExceptions: true
+    });
+    if (response.getResponseCode() >= 300) {
+      throw new Error('Supabase update failed (' + response.getResponseCode() + '): ' +
+        response.getContentText());
+    }
+
+    properties.setProperty(propertyKey, 'done');
+  } catch (e) {
+    Logger.log('Admin Email ID migration error: ' + e.toString());
   }
   return appData;
 }
@@ -1023,7 +1220,7 @@ function apiGetInitialData() {
       appData = dbLoadAll();
     }
 
-    // 2. Fallback: If database is not initialized yet, check sheet DB_JSON or seed data
+    // 2. Fallback: If the database is not initialized, check only the saved snapshot.
     if (!appData) {
       const ss = getDbSpreadsheet();
       if (ss) {
@@ -1037,9 +1234,7 @@ function apiGetInitialData() {
       }
     }
 
-    if (!appData) {
-      appData = getDefaultSeedData();
-    }
+    if (!appData) appData = getEmptyAppData_();
 
     // Reuse one Spreadsheet service handle for the Sheet-backed login/data merge.
     // Reopening the same workbook for each tab added avoidable startup latency.
@@ -1058,15 +1253,20 @@ function apiGetInitialData() {
     // apiCreateDummyDataAndSheets(), rather than being injected on every load.
     // Settings_Config is the persisted source for these institute settings.
     appData = mergeSettingsFromSheet_(appData, sourceSpreadsheet);
+    removeDuplicateDeveloperSettingsFromSupabase_(appData.settings);
+    appData = migrateAdminEmailSetting_(appData, sourceSpreadsheet);
     // Migrate only the old sample social URLs; custom Settings_Config values stay intact.
     appData = migrateLegacySeedSettings_(appData);
     // Safety: curated study portals are permanent — re-seed if list ended up empty
     if (!appData.externalLinks || appData.externalLinks.length === 0) {
-      appData.externalLinks = getDefaultSeedData().externalLinks;
+      appData.externalLinks = getDefaultSeedData().externalLinks.filter(function (link) {
+        return link && !isDummyRecord_(link);
+      });
     }
 
     // 2d. Strip manually-deleted (tombstoned) records — deletions are forever
     appData = applyTombstones_(appData);
+    appData = applyDummySeedLocks_(appData);
 
     // 3. Student access (Active/Blocked) and roster membership are controlled
     //    from the app UI and the Students_Master sheet — no forced records.
@@ -1090,14 +1290,16 @@ function apiGetInitialData() {
       Logger.log('Fee reminder trigger setup notice: ' + triggerErr.toString());
     }
 
-    // Developer toggle: hide seed/demo records from clients (DB keeps them)
+    // The persistent lock filters demo/test records from both returned and saved state.
     return stripDummyData_(appData);
   } catch (err) {
     Logger.log('apiGetInitialData error: ' + err.toString());
-    const seed = getDefaultSeedData();
-    if (seed.settings) delete seed.settings.devPassword;
-    dbSaveAll(seed);
-    return seed;
+    const emptyData = getEmptyAppData_();
+    if (emptyData.settings) delete emptyData.settings.devPassword;
+    try { applyDummySeedLocks_(emptyData); } catch (lockErr) {
+      Logger.log('Empty database seed lock notice: ' + lockErr.toString());
+    }
+    return emptyData;
   }
 }
 
@@ -1107,37 +1309,36 @@ function apiGetInitialData() {
  */
 function apiVerifyDeveloperLogin(email, password) {
   try {
-    const props = PropertiesService.getScriptProperties();
-    let settingsEmail = '';
-    let settingsPassword = '';
-    try {
-      const appData = dbLoadAll() || apiGetInitialData();
-      mergeSettingsFromSheet_(appData, getDbSpreadsheet());
-      settingsEmail = appData.settings && appData.settings.leadDevEmail || '';
-      settingsPassword = appData.settings && appData.settings.leadDevPassword || '';
-    } catch (settingsErr) {
-      Logger.log('Lead Dev email settings lookup notice: ' + settingsErr.toString());
-    }
-    const savedEmail = String(props.getProperty('LEAD_DEV_EMAIL') || settingsEmail || 'anil.chahar170@gmail.com').trim().toLowerCase();
-    const savedPassword = String(props.getProperty('LEAD_DEV_PASSWORD') || settingsPassword || 'Anil@1310');
-
-    const submittedEmail = String(email || '').trim().toLowerCase();
-    const submittedPassword = String(password || '');
-    const isDevIdentifier = (
-      submittedEmail === savedEmail ||
-      submittedEmail === 'dev' ||
-      submittedEmail === 'developer' ||
-      submittedEmail === 'leaddev' ||
-      submittedEmail === 'anil'
-    );
-    if (!isDevIdentifier || !constantTimeEquals_(submittedPassword, savedPassword)) {
-      return { success: false };
-    }
-    return { success: true };
+    return verifyDeveloperCredentials_(email, password);
   } catch (err) {
     Logger.log('Developer login verification failed: ' + err.toString());
     return { success: false };
   }
+}
+
+function verifyDeveloperCredentials_(email, password) {
+  const props = PropertiesService.getScriptProperties();
+  let savedEmail = String(props.getProperty('LEAD_DEV_EMAIL') || '').trim().toLowerCase();
+  if (!savedEmail) {
+    let settingsEmail = '';
+    try {
+      const appData = dbLoadAll() || apiGetInitialData();
+      mergeSettingsFromSheet_(appData, getDbSpreadsheet());
+      settingsEmail = appData.settings && appData.settings.leadDevEmail || '';
+    } catch (settingsErr) {
+      Logger.log('Lead Dev email settings lookup notice: ' + settingsErr.toString());
+    }
+    savedEmail = String(settingsEmail).trim().toLowerCase();
+  }
+  const savedPassword = String(props.getProperty('LEAD_DEV_PASSWORD') || '');
+  if (!savedEmail || !savedPassword) return { success: false, notConfigured: true };
+
+  const submittedEmail = String(email || '').trim().toLowerCase();
+  const submittedPassword = String(password || '');
+  if (!constantTimeEquals_(submittedEmail, savedEmail) || !constantTimeEquals_(submittedPassword, savedPassword)) {
+    return { success: false };
+  }
+  return { success: true };
 }
 
 function constantTimeEquals_(left, right) {
@@ -1442,10 +1643,9 @@ function apiSaveDailyAttendance(payload) {
  * Direct Database API: Update a student's status (Active vs Blocked)
  */
 function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
-  // Operate on full DB data (not the dummy-stripped client view) so saving
-  // never wipes seed/demo records when settings.showDummyData is false.
+  // Update only an existing saved record; this path must not initialize demo data.
   let data = dbLoadAll();
-  if (!data) data = getDefaultSeedData();
+  if (!data) data = getEmptyAppData_();
   const student = (data.students || []).find(function (s) {
     return s.id === studentIdOrRoll || s.roll === studentIdOrRoll;
   });
@@ -1462,11 +1662,8 @@ function apiDatabaseUpdateStudentStatus(studentIdOrRoll, newStatus) {
 function apiSyncAllData(fullData) {
   try {
     if (fullData && fullData.settings) delete fullData.settings.devPassword;
-    // 0. Dummy-data safety: if client state was stripped (showDummyData off),
-    //    re-inject seed/demo records so a sync never permanently deletes them.
-    try { restoreDummyData_(fullData); } catch (dummyErr) {
-      Logger.log('restoreDummyData_ notice: ' + dummyErr.toString());
-    }
+    // Apply the server-side seed lock before persisting any client state.
+    restoreDummyData_(fullData);
 
     // 0b. Deletion safety: strip tombstoned (manually sheet-deleted) records so
     //     a stale browser tab can NEVER resurrect a deleted student/link.
@@ -1492,10 +1689,12 @@ function apiSyncAllData(fullData) {
     dbSaveAll(fullData);
 
     // 1b. Supabase Database Sync (keep Supabase in sync with latest settings and state)
+    let supabaseSync = { success: false, error: 'Supabase sync did not run.' };
     try {
-      syncToSupabase_(fullData);
+      supabaseSync = syncToSupabase_(fullData);
     } catch (sbErr) {
       Logger.log('Supabase sync notice: ' + sbErr.toString());
+      supabaseSync = { success: false, error: sbErr.message || sbErr.toString() };
     }
 
     // 2. Optional secondary mirror. Existing installs default to enabled;
@@ -1522,6 +1721,7 @@ function apiSyncAllData(fullData) {
       success: true,
       storage: 'cloud_database',
       timestamp: new Date().toISOString(),
+      supabaseSync: supabaseSync,
       photoUpdates: photoUpdates
     };
   } catch (err) {
@@ -1537,9 +1737,12 @@ function syncToSupabase_(fullData) {
   const settings = (fullData && fullData.settings) || {};
   const supabaseUrl = settings.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
   const supabaseKey = settings.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
-  if (!supabaseUrl || !supabaseKey) return false;
+  if (!supabaseUrl || !supabaseKey) {
+    return { success: false, error: 'Supabase URL or API key is missing.' };
+  }
 
-  const base = supabaseUrl.replace(/\/+$/, '') + '/rest/v1/';
+  const normalizedUrl = supabaseUrl.replace(/\/+$/, '');
+  const base = normalizedUrl + (/\/rest\/v1$/i.test(normalizedUrl) ? '/' : '/rest/v1/');
   const headers = {
     'apikey': supabaseKey,
     'Authorization': 'Bearer ' + supabaseKey,
@@ -1581,6 +1784,18 @@ function syncToSupabase_(fullData) {
         payload: JSON.stringify(settingsPayload),
         muteHttpExceptions: true
       });
+      const duplicateRowsResponse = UrlFetchApp.fetch(
+        base + 'settings_config?setting_parameter=in.(LEAD_DEV_EMAIL,LEAD_DEV_PASSWORD)',
+        {
+          method: 'delete',
+          headers: headers,
+          muteHttpExceptions: true
+        }
+      );
+      if (duplicateRowsResponse.getResponseCode() >= 300) {
+        Logger.log('Supabase duplicate developer setting cleanup failed: ' +
+          duplicateRowsResponse.getContentText());
+      }
     } catch (e) {
       Logger.log('Supabase settings_config update error: ' + e.toString());
     }
@@ -1612,6 +1827,7 @@ function syncToSupabase_(fullData) {
   }
 
   // 3. Students update
+  let studentTable = '';
   if (Array.isArray(fullData.students) && fullData.students.length) {
     const studentsPayload = fullData.students.map(function(s) {
       return {
@@ -1631,15 +1847,55 @@ function syncToSupabase_(fullData) {
         batch_id: s.batchId || ''
       };
     });
+    let studentResponse;
     try {
-      UrlFetchApp.fetch(base + 'students?on_conflict=id', {
+      studentResponse = UrlFetchApp.fetch(base + 'students?on_conflict=id', {
         method: 'post',
         headers: headers,
         payload: JSON.stringify(studentsPayload),
         muteHttpExceptions: true
       });
+      if (studentResponse.getResponseCode() < 300) {
+        studentTable = 'students';
+      }
     } catch (e) {
       Logger.log('Supabase students sync notice: ' + e.toString());
+    }
+    if (!studentTable) {
+      const primaryError = studentResponse
+        ? 'HTTP ' + studentResponse.getResponseCode() + ': ' + studentResponse.getContentText()
+        : 'The students table request could not be completed.';
+      try {
+        const fallbackResponse = UrlFetchApp.fetch(base + 'students_master?on_conflict=roll_no', {
+          method: 'post',
+          headers: headers,
+          payload: JSON.stringify(fullData.students.map(function(s) {
+            return {
+              roll_no: s.roll || s.id,
+              student_name: s.name || '',
+              login_password: s.password || 'password123',
+              access_status: s.status || 'Active',
+              parent_name: s.parentName || '',
+              contact_phone: s.phone || '',
+              total_fee_inr: Number(s.totalFee || 0),
+              paid_fee_inr: Number(s.paidFee || 0),
+              pending_dues_inr: Number(s.totalFee || 0) - Number(s.paidFee || 0),
+              monthly_fee_inr: Number(s.monthlyFee || 0),
+              fee_due_date: s.dueDate || 'Fully Paid',
+              last_reminder_sent: s.lastReminder || '-',
+              admission_date: s.admissionDate || '',
+              batch_id: s.batchId || ''
+            };
+          })),
+          muteHttpExceptions: true
+        });
+        if (fallbackResponse.getResponseCode() >= 300) {
+          throw new Error('HTTP ' + fallbackResponse.getResponseCode() + ': ' + fallbackResponse.getContentText());
+        }
+        studentTable = 'students_master';
+      } catch (fallbackError) {
+        throw new Error('Student records could not be saved to Supabase. ' + primaryError + ' Fallback failed: ' + fallbackError.toString());
+      }
     }
   }
 
@@ -1782,7 +2038,7 @@ function syncToSupabase_(fullData) {
     }
   }
 
-  return true;
+  return { success: true, studentTable: studentTable || '' };
 }
 
 /**
@@ -1818,8 +2074,272 @@ function loadFromSupabase_(settings) {
  * Developer action: merge demo records into the saved app data and rebuild
  * every configured spreadsheet tab from the seed-backed database.
  */
+function syncDummySeedRecordsToSupabase_(data, excessDummyIds) {
+  const settings = (data && data.settings) || {};
+  const supabaseUrl = settings.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
+  const supabaseKey = settings.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase URL or API key is missing.');
+  }
+
+  const normalizedUrl = supabaseUrl.replace(/\/+$/, '');
+  const base = normalizedUrl + (/\/rest\/v1$/i.test(normalizedUrl) ? '' : '/rest/v1');
+  const headers = {
+    apikey: supabaseKey,
+    Authorization: 'Bearer ' + supabaseKey,
+    'Content-Type': 'application/json',
+    Prefer: 'resolution=merge-duplicates,return=minimal'
+  };
+  const dummyRecords = function (key) {
+    return (data[key] || []).filter(function (record) {
+      return !!(record && record.isDummy === true);
+    });
+  };
+  const tableConfigs = [
+    {
+      stateKey: 'batches',
+      variants: [
+        { table: 'batches', conflict: 'id', map: function (r) {
+          return { id: r.id, name: r.name, subject: r.subject, schedule: r.schedule, room: r.room, teacher: r.teacher, student_ids: r.studentIds || [] };
+        } },
+        { table: 'batches_roster', conflict: 'batch_id', map: function (r) {
+          return { batch_id: r.id, batch_name: r.name, subjects: r.subject, schedule: r.schedule, classroom_hall: r.room, lead_faculty: r.teacher, student_ids: r.studentIds || [], student_count: (r.studentIds || []).length };
+        } }
+      ]
+    },
+    {
+      stateKey: 'students',
+      variants: [
+        { table: 'students', conflict: 'id', map: function (r) {
+          return { id: r.id || r.roll, roll: r.roll || r.id, name: r.name, phone: r.phone || '', parent_name: r.parentName || '', total_fee: Number(r.totalFee || 0), paid_fee: Number(r.paidFee || 0), monthly_fee: Number(r.monthlyFee || 0), due_date: r.dueDate || 'Fully Paid', last_reminder: r.lastReminder || '-', password: r.password || '', status: r.status || 'Active', admission_date: r.admissionDate || '', batch_id: r.batchId || '' };
+        } },
+        { table: 'students_master', conflict: 'roll_no', map: function (r) {
+          return { roll_no: r.roll || r.id, student_name: r.name, login_password: r.password || '', access_status: r.status || 'Active', parent_name: r.parentName || '', contact_phone: r.phone || '', total_fee_inr: Number(r.totalFee || 0), paid_fee_inr: Number(r.paidFee || 0), monthly_fee_inr: Number(r.monthlyFee || 0), fee_due_date: r.dueDate || 'Fully Paid', last_reminder_sent: r.lastReminder || '-', admission_date: r.admissionDate || '', batch_id: r.batchId || '' };
+        } }
+      ]
+    },
+    {
+      stateKey: 'materials',
+      variants: [
+        { table: 'materials', conflict: 'id', map: function (r) {
+          return { id: r.id, batch_id: r.batchId || '', batch_name: r.batchName || '', title: r.title || '', category: r.category || 'Study Material', upload_date: r.uploadDate || r.date || '', uploaded_by: r.uploadedBy || 'Faculty', file_size: r.fileSize || r.size || '', downloads: Number(r.downloads || 0), description: r.description || '', download_url: r.downloadUrl || r.url || '', drive_url: r.driveUrl || r.url || '' };
+        } },
+        { table: 'materials_repository', conflict: 'material_id', map: function (r) {
+          return { material_id: r.id, batch_id: r.batchId || '', batch_name: r.batchName || '', title: r.title || '', category: r.category || 'Study Material', upload_date: r.uploadDate || r.date || '', uploaded_by: r.uploadedBy || 'Faculty', file_size: r.fileSize || r.size || '', downloads: Number(r.downloads || 0), description: r.description || '', download_url: r.downloadUrl || r.url || '', google_drive_link: r.driveUrl || r.url || '' };
+        } }
+      ]
+    },
+    {
+      stateKey: 'offlineTests',
+      variants: [
+        { table: 'offline_tests', conflict: 'id', map: function (r) {
+          return { id: r.id, batch_id: r.batchId || '', title: r.title || '', subject: r.subject || '', test_date: r.date || '', max_marks: Number(r.maxMarks || 100), marks: r.marks || {}, is_dummy: true };
+        } },
+        { table: 'offline_test_marks', conflict: 'test_id', map: function (r) {
+          return { test_id: r.id, batch_id: r.batchId || '', test_title: r.title || '', subject: r.subject || '', test_date: r.date || '', max_marks: Number(r.maxMarks || 100), marks: r.marks || {}, is_dummy: true };
+        } }
+      ]
+    },
+    {
+      stateKey: 'teachers',
+      variants: [
+        { table: 'teachers', conflict: 'id', map: function (r) {
+          return { id: r.id, name: r.name || '', subject: r.subject || '', qualification: r.qualification || '', experience: r.experience || '', email: r.email || '', phone: r.phone || '', specialization: r.specialization || '', bio: r.bio || '', avatar_color: r.avatarColor || '', initials: r.initials || '', password: r.password || '', status: r.status || 'Active' };
+        } },
+        { table: 'teachers_roster', conflict: 'teacher_id', map: function (r) {
+          return { teacher_id: r.id, teacher_name: r.name || '', primary_subject: r.subject || '', academic_qualifications: r.qualification || '', teaching_experience: r.experience || '', login_email: r.email || '', contact_phone: r.phone || '', specialization_focus: r.specialization || '', faculty_biography: r.bio || '', avatar_color: r.avatarColor || '', initials: r.initials || '', login_password: r.password || '', access_status: r.status || 'Active' };
+        } }
+      ]
+    },
+    {
+      stateKey: 'gallery',
+      variants: [
+        { table: 'gallery', conflict: 'id', map: function (r) {
+          return { id: r.id, title: r.title || '', category: r.category || 'Event', date: r.date || '', caption: r.caption || '', badge: r.badge || '', image_url: r.imageUrl || r.image || '' };
+        } },
+        { table: 'gallery_banners', conflict: 'banner_id', map: function (r) {
+          return { banner_id: r.id, title: r.title || '', category: r.category || 'Event', banner_date: r.date || '', caption: r.caption || '', badge_air_rank: r.badge || '', image_url: r.imageUrl || r.image || '' };
+        } }
+      ]
+    },
+    {
+      stateKey: 'feedbacks',
+      variants: [
+        { table: 'feedbacks', conflict: 'id', map: function (r) {
+          return { id: r.id, name: r.authorName || r.name || '', message: r.comment || r.message || '', rating: Number(r.rating || 5), created_at: r.date || '', batch: r.batchName || r.batch || '', role: r.role || 'Student', category: r.category || 'General', read: r.read === true };
+        } },
+        { table: 'feedback_responses', conflict: 'row_id', map: function (r) {
+          return { row_id: r.id, author_name: r.authorName || r.name || '', feedback_comment: r.comment || r.message || '', rating_stars: Number(r.rating || 5), feedback_date: r.date || '', batch_name: r.batchName || r.batch || '', role: r.role || 'Student', topic: r.category || 'General', read: r.read === true };
+        } }
+      ]
+    },
+    {
+      stateKey: 'notifications',
+      variants: [
+        { table: 'notifications', conflict: 'id', map: function (r) {
+          return {
+            id: r.id,
+            title: r.title || 'Demo notification',
+            message: r.message || '',
+            time: r.time || '',
+            timestamp: Number(r.timestamp || Date.now()),
+            read: r.read === true,
+            admin_seen: r.adminSeen === true,
+            type: r.type || 'info',
+            icon: r.icon || '',
+            icon_color: r.iconColor || '',
+            bg_color: r.bgColor || '',
+            action_tab: r.actionTab || '',
+            target_role: r.targetRole || 'all',
+            material_id: r.materialId || '',
+            batch_name: r.batchName || ''
+          };
+        } }
+      ]
+    }
+  ];
+
+  const failures = [];
+  excessDummyIds = excessDummyIds || {};
+  const extraDummyIds = {
+    batches: ['b7', 'b8', 'b9', 'b10'],
+    students: ['s3', 's4', 's7', 's10', 's11'],
+    materials: ['m7', 'm8', 'm9', 'm10'],
+    offlineTests: ['t7', 't8', 't9', 't10'],
+    teachers: ['tr7', 'tr8', 'tr9', 'tr10'],
+    gallery: ['g7', 'g8', 'g9', 'g10'],
+    feedbacks: ['f7', 'f8', 'f9', 'f10']
+  };
+  const obsoleteTableConfigs = [
+    { stateKey: 'batches', tables: [{ name: 'batches', columns: ['id'] }, { name: 'batches_roster', columns: ['batch_id'] }] },
+    { stateKey: 'students', tables: [{ name: 'students', columns: ['id'] }, { name: 'students_master', columns: ['roll_no'] }] },
+    { stateKey: 'materials', tables: [{ name: 'materials', columns: ['id'] }, { name: 'materials_repository', columns: ['material_id'] }] },
+    { stateKey: 'offlineTests', tables: [{ name: 'offline_tests', columns: ['id'] }, { name: 'offline_test_marks', columns: ['test_id'] }] },
+    { stateKey: 'teachers', tables: [{ name: 'teachers', columns: ['id'] }, { name: 'teachers_roster', columns: ['teacher_id'] }] },
+    { stateKey: 'gallery', tables: [{ name: 'gallery', columns: ['id'] }, { name: 'gallery_banners', columns: ['banner_id'] }] },
+    { stateKey: 'feedbacks', tables: [{ name: 'feedbacks', columns: ['id'] }, { name: 'feedback_responses', columns: ['row_id'] }] },
+    { stateKey: 'notifications', tables: [{ name: 'notifications', columns: ['id'] }] }
+  ];
+  obsoleteTableConfigs.forEach(function (config) {
+    const ids = (extraDummyIds[config.stateKey] || []).concat(excessDummyIds[config.stateKey] || [])
+      .filter(function (id, index, list) { return id && list.indexOf(id) === index; });
+    if (!ids.length) return;
+    config.tables.forEach(function (table) {
+      table.columns.forEach(function (column) {
+        const filter = ids.map(function (id) { return encodeURIComponent(id); }).join(',');
+        const response = UrlFetchApp.fetch(base + '/' + table.name + '?' + column + '=in.(' + filter + ')', {
+          method: 'delete',
+          headers: headers,
+          muteHttpExceptions: true
+        });
+        const status = response.getResponseCode();
+        if (status >= 300 && table.name === config.tables[0].name && column === config.tables[0].columns[0]) {
+          failures.push(table.name + ' demo-row cleanup: ' + (response.getContentText() || status));
+        }
+      });
+    });
+  });
+
+  tableConfigs.forEach(function (config) {
+    const records = dummyRecords(config.stateKey);
+    if (!records.length) return;
+    let synced = false;
+    const tableErrors = [];
+    config.variants.forEach(function (variant) {
+      if (synced) return;
+      const payload = records.map(variant.map);
+      const response = UrlFetchApp.fetch(
+        base + '/' + variant.table + '?on_conflict=' + encodeURIComponent(variant.conflict),
+        {
+          method: 'post',
+          headers: headers,
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true
+        }
+      );
+      if (response.getResponseCode() >= 200 && response.getResponseCode() < 300) {
+        synced = true;
+      } else {
+        tableErrors.push(variant.table + ': ' +
+          (response.getContentText() || ('HTTP ' + response.getResponseCode())));
+      }
+    });
+    if (!synced) failures.push(config.stateKey + ' (' + tableErrors.join('; ') + ')');
+  });
+
+  const snapshotResponse = UrlFetchApp.fetch(base + '/db_json?on_conflict=snapshot_key', {
+    method: 'post',
+    headers: headers,
+    payload: JSON.stringify([{ snapshot_key: 'main', payload: data, updated_at: new Date().toISOString() }]),
+    muteHttpExceptions: true
+  });
+  if (snapshotResponse.getResponseCode() >= 300) {
+    failures.push('db_json: ' + (snapshotResponse.getContentText() || snapshotResponse.getResponseCode()));
+  }
+
+  if (failures.length) {
+    throw new Error('Supabase demo-data sync failed: ' + failures.join('; '));
+  }
+  return true;
+}
+
+function enforceSixDummySeedRecordsPerTable_(data, seed) {
+  const tableKeys = ['batches', 'students', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks', 'notifications'];
+  const removedIds = {};
+  tableKeys.forEach(function (tableKey) {
+    if (tableKey === 'students' && data.settings &&
+      (data.settings.studentSeedDataDisabled === true || data.settings.studentSeedDataDisabled === 'true')) {
+      removedIds[tableKey] = [];
+      data[tableKey] = (data[tableKey] || []).filter(function (record) {
+        if (!record || !isDummyRecord_(record)) return true;
+        if (record.id) removedIds[tableKey].push(String(record.id));
+        return false;
+      });
+      return;
+    }
+    const seedRecords = (seed[tableKey] || []).slice(0, 6);
+    const allowed = {};
+    seedRecords.forEach(function (record) { allowed[String(record.id)] = true; });
+    const keptIds = {};
+    removedIds[tableKey] = [];
+    data[tableKey] = (data[tableKey] || []).filter(function (record) {
+      if (!record || !isDummyRecord_(record)) return true;
+      const id = String(record.id || '');
+      if (!allowed[id] || keptIds[id]) {
+        if (id && removedIds[tableKey].indexOf(id) < 0) removedIds[tableKey].push(id);
+        return false;
+      }
+      record.isDummy = true;
+      keptIds[id] = true;
+      return true;
+    });
+    seedRecords.forEach(function (seedRecord) {
+      const id = String(seedRecord.id);
+      if (keptIds[id]) return;
+      const copy = JSON.parse(JSON.stringify(seedRecord));
+      copy.isDummy = true;
+      data[tableKey].push(copy);
+      keptIds[id] = true;
+    });
+  });
+  const removedStudents = {};
+  (removedIds.students || []).forEach(function (id) { removedStudents[id] = true; });
+  (data.batches || []).forEach(function (batch) {
+    if (batch && Array.isArray(batch.studentIds)) {
+      batch.studentIds = batch.studentIds.filter(function (id) { return !removedStudents[String(id)]; });
+    }
+  });
+  (data.offlineTests || []).forEach(function (test) {
+    if (!test || !test.marks || typeof test.marks !== 'object') return;
+    Object.keys(removedStudents).forEach(function (id) { delete test.marks[id]; });
+  });
+  return removedIds;
+}
+
 function apiCreateDummyDataAndSheets() {
   try {
+    PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_WIPED', 'false');
+    PropertiesService.getScriptProperties().setProperty('STUDENT_SEED_DATA_DISABLED', 'false');
     try {
       PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
       PropertiesService.getScriptProperties().deleteProperty('DB_tomb_linkUrls');
@@ -1828,13 +2348,14 @@ function apiCreateDummyDataAndSheets() {
     // 1. Get seed data baseline
     const seed = getDefaultSeedData();
     let data = dbLoadAll();
-    if (!data) data = seed;
+    if (!data) data = apiGetInitialData() || seed;
     if (!data.settings) data.settings = {};
     data.settings.dummyDataWiped = false;
     data.settings.showDummyData = true;
+    data.settings.studentSeedDataDisabled = false;
 
     // 2. Add missing seed demo records to all tables (preserving genuine client records)
-    ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks', 'externalLinks'].forEach(function(tbl) {
+    ['students', 'batches', 'materials', 'offlineTests', 'teachers', 'gallery', 'feedbacks', 'notifications'].forEach(function(tbl) {
       if (!Array.isArray(data[tbl])) data[tbl] = [];
       const existingIds = {};
       data[tbl].forEach(function(item) { if (item && item.id) existingIds[String(item.id)] = true; });
@@ -1847,7 +2368,7 @@ function apiCreateDummyDataAndSheets() {
         }
       });
     });
-
+    const excessDummyIds = enforceSixDummySeedRecordsPerTable_(data, seed);
     // 3. Save directly to Cloud Database
     dbSaveAll(data);
 
@@ -1856,22 +2377,22 @@ function apiCreateDummyDataAndSheets() {
     if (!ss) return { success: false, error: 'The database is unavailable.' };
     syncReadableSheets(ss, data);
 
-    // 5. Sync directly to Supabase tables and snapshot
-    syncToSupabase_(data);
+    // 5. Upsert dummy rows to Supabase without replacing existing client records.
+    syncDummySeedRecordsToSupabase_(data, excessDummyIds);
 
     const recordCounts = {};
     const shortTabs = [];
     getRequiredSheetTabNames_().forEach(function (name) {
-      if (name === 'DB_JSON') return; // One hidden system snapshot, not a records table.
+      if (name === 'DB_JSON' || name === 'External_Links_Hub' || name === 'Settings_Config') return;
       const sheet = ss.getSheetByName(name);
       const count = Math.max(0, sheet ? sheet.getLastRow() - 1 : 0);
       recordCounts[name] = count;
-      if (count < 10) shortTabs.push(name + ' (' + count + ')');
+      if (count < 6) shortTabs.push(name + ' (' + count + ')');
     });
     if (shortTabs.length) {
       return {
         success: false,
-        error: 'Some tabs have fewer than 10 records: ' + shortTabs.join(', '),
+        error: 'Some demo-data tabs have fewer than 6 records: ' + shortTabs.join(', '),
         recordCounts: recordCounts
       };
     }
@@ -1879,6 +2400,7 @@ function apiCreateDummyDataAndSheets() {
       success: true,
       sheetCount: getRequiredSheetTabNames_().length,
       recordCounts: recordCounts,
+      studentSeedDataDisabled: data.settings.studentSeedDataDisabled === true || data.settings.studentSeedDataDisabled === 'true',
       timestamp: new Date().toISOString()
     };
   } catch (err) {
@@ -1898,6 +2420,8 @@ function apiCreateDummyDataAndSheets() {
  */
 function apiPermanentClearDummyData() {
   try {
+    PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_WIPED', 'true');
+    PropertiesService.getScriptProperties().setProperty('STUDENT_SEED_DATA_DISABLED', 'true');
     let data = dbLoadAll();
     if (!data) data = apiGetInitialData();
     if (!data) return { success: false, error: 'Database is unavailable.' };
@@ -1905,11 +2429,69 @@ function apiPermanentClearDummyData() {
     if (!data.settings) data.settings = {};
     data.settings.showDummyData = false;
     data.settings.dummyDataWiped = true;
+    data.settings.studentSeedDataDisabled = true;
+
+    const dummySupabaseIds = {
+      batches: [],
+      students: [],
+      materials: [],
+      offline_tests: [],
+      teachers: [],
+      gallery: [],
+      feedbacks: []
+    };
+    const supabaseTableKeys = {
+      batches: 'batches',
+      students: 'students',
+      materials: 'materials',
+      offlineTests: 'offline_tests',
+      teachers: 'teachers',
+      gallery: 'gallery',
+      feedbacks: 'feedbacks'
+    };
+    Object.keys(supabaseTableKeys).forEach(function (dataKey) {
+      (data[dataKey] || []).forEach(function (record) {
+        if (!record || !isDummyRecord_(record)) return;
+        const tableKey = supabaseTableKeys[dataKey];
+        [record.id, record.roll].forEach(function (id) {
+          id = String(id || '').trim();
+          if (id && dummySupabaseIds[tableKey].indexOf(id) < 0) {
+            dummySupabaseIds[tableKey].push(id);
+          }
+        });
+      });
+    });
 
     // Track dummy student IDs to clean foreign keys
     const dummyStudentIds = {};
     (data.students || []).forEach(function(s) {
       if (s && isDummyRecord_(s)) dummyStudentIds[String(s.id)] = true;
+    });
+    const dummyMaterialIds = {};
+    (data.materials || []).forEach(function (material) {
+      if (material && isDummyRecord_(material)) dummyMaterialIds[String(material.id)] = true;
+    });
+    const dummyNotificationIds = [];
+    data.notifications = (data.notifications || []).filter(function (notification) {
+      if (!notification) return false;
+      const notificationId = String(notification.id || '');
+      const studentId = String(notification.targetStudentId || notification.studentId || '');
+      const materialId = String(notification.materialId || '');
+      const isDummyNotification = notification.isDummy === true ||
+        !!dummyStudentIds[studentId] ||
+        !!dummyMaterialIds[materialId] ||
+        Object.keys(dummyStudentIds).some(function (id) {
+          return notificationId.indexOf('notif_fee_' + id + '_') === 0 ||
+            notificationId.indexOf('monthly_fee_' + id + '_') === 0;
+        }) ||
+        Object.keys(dummyMaterialIds).some(function (id) {
+          return notificationId.indexOf('notif_mat_' + id) === 0;
+        });
+      if (isDummyNotification) {
+        if (notificationId) dummyNotificationIds.push(notificationId);
+        return false;
+      }
+      return true;
     });
 
     const clearedCounts = {};
@@ -1921,9 +2503,6 @@ function apiPermanentClearDummyData() {
       data[tbl] = (data[tbl] || []).filter(function(r) { return !isDummyRecord_(r); });
       clearedCounts[tbl] = initialCount - data[tbl].length;
     });
-
-    // Clear notifications on dummy data wipe
-    data.notifications = [];
 
     // 2. Remove dummy student references from surviving client batches
     (data.batches || []).forEach(function(b) {
@@ -1958,16 +2537,13 @@ function apiPermanentClearDummyData() {
       Logger.log('Spreadsheet wipe mirror notice: ' + sheetErr.toString());
     }
 
-    // 6. Delete dummy records from Supabase tables
-    try {
-      clearDummyDataFromSupabase_(data);
-    } catch (sbErr) {
-      Logger.log('Supabase dummy clear notice: ' + sbErr.toString());
-    }
+    // 6. Delete dummy records from Supabase tables and fail explicitly if it cannot complete.
+    const supabaseClearResult = clearDummyDataFromSupabase_(data, dummySupabaseIds, dummyNotificationIds);
 
     return {
       success: true,
       clearedCounts: clearedCounts,
+      supabaseCleared: supabaseClearResult.success,
       remainingCounts: {
         students: (data.students || []).length,
         batches: (data.batches || []).length,
@@ -1986,11 +2562,416 @@ function apiPermanentClearDummyData() {
   }
 }
 
-function clearDummyDataFromSupabase_(data) {
+function apiClearStudentTable(developerEmail, developerPassword, confirmationText) {
+  let serverCleared = false;
+  let studentTableClearedAt = '';
+  try {
+    const verification = verifyDeveloperCredentials_(developerEmail, developerPassword);
+    if (!verification.success) {
+      return {
+        success: false,
+        error: verification.notConfigured
+          ? 'Developer credentials are not configured on the server.'
+          : 'Developer email or password is incorrect.'
+      };
+    }
+    if (String(confirmationText || '').trim() !== 'CLEAR STUDENTS') {
+      return { success: false, error: 'Type CLEAR STUDENTS to confirm this operation.' };
+    }
+
+    PropertiesService.getScriptProperties().setProperty('STUDENT_SEED_DATA_DISABLED', 'true');
+    let data = dbLoadAll();
+    if (!data) data = apiGetInitialData();
+    if (!data) return { success: false, error: 'Database is unavailable.' };
+    if (!data.settings || typeof data.settings !== 'object') data.settings = {};
+
+    const removedIds = {};
+    (data.students || []).forEach(function (student) {
+      if (!student) return;
+      [student.id, student.roll].forEach(function (id) {
+        if (id) removedIds[String(id)] = true;
+      });
+    });
+    const removedCount = (data.students || []).length;
+    data.students = [];
+    data.settings.studentSeedDataDisabled = true;
+    studentTableClearedAt = new Date().toISOString();
+    data.settings.studentTableClearedAt = studentTableClearedAt;
+
+    (data.batches || []).forEach(function (batch) {
+      if (Array.isArray(batch.studentIds)) {
+        batch.studentIds = batch.studentIds.filter(function (id) { return !removedIds[String(id)]; });
+      }
+    });
+    (data.offlineTests || []).forEach(function (test) {
+      if (!test || !test.marks || typeof test.marks !== 'object') return;
+      Object.keys(removedIds).forEach(function (id) { delete test.marks[id]; });
+    });
+    data.notifications = (data.notifications || []).filter(function (notification) {
+      if (!notification) return false;
+      const targetId = String(notification.targetStudentId || notification.studentId || '');
+      const targetRoll = String(notification.targetRoll || '');
+      return !removedIds[targetId] && !removedIds[targetRoll];
+    });
+
+    const saveResult = apiSyncAllData(data);
+    if (!saveResult || !saveResult.success) {
+      throw new Error((saveResult && saveResult.error) || 'The cleared student roster could not be saved.');
+    }
+    serverCleared = true;
+
+    const spreadsheet = getDbSpreadsheet();
+    if (!spreadsheet) throw new Error('The student roster sheet is unavailable.');
+    let studentsSheet = spreadsheet.getSheetByName('Students_Master');
+    if (!studentsSheet) studentsSheet = spreadsheet.insertSheet('Students_Master');
+    const studentHeaders = ['Roll No', 'Student Name', 'Login Password', 'Access Status', 'Parent Name', 'Contact Phone', 'Total Fee (INR)', 'Paid Fee (INR)', 'Pending Dues (INR)', 'Fee Due Date', 'Last Reminder Sent', 'Admission Date', 'Monthly Fee (INR)'];
+    studentsSheet.clear();
+    studentsSheet.getRange(1, 1, 1, studentHeaders.length).setValues([studentHeaders]);
+    studentsSheet.getRange(1, 1, 1, studentHeaders.length).setFontWeight('bold').setBackground('#4f46e5').setFontColor('#ffffff');
+    formatAndTrimSheet(studentsSheet, studentHeaders.length, 1);
+
+    let settingsSheet = spreadsheet.getSheetByName('Settings_Config');
+    if (!settingsSheet) {
+      settingsSheet = spreadsheet.insertSheet('Settings_Config');
+      settingsSheet.getRange(1, 1, 1, 3).setValues([['Setting Parameter', 'Configured Value', 'Description']]);
+    }
+    const settingRows = settingsSheet.getLastRow() > 1
+      ? settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 1).getDisplayValues()
+      : [];
+    [
+      ['Student Seed Data Disabled', 'Yes', 'Do not restore demo student rows after the student table is cleared'],
+      ['Student Table Cleared At', data.settings.studentTableClearedAt, 'Reject stale student rows from before the developer clear action']
+    ].forEach(function (setting) {
+      const rowIndex = settingRows.findIndex(function (row) {
+        return String(row[0] || '').trim() === setting[0];
+      });
+      if (rowIndex >= 0) {
+        settingsSheet.getRange(rowIndex + 2, 2).setValue(setting[1]);
+      } else {
+        settingsSheet.appendRow([setting[0], setting[1], setting[2]]);
+      }
+    });
+    const snapshotSheet = spreadsheet.getSheetByName('DB_JSON');
+    if (snapshotSheet) snapshotSheet.getRange(1, 1).setValue(JSON.stringify(data));
+
+    const settings = data.settings;
+    const normalizedUrl = (settings.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co').replace(/\/+$/, '');
+    const supabaseKey = settings.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+    const base = normalizedUrl + (/\/rest\/v1$/i.test(normalizedUrl) ? '' : '/rest/v1');
+    const headers = {
+      apikey: supabaseKey,
+      Authorization: 'Bearer ' + supabaseKey,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    };
+    const tableResults = [];
+    const tableFailures = [];
+    [
+      { name: 'students', column: 'id' },
+      { name: 'students_master', column: 'roll_no' }
+    ].forEach(function (table) {
+      try {
+        const response = UrlFetchApp.fetch(
+          base + '/' + table.name + '?' + table.column + '=not.is.null',
+          { method: 'delete', headers: headers, muteHttpExceptions: true }
+        );
+        const status = response.getResponseCode();
+        const body = response.getContentText();
+        if (status >= 200 && status < 300) {
+          let deletedRows = null;
+          if (body) {
+            try {
+              const rows = JSON.parse(body);
+              if (Array.isArray(rows)) deletedRows = rows.length;
+            } catch (parseError) {
+              throw new Error(table.name + ' deletion count could not be verified.');
+            }
+          }
+          tableResults.push({ name: table.name, deletedRows: deletedRows });
+        } else if (!(/PGRST205|42P01|does not exist|not found/i.test(body)) || status !== 404) {
+          tableFailures.push(table.name + ': HTTP ' + status + (body ? ' ' + body : ''));
+        }
+      } catch (requestError) {
+        tableFailures.push(table.name + ': ' + requestError.toString());
+      }
+    });
+    if (!tableResults.length || tableFailures.length) {
+      throw new Error('Supabase student-table cleanup was incomplete: ' +
+        (tableFailures.length ? tableFailures.join('; ') : 'No student table was available.'));
+    }
+
+    const settingsResponse = UrlFetchApp.fetch(base + '/settings_config?on_conflict=setting_parameter', {
+      method: 'post',
+      headers: Object.assign({}, headers, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      payload: JSON.stringify([{
+        setting_parameter: 'Student Seed Data Disabled',
+        configured_value: 'Yes',
+        description: 'Do not restore demo student rows after the student table is cleared'
+      }, {
+        setting_parameter: 'Student Table Cleared At',
+        configured_value: data.settings.studentTableClearedAt,
+        description: 'Reject stale student rows from before the developer clear action'
+      }]),
+      muteHttpExceptions: true
+    });
+    if (settingsResponse.getResponseCode() >= 300) {
+      throw new Error('Could not persist the student-seed lock in Supabase: ' + settingsResponse.getContentText());
+    }
+
+    const snapshotResponse = UrlFetchApp.fetch(base + '/db_json?snapshot_key=eq.main', {
+      method: 'patch',
+      headers: Object.assign({}, headers, { Prefer: 'return=minimal' }),
+      payload: JSON.stringify({ payload: data, updated_at: new Date().toISOString() }),
+      muteHttpExceptions: true
+    });
+    if (snapshotResponse.getResponseCode() >= 300) {
+      throw new Error('Could not persist the cleared student snapshot in Supabase: ' + snapshotResponse.getContentText());
+    }
+
+    try {
+      PropertiesService.getScriptProperties().deleteProperty('DB_tomb_rolls');
+    } catch (tombstoneError) {
+      Logger.log('Student roster tombstone cleanup notice: ' + tombstoneError.toString());
+    }
+    return {
+      success: true,
+      clearedRows: removedCount,
+      supabaseTables: tableResults,
+      studentSeedDataDisabled: true,
+      studentTableClearedAt: studentTableClearedAt
+    };
+  } catch (err) {
+    Logger.log('apiClearStudentTable error: ' + err.toString());
+    return {
+      success: false,
+      serverCleared: serverCleared,
+      studentSeedDataDisabled: serverCleared,
+      studentTableClearedAt: studentTableClearedAt,
+      error: err.message || String(err)
+    };
+  }
+}
+
+function apiClearAllSupabaseData(developerEmail, developerPassword, confirmationText) {
+  try {
+    const verification = verifyDeveloperCredentials_(developerEmail, developerPassword);
+    if (!verification.success) {
+      return {
+        success: false,
+        error: verification.notConfigured
+          ? 'Developer credentials are not configured on the server.'
+          : 'Developer email or password is incorrect.'
+      };
+    }
+    if (String(confirmationText || '').trim() !== 'CLEAR ALL') {
+      return { success: false, error: 'Type CLEAR ALL to confirm this operation.' };
+    }
+
+    PropertiesService.getScriptProperties().setProperty('DUMMY_DATA_WIPED', 'true');
+    PropertiesService.getScriptProperties().setProperty('STUDENT_SEED_DATA_DISABLED', 'true');
+    const data = dbLoadAll() || {};
+    const settings = data.settings || {};
+    const supabaseUrl = settings.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
+    const supabaseKey = settings.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
+    if (!supabaseUrl || !supabaseKey) {
+      return { success: false, error: 'Supabase URL or API key is missing.' };
+    }
+
+    const normalizedUrl = supabaseUrl.replace(/\/+$/, '');
+    const base = normalizedUrl + (/\/rest\/v1$/i.test(normalizedUrl) ? '/' : '/rest/v1/');
+    const headers = {
+      apikey: supabaseKey,
+      Authorization: 'Bearer ' + supabaseKey,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    };
+    const tables = [
+      { name: 'batches', column: 'id' },
+      { name: 'batches_roster', column: 'batch_id' },
+      { name: 'students', column: 'id' },
+      { name: 'students_master', column: 'roll_no' },
+      { name: 'teachers', column: 'id' },
+      { name: 'teachers_roster', column: 'teacher_id' },
+      { name: 'materials', column: 'id' },
+      { name: 'materials_repository', column: 'material_id' },
+      { name: 'offline_tests', column: 'id' },
+      { name: 'offline_test_marks', column: 'test_id' },
+      { name: 'gallery', column: 'id' },
+      { name: 'external_links', column: 'id' },
+      { name: 'feedbacks', column: 'id' },
+      { name: 'notifications', column: 'id' },
+      { name: 'db_json', column: 'snapshot_key' }
+    ];
+    const clearedTables = [];
+    const failures = [];
+
+    tables.forEach(function (table) {
+      try {
+        const response = UrlFetchApp.fetch(
+          base + table.name + '?' + table.column + '=not.is.null',
+          {
+            method: 'delete',
+            headers: headers,
+            muteHttpExceptions: true
+          }
+        );
+        const status = response.getResponseCode();
+        if (status < 200 || status >= 300) {
+          const body = response.getContentText();
+          if (status === 404 && /PGRST205|42P01|does not exist|not found/i.test(body)) {
+            return;
+          }
+          failures.push(table.name + ': HTTP ' + status + (body ? ' ' + body : ''));
+          return;
+        }
+
+        let deletedRows = null;
+        const body = response.getContentText();
+        if (body) {
+          try {
+            const deleted = JSON.parse(body);
+            if (Array.isArray(deleted)) deletedRows = deleted.length;
+          } catch (parseError) {
+            failures.push(table.name + ': could not verify deleted row count.');
+            return;
+          }
+        }
+        clearedTables.push({ name: table.name, deletedRows: deletedRows });
+      } catch (requestError) {
+        failures.push(table.name + ': ' + requestError.toString());
+      }
+    });
+
+    // Keep operational settings so the developer can continue using the app,
+    // but clear every application-data collection in the other configured stores.
+    const emptyData = Object.assign({}, data, {
+      batches: [],
+      students: [],
+      teachers: [],
+      materials: [],
+      offlineTests: [],
+      gallery: [],
+      externalLinks: [],
+      feedbacks: [],
+      notifications: [],
+      settings: Object.assign({}, settings, {
+        showDummyData: false,
+        dummyDataWiped: true,
+        studentSeedDataDisabled: true,
+        studentTableClearedAt: new Date().toISOString()
+      })
+    });
+    let cloudDatabaseCleared = true;
+    DB_TABLES.forEach(function (tableName) {
+      try {
+        if (!dbSetTable(tableName, emptyData[tableName] !== undefined ? emptyData[tableName] : [])) {
+          cloudDatabaseCleared = false;
+          failures.push('Apps Script Cloud Database.' + tableName + ': clear failed');
+        }
+      } catch (dbError) {
+        cloudDatabaseCleared = false;
+        failures.push('Apps Script Cloud Database.' + tableName + ': ' + dbError.toString());
+      }
+    });
+
+    let spreadsheetCleared = false;
+    try {
+      const spreadsheet = getDbSpreadsheet();
+      if (!spreadsheet) throw new Error('Could not open the configured Google Sheets database.');
+      syncReadableSheets(spreadsheet, emptyData);
+      const attendanceSheet = spreadsheet.getSheetByName(ATTENDANCE_SHEET_NAME);
+      if (attendanceSheet && attendanceSheet.getLastRow() > 1) {
+        attendanceSheet.getRange(2, 1, attendanceSheet.getLastRow() - 1, attendanceSheet.getLastColumn()).clearContent();
+      }
+      const snapshotSheet = spreadsheet.getSheetByName('DB_JSON');
+      if (snapshotSheet) snapshotSheet.getRange(1, 1).setValue(JSON.stringify(emptyData));
+      getRequiredSheetTabNames_().forEach(function (sheetName) {
+        if (sheetName === 'DB_JSON' || sheetName === 'Settings_Config') return;
+        const sheet = spreadsheet.getSheetByName(sheetName);
+        if (!sheet || sheet.getLastRow() > 1) {
+          throw new Error('Google Sheets clear could not be verified for tab: ' + sheetName);
+        }
+      });
+      spreadsheetCleared = true;
+    } catch (sheetError) {
+      failures.push('Google Sheets: ' + sheetError.toString());
+    }
+
+    try {
+      const settingsRows = [
+        ['Show Dummy / Demo Data', 'Off', 'Seed demo students/batches/tests visibility'],
+        ['Dummy Data Wiped', 'Yes', 'Permanent clearance status before client handover'],
+        ['Student Seed Data Disabled', 'Yes', 'Do not restore demo student rows after the student table is cleared'],
+        ['Student Table Cleared At', emptyData.settings.studentTableClearedAt, 'Reject stale student rows from before the developer clear action']
+      ].map(function (row) {
+        return { setting_parameter: row[0], configured_value: row[1], description: row[2] };
+      });
+      const settingsResponse = UrlFetchApp.fetch(base + 'settings_config?on_conflict=setting_parameter', {
+        method: 'post',
+        headers: Object.assign({}, headers, {
+          Prefer: 'resolution=merge-duplicates,return=minimal'
+        }),
+        payload: JSON.stringify(settingsRows),
+        muteHttpExceptions: true
+      });
+      if (settingsResponse.getResponseCode() < 200 || settingsResponse.getResponseCode() >= 300) {
+        failures.push('Supabase settings_config: HTTP ' + settingsResponse.getResponseCode() +
+          (settingsResponse.getContentText() ? ' ' + settingsResponse.getContentText() : ''));
+      }
+    } catch (settingsError) {
+      failures.push('Supabase settings_config: ' + settingsError.toString());
+    }
+
+    try {
+      const snapshotResponse = UrlFetchApp.fetch(base + 'db_json?on_conflict=snapshot_key', {
+        method: 'post',
+        headers: Object.assign({}, headers, {
+          Prefer: 'resolution=merge-duplicates,return=minimal'
+        }),
+        payload: JSON.stringify([{
+          snapshot_key: 'main',
+          payload: emptyData,
+          updated_at: new Date().toISOString()
+        }]),
+        muteHttpExceptions: true
+      });
+      if (snapshotResponse.getResponseCode() < 200 || snapshotResponse.getResponseCode() >= 300) {
+        failures.push('Supabase db_json snapshot: HTTP ' + snapshotResponse.getResponseCode());
+      }
+    } catch (snapshotError) {
+      failures.push('Supabase db_json snapshot: ' + snapshotError.toString());
+    }
+
+    if (failures.length) {
+      return {
+        success: false,
+        error: 'Clear was incomplete: ' + failures.join('; '),
+        clearedTables: clearedTables,
+        cloudDatabaseCleared: cloudDatabaseCleared,
+        spreadsheetCleared: spreadsheetCleared,
+        appData: emptyData
+      };
+    }
+    return {
+      success: true,
+      clearedTables: clearedTables,
+      cloudDatabaseCleared: cloudDatabaseCleared,
+      spreadsheetCleared: spreadsheetCleared,
+      appData: emptyData
+    };
+  } catch (err) {
+    Logger.log('apiClearAllSupabaseData error: ' + err.toString());
+    return { success: false, error: err.message || String(err) };
+  }
+}
+
+function clearDummyDataFromSupabase_(data, removedIds, dummyNotificationIds) {
   const settings = (data && data.settings) || {};
   const supabaseUrl = settings.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
   const supabaseKey = settings.supabaseKey || 'sb_publishable_vxonFVKPpyJjY5O-Y9mS6g_bhSYCcsS';
-  if (!supabaseUrl || !supabaseKey) return;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase URL or API key is missing; dummy records were not cleared from Supabase.');
+  }
 
   const base = supabaseUrl.replace(/\/+$/, '') + '/rest/v1/';
   const headers = {
@@ -2000,52 +2981,123 @@ function clearDummyDataFromSupabase_(data) {
   };
 
   const dummyTableIds = {
-    'batches': 'b1,b2,b3,b4,b5,b6,b7,b8,b9,b10',
-    'students': 's1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11',
-    'materials': 'm1,m2,m3,m4,m5,m6,m7,m8,m9,m10',
-    'offline_tests': 't1,t2,t3,t4,t5,t6,t7,t8,t9,t10',
-    'teachers': 'tr1,tr2,tr3,tr4,tr5,tr6,tr7,tr8,tr9,tr10',
-    'gallery': 'g1,g2,g3,g4,g5,g6,g7,g8,g9,g10',
-    'feedbacks': 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10'
+    batches: ['b1','b2','b3','b4','b5','b6','b7','b8','b9','b10'],
+    students: [
+      's1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11',
+      'DC-101','DC-102','DC-201','DC-202','DC-301','DC-302'
+    ],
+    materials: ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10'],
+    offline_tests: ['t1','t2','t3','t4','t5','t6','t7','t8','t9','t10'],
+    teachers: ['tr1','tr2','tr3','tr4','tr5','tr6','tr7','tr8','tr9','tr10'],
+    gallery: ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'],
+    feedbacks: ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10']
   };
+  const tableAliases = {
+    batches: ['batches', 'batches_roster'],
+    students: ['students', 'students_master'],
+    materials: ['materials', 'materials_repository'],
+    offline_tests: ['offline_tests', 'offline_test_marks'],
+    teachers: ['teachers', 'teachers_roster'],
+    gallery: ['gallery', 'gallery_banners'],
+    feedbacks: ['feedbacks', 'feedback_responses']
+  };
+  const idColumns = {
+    batches: ['id', 'batch_id'],
+    students: ['id', 'roll_no'],
+    materials: ['id', 'material_id'],
+    offline_tests: ['id', 'test_id'],
+    teachers: ['id', 'teacher_id'],
+    gallery: ['id', 'banner_id'],
+    feedbacks: ['id', 'row_id']
+  };
+  const failures = [];
 
   // Delete dummy rows from Supabase (external_links and settings_config are NEVER deleted)
   Object.keys(dummyTableIds).forEach(function(tbl) {
-    try {
-      UrlFetchApp.fetch(base + tbl + '?id=in.(' + dummyTableIds[tbl] + ')', {
-        method: 'delete',
-        headers: headers,
-        muteHttpExceptions: true
+    const ids = dummyTableIds[tbl].concat((removedIds && removedIds[tbl]) || []);
+    const uniqueIds = ids.filter(function (id, index) {
+      return id && ids.indexOf(id) === index;
+    });
+    if (!uniqueIds.length) return;
+
+    let tableAvailable = false;
+    let lastFailure = '';
+    (tableAliases[tbl] || [tbl]).forEach(function (tableName) {
+      let aliasAvailable = false;
+      let missingTable = false;
+      (idColumns[tbl] || ['id']).forEach(function (column) {
+        const filter = uniqueIds.map(function (id) {
+          return encodeURIComponent(String(id));
+        }).join(',');
+        const response = UrlFetchApp.fetch(
+          base + tableName + '?' + column + '=in.(' + filter + ')',
+          {
+            method: 'delete',
+            headers: Object.assign({}, headers, { Prefer: 'return=minimal' }),
+            muteHttpExceptions: true
+          }
+        );
+        const status = response.getResponseCode();
+        if (status >= 200 && status < 300) {
+          tableAvailable = true;
+          aliasAvailable = true;
+        } else {
+          const errorText = response.getContentText() || ('HTTP ' + status);
+          if (status === 404 && /PGRST205|42P01|does not exist|not found/i.test(errorText)) {
+            missingTable = true;
+          } else {
+            lastFailure = errorText;
+          }
+        }
       });
-    } catch (e) {
-      Logger.log('Supabase delete ' + tbl + ' error: ' + e.toString());
-    }
+      if (!aliasAvailable && !missingTable && lastFailure) {
+        failures.push(tableName + ': ' + lastFailure);
+      }
+    });
+    if (!tableAvailable) failures.push(tbl + ': ' + (lastFailure || 'No configured table was found.'));
   });
 
-  // Delete all notifications from Supabase
-  try {
-    UrlFetchApp.fetch(base + 'notifications?id=neq.placeholder', {
+  // Delete only notifications that reference removed demo students/materials.
+  const notificationIds = (dummyNotificationIds || []).filter(function (id, index, ids) {
+    return id && ids.indexOf(id) === index;
+  });
+  if (notificationIds.length) {
+    const filter = notificationIds.map(function (id) {
+      return encodeURIComponent(String(id));
+    }).join(',');
+    const response = UrlFetchApp.fetch(base + 'notifications?id=in.(' + filter + ')', {
       method: 'delete',
-      headers: headers,
+      headers: Object.assign({}, headers, { Prefer: 'return=minimal' }),
       muteHttpExceptions: true
     });
-  } catch (e) {
-    Logger.log('Supabase delete notifications error: ' + e.toString());
+    if (response.getResponseCode() >= 300) {
+      failures.push('notifications: ' + (response.getContentText() || response.getResponseCode()));
+    }
   }
 
   // Update settings_config in Supabase
-  try {
-    UrlFetchApp.fetch(base + 'settings_config?setting_parameter=eq.Show Dummy / Demo Data', {
-      method: 'patch',
-      headers: headers,
-      payload: JSON.stringify({ configured_value: 'Off' }),
-      muteHttpExceptions: true
-    });
-  } catch (e) {}
+  [
+    { parameter: 'Show Dummy / Demo Data', value: 'Off' },
+    { parameter: 'Dummy Data Wiped', value: 'Yes' },
+    { parameter: 'Student Seed Data Disabled', value: 'Yes' }
+  ].forEach(function (setting) {
+    const response = UrlFetchApp.fetch(
+      base + 'settings_config?setting_parameter=eq.' + encodeURIComponent(setting.parameter),
+      {
+        method: 'patch',
+        headers: headers,
+        payload: JSON.stringify({ configured_value: setting.value }),
+        muteHttpExceptions: true
+      }
+    );
+    if (response.getResponseCode() >= 300) {
+      failures.push('settings_config (' + setting.parameter + '): ' +
+        (response.getContentText() || response.getResponseCode()));
+    }
+  });
 
   // Update snapshot db_json
-  try {
-    UrlFetchApp.fetch(base + 'db_json?snapshot_key=eq.main', {
+  const snapshotResponse = UrlFetchApp.fetch(base + 'db_json?snapshot_key=eq.main', {
       method: 'patch',
       headers: {
         'apikey': supabaseKey,
@@ -2055,8 +3107,14 @@ function clearDummyDataFromSupabase_(data) {
       },
       payload: JSON.stringify({ payload: data, updated_at: new Date().toISOString() }),
       muteHttpExceptions: true
-    });
-  } catch (e) {}
+  });
+  if (snapshotResponse.getResponseCode() >= 300) {
+    failures.push('db_json snapshot: ' + (snapshotResponse.getContentText() || snapshotResponse.getResponseCode()));
+  }
+  if (failures.length) {
+    throw new Error('Supabase dummy-data cleanup failed: ' + failures.join('; '));
+  }
+  return { success: true };
 }
 
 /**
@@ -2273,197 +3331,4 @@ function apiUpdateAdminPassword(newPassword) {
   if (!data.settings) data.settings = {};
   data.settings.adminPassword = String(newPassword).trim();
   return apiSyncAllData(data);
-}
-
-/**
- * Backend Gemini AI Integration for Divine Classes
- * Auto-answers academic doubts, institute queries, and extracts student data
- */
-function apiAskGeminiAi(userPrompt, conversationHistory, contextData) {
-  try {
-    let apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-    if (!apiKey) {
-      const ss = getDbSpreadsheet();
-      if (ss) {
-        const setSheet = ss.getSheetByName('Settings_Config');
-        if (setSheet) {
-          const values = setSheet.getDataRange().getValues();
-          for (let i = 1; i < values.length; i++) {
-            const keyCol = String(values[i][0] || '').toLowerCase().trim();
-            if (keyCol === 'gemini_api_key' || keyCol === 'geminiapikey') {
-              apiKey = String(values[i][1] || '').trim();
-              break;
-            }
-          }
-        }
-      }
-    }
-    if (!apiKey && contextData && contextData.apiKey) {
-      apiKey = String(contextData.apiKey).trim();
-    }
-
-    if (!apiKey) {
-      return {
-        success: false,
-        error: 'NO_API_KEY',
-        message: 'No Gemini API Key configured yet. Please provide your Gemini Developer Key to auto-connect.'
-      };
-    }
-
-    const model = (contextData && contextData.model) || 'gemini-2.5-flash';
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey);
-
-    const systemPrompt = "You are the advanced official AI Academic Tutor and Institute Assistant for Divine Classes.\n" +
-      "Institute Details:\n" +
-      "- Center: Divine Classes\n" +
-      "- Location: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063\n" +
-      "- Director & Head Faculty: Er. Rajesh Chahar (Senior Physics & Mathematics Faculty)\n" +
-      "- Lead Software Architect: Dev. Anil Kumar Chahar (Phone: 8126390611)\n" +
-      "- Standard Tuition Fee: ₹1,000 / month per course\n" +
-      (contextData && contextData.studentSummary ? ("- Current User Context: " + contextData.studentSummary + "\n") : "") +
-      "Tone & Formatting:\n" +
-      "- Format with bold headings, clean bullet points, and step-by-step logic.\n" +
-      "- For physics/math questions, give clear formulas and complete solutions.\n" +
-      "- Be encouraging, accurate, and concise.";
-
-    const contents = [];
-    if (Array.isArray(conversationHistory)) {
-      conversationHistory.slice(-6).forEach(function(msg) {
-        contents.push({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.text }]
-        });
-      });
-    }
-    contents.push({
-      role: 'user',
-      parts: [{ text: userPrompt }]
-    });
-
-    const payload = {
-      contents: contents,
-      systemInstruction: {
-        parts: [{ text: systemPrompt }]
-      },
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2048
-      }
-    };
-
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-
-    const res = UrlFetchApp.fetch(url, options);
-    const code = res.getResponseCode();
-    const json = JSON.parse(res.getContentText());
-
-    if (code >= 200 && code < 300 && json.candidates && json.candidates.length > 0) {
-      const reply = json.candidates[0].content.parts.map(function(p) { return p.text; }).join('\n');
-      return { success: true, reply: reply, model: model };
-    } else {
-      const errMsg = (json.error && json.error.message) ? json.error.message : ('HTTP ' + code);
-      return { success: false, error: errMsg };
-    }
-  } catch (err) {
-    return { success: false, error: err.toString() };
-  }
-}
-
-/**
- * Auto-answers doubts using OpenAI ChatGPT (GPT-4o, GPT-4o-mini)
- */
-function apiAskOpenAi(userPrompt, conversationHistory, contextData) {
-  try {
-    let apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
-    if (!apiKey) {
-      const ss = getDbSpreadsheet();
-      if (ss) {
-        const setSheet = ss.getSheetByName('Settings_Config');
-        if (setSheet) {
-          const values = setSheet.getDataRange().getValues();
-          for (let i = 1; i < values.length; i++) {
-            const keyCol = String(values[i][0] || '').toLowerCase().trim();
-            if (keyCol === 'openai_api_key' || keyCol === 'chatgpt_api_key' || keyCol === 'openaiapikey') {
-              apiKey = String(values[i][1] || '').trim();
-              break;
-            }
-          }
-        }
-      }
-    }
-    if (!apiKey && contextData && contextData.apiKey) {
-      apiKey = String(contextData.apiKey).trim();
-    }
-
-    if (!apiKey) {
-      return {
-        success: false,
-        error: 'NO_API_KEY',
-        message: 'No OpenAI API Key configured.'
-      };
-    }
-
-    const model = (contextData && contextData.model) || 'gpt-4o-mini';
-    const url = 'https://api.openai.com/v1/chat/completions';
-
-    const systemPrompt = "You are the advanced official AI Academic Tutor and Institute Assistant for Divine Classes.\n" +
-      "Institute Details:\n" +
-      "- Center: Divine Classes\n" +
-      "- Location: 235 Paschimpuri Pocket 2, Club Rd, New Delhi 110063\n" +
-      "- Director & Head Faculty: Er. Rajesh Chahar (Senior Physics & Mathematics Faculty)\n" +
-      "- Lead Software Architect: Dev. Anil Kumar Chahar (Phone: 8126390611)\n" +
-      "- Standard Tuition Fee: ₹1,000 / month per course\n" +
-      (contextData && contextData.studentSummary ? ("- Current User Context: " + contextData.studentSummary + "\n") : "") +
-      "Tone & Formatting:\n" +
-      "- Format with bold headings, clean bullet points, and step-by-step logic.\n" +
-      "- For physics/math questions, give clear formulas and complete solutions.\n" +
-      "- Be encouraging, accurate, and concise.";
-
-    const messages = [{ role: 'system', content: systemPrompt }];
-    if (Array.isArray(conversationHistory)) {
-      conversationHistory.slice(-6).forEach(function(msg) {
-        messages.push({
-          role: msg.role === 'user' ? 'user' : 'assistant',
-          content: msg.text
-        });
-      });
-    }
-    messages.push({ role: 'user', content: userPrompt });
-
-    const payload = {
-      model: model,
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2048
-    };
-
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-
-    const res = UrlFetchApp.fetch(url, options);
-    const code = res.getResponseCode();
-    const json = JSON.parse(res.getContentText());
-
-    if (code >= 200 && code < 300 && json.choices && json.choices.length > 0) {
-      const reply = json.choices[0].message.content;
-      return { success: true, reply: reply, model: model };
-    } else {
-      const errMsg = (json.error && json.error.message) ? json.error.message : ('HTTP ' + code);
-      return { success: false, error: errMsg };
-    }
-  } catch (err) {
-    return { success: false, error: err.toString() };
-  }
 }

@@ -4,19 +4,11 @@ const ROUTE_MODULES = {
     "title": "Divine Classes - Institute Management System"
   },
   "login": {
-    "template": "Routes/Home/page",
+    "template": "Routes/Login/page",
     "title": "Sign In - Divine Classes Portal"
   },
   "logout": {
     "template": "Routes/Logout/page",
     "title": "Signed Out - Divine Classes Portal"
-  },
-  "loading": {
-    "template": "Routes/Home/page",
-    "title": "Connecting to Divine Classes..."
-  },
-  "chatbot": {
-    "template": "Routes/Chatbot/page",
-    "title": "Divine AI Assistant - Divine Classes"
   }
 };

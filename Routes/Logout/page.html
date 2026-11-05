@@ -52,7 +52,7 @@
         </div>
 
         <div class="pt-2 space-y-3">
-            <a id="btn-login-again" href="?page=index" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md hover:shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer">
+            <a id="btn-login-again" href="?page=login" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md hover:shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer">
                 <i class="fa-solid fa-arrow-right-to-bracket"></i>
                 <span>Sign In Again</span>
             </a>
@@ -62,14 +62,20 @@
             </a>
         </div>
 
-        <div class="pt-4 border-t border-slate-100 dark:border-slate-700 text-[11px] text-slate-400">
-            <p><i class="fa-solid fa-location-dot text-indigo-500 mr-1"></i> 235 Paschimpuri Pocket 2, Club Rd New Delhi 110063</p>
-            <p class="mt-0.5"><i class="fa-solid fa-headset text-indigo-500 mr-1"></i> Contact: 9555-6787-53</p>
-        </div>
     </div>
 
-    <footer class="text-center py-4 text-xs text-slate-400">
-        <p class="text-[10px] text-slate-500">&copy; 2026 Designed & Engineered by <span class="font-semibold text-slate-400">Dev. Anil Kumar Chahar</span> • 8126390611 • v2.5 Cloud Edition</p>
+    <footer class="mx-auto w-full max-w-3xl border-t border-slate-200/80 py-5 dark:border-slate-700">
+        <div class="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
+            <div>
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">Divine Classes Portal</p>
+                <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Designed &amp; engineered by <span class="font-medium text-slate-600 dark:text-slate-300">Dev. Anil Kumar Chahar</span></p>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <a href="tel:8126390611" class="inline-flex items-center gap-1.5 hover:text-indigo-600 dark:hover:text-indigo-300"><i class="fa-solid fa-phone text-[10px]" aria-hidden="true"></i>8126390611</a>
+                <span>Cloud Edition / v2.5</span>
+                <span>© 2026</span>
+            </div>
+        </div>
     </footer>
 
     <?!= include('javascript'); ?>

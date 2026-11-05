@@ -5,6 +5,7 @@ var PAGE_BACKEND_SETTINGS = {
   "sheet": "Settings_Config",
   "methods": [
     "apiDatabaseSave",
-    "apiUpdateAdminPassword"
+    "apiUpdateAdminPassword",
+    "apiClearStudentTable"
   ]
 };

@@ -9,8 +9,6 @@
 #main-content[data-page-module="links"] .dc-page-root { display: contents; }
 #main-content[data-page-module="feedback"] .dc-page-root { display: contents; }
 #main-content[data-page-module="settings"] .dc-page-root { display: contents; }
-#main-content[data-page-module="loading"] .dc-page-root { display: contents; }
-#main-content[data-page-module="chatbot"] .dc-page-root { display: contents; }
 </style>
 <div hidden aria-hidden="true">
 <!-- The legacy renderer supplies this page's content. -->
@@ -33,10 +31,6 @@
 <template id="dc-page-feedback" data-app-section="feedback" data-sheet-tab="Feedback_Responses"><section class="dc-page-root" data-page-root="feedback"></section></template>
 <!-- The legacy renderer supplies this page's content. -->
 <template id="dc-page-settings" data-app-section="settings" data-sheet-tab="Settings_Config"><section class="dc-page-root" data-page-root="settings"></section></template>
-<!-- The dedicated loading page module -->
-<template id="dc-page-loading" data-app-section="loading" data-sheet-tab="System_Config"><section class="dc-page-root" data-page-root="loading"></section></template>
-<!-- The dedicated chatbot page module -->
-<template id="dc-page-chatbot" data-app-section="chatbot" data-sheet-tab="System_Config"><section class="dc-page-root" data-page-root="chatbot"></section></template>
 </div>
 <script>
 window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
@@ -129,22 +123,6 @@ window.DIVINE_PAGE_MODULES["settings"] = {
     "developer"
   ]
 };
-window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
-window.DIVINE_PAGE_MODULES["loading"] = {
-  "id": "loading",
-  "sheet": "System_Config",
-  "templateId": "dc-page-loading",
-  "renderer": "renderLoadingView",
-  "access": []
-};
-window.DIVINE_PAGE_MODULES = window.DIVINE_PAGE_MODULES || {};
-window.DIVINE_PAGE_MODULES["chatbot"] = {
-  "id": "chatbot",
-  "sheet": "System_Config",
-  "templateId": "dc-page-chatbot",
-  "renderer": "renderChatbotDedicatedView",
-  "access": []
-};
 window.DIVINE_PAGE_BACKENDS = {
   "attendance": {
     "source": "Code.js",
@@ -222,20 +200,6 @@ window.DIVINE_PAGE_BACKENDS = {
     "methods": [
       "apiDatabaseSave",
       "apiUpdateAdminPassword"
-    ]
-  },
-  "loading": {
-    "source": "Code.js",
-    "sheetHelpers": "Sheets.js",
-    "methods": [
-      "apiGetInitialData"
-    ]
-  },
-  "chatbot": {
-    "source": "Code.js",
-    "sheetHelpers": "Sheets.js",
-    "methods": [
-      "apiAskGeminiAi"
     ]
   }
 };
