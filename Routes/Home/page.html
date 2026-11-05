@@ -321,7 +321,7 @@
     </section>
 
     <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
-        onload="if (typeof startSupabaseLiveSync === 'function') startSupabaseLiveSync()"
+        onload="window._supabaseLibraryLoaded = true; if (typeof restoreSupabasePortalSession === 'function') restoreSupabasePortalSession(); if (typeof startSupabaseLiveSync === 'function') startSupabaseLiveSync()"
         onerror="console.warn('Supabase Realtime library failed to load; periodic sync fallback remains active.')"></script>
     <?!= include('PageModules'); ?>
     <?!= include('supabase'); ?>

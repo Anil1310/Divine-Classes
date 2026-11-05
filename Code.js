@@ -1112,6 +1112,22 @@ function mergeSettingsFromSheet_(appData, spreadsheet) {
   return appData;
 }
 
+function getSupabaseSafeSnapshot_(data) {
+  const snapshot = JSON.parse(JSON.stringify(data || {}));
+  if (snapshot.settings) {
+    delete snapshot.settings.adminPassword;
+    delete snapshot.settings.leadDevPassword;
+    delete snapshot.settings.devPassword;
+    delete snapshot.settings.admin_password;
+    delete snapshot.settings.LEAD_DEV_PASSWORD;
+    delete snapshot.settings['Master Admin Password'];
+    delete snapshot.settings['Admin Password'];
+    delete snapshot.settings['Lead Developer Password'];
+    delete snapshot.settings['Lead Dev Password'];
+  }
+  return snapshot;
+}
+
 function removeDuplicateDeveloperSettingsFromSupabase_(settings) {
   const config = settings || {};
   const supabaseUrl = config.supabaseUrl || 'https://srjqsofkjizwskqnzyfn.supabase.co';
@@ -1121,7 +1137,8 @@ function removeDuplicateDeveloperSettingsFromSupabase_(settings) {
   const base = supabaseUrl.replace(/\/+$/, '') + (/\/rest\/v1$/i.test(supabaseUrl) ? '' : '/rest/v1');
   try {
     const response = UrlFetchApp.fetch(
-      base + '/settings_config?setting_parameter=in.(LEAD_DEV_EMAIL,LEAD_DEV_PASSWORD)',
+      base + '/settings_config?setting_parameter=' +
+        encodeURIComponent('in.(Master Admin Password,Admin Password,Admin Login Password,admin_password,Lead Developer Password,Lead Dev Password,LEAD_DEV_PASSWORD)'),
       {
         method: 'delete',
         headers: {
@@ -1283,9 +1300,11 @@ function apiGetInitialData() {
         .replace(/Club Road/i, 'Club Rd');
     }
 
-    // Remove legacy client-side credentials. Developer login secrets live only
-    // in Script Properties and are never returned to the browser.
-    if (appData.settings) delete appData.settings.devPassword;
+    // Developer login secrets live only in Script Properties, never in the browser payload.
+    if (appData.settings) {
+      delete appData.settings.devPassword;
+      delete appData.settings.leadDevPassword;
+    }
 
     // Persist verified state in the Cloud Database
     dbSaveAll(appData);
@@ -1765,7 +1784,7 @@ function syncToSupabase_(fullData) {
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal'
       },
-      payload: JSON.stringify({ payload: fullData, updated_at: new Date().toISOString() }),
+      payload: JSON.stringify({ payload: getSupabaseSafeSnapshot_(fullData), updated_at: new Date().toISOString() }),
       muteHttpExceptions: true
     });
   } catch (e) {
@@ -1790,7 +1809,8 @@ function syncToSupabase_(fullData) {
         muteHttpExceptions: true
       });
       const duplicateRowsResponse = UrlFetchApp.fetch(
-        base + 'settings_config?setting_parameter=in.(LEAD_DEV_EMAIL,LEAD_DEV_PASSWORD)',
+        base + 'settings_config?setting_parameter=' +
+          encodeURIComponent('in.(Master Admin Password,Admin Password,Admin Login Password,admin_password,Lead Developer Password,Lead Dev Password,LEAD_DEV_PASSWORD)'),
         {
           method: 'delete',
           headers: headers,
@@ -2275,7 +2295,7 @@ function syncDummySeedRecordsToSupabase_(data, excessDummyIds) {
   const snapshotResponse = UrlFetchApp.fetch(base + '/db_json?on_conflict=snapshot_key', {
     method: 'post',
     headers: headers,
-    payload: JSON.stringify([{ snapshot_key: 'main', payload: data, updated_at: new Date().toISOString() }]),
+    payload: JSON.stringify([{ snapshot_key: 'main', payload: getSupabaseSafeSnapshot_(data), updated_at: new Date().toISOString() }]),
     muteHttpExceptions: true
   });
   if (snapshotResponse.getResponseCode() >= 300) {
@@ -2726,7 +2746,7 @@ function apiClearStudentTable(developerEmail, developerPassword, confirmationTex
     const snapshotResponse = UrlFetchApp.fetch(base + '/db_json?snapshot_key=eq.main', {
       method: 'patch',
       headers: Object.assign({}, headers, { Prefer: 'return=minimal' }),
-      payload: JSON.stringify({ payload: data, updated_at: new Date().toISOString() }),
+      payload: JSON.stringify({ payload: getSupabaseSafeSnapshot_(data), updated_at: new Date().toISOString() }),
       muteHttpExceptions: true
     });
     if (snapshotResponse.getResponseCode() >= 300) {
@@ -3110,7 +3130,7 @@ function clearDummyDataFromSupabase_(data, removedIds, dummyNotificationIds) {
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal'
       },
-      payload: JSON.stringify({ payload: data, updated_at: new Date().toISOString() }),
+      payload: JSON.stringify({ payload: getSupabaseSafeSnapshot_(data), updated_at: new Date().toISOString() }),
       muteHttpExceptions: true
   });
   if (snapshotResponse.getResponseCode() >= 300) {

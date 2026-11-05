@@ -11,6 +11,21 @@
     function getSupabaseAnonKey() {
         return (state.settings && state.settings.supabaseKey) || '';
     }
+    function createSupabaseSafeSnapshot(source) {
+        const snapshot = JSON.parse(JSON.stringify(source || {}));
+        if (snapshot.settings) {
+            delete snapshot.settings.adminPassword;
+            delete snapshot.settings.leadDevPassword;
+            delete snapshot.settings.devPassword;
+            delete snapshot.settings.admin_password;
+            delete snapshot.settings.LEAD_DEV_PASSWORD;
+            delete snapshot.settings['Master Admin Password'];
+            delete snapshot.settings['Admin Password'];
+            delete snapshot.settings['Lead Developer Password'];
+            delete snapshot.settings['Lead Dev Password'];
+        }
+        return snapshot;
+    }
     async function supabaseFetch(path, options) {
         const base = getSupabaseApiUrl();
         const key = getSupabaseAnonKey();
@@ -496,7 +511,7 @@
             if (typeof saveStateLocally === 'function') saveStateLocally();
         }
 
-        const syncData = JSON.parse(JSON.stringify(state));
+        const syncData = createSupabaseSafeSnapshot(state);
         await deleteRowsRemovedInApp(syncData, previousSyncSnapshot);
 
         // Start the full snapshot write before table upserts so independent
@@ -882,13 +897,10 @@
                     'Address': 'address',
                     'YouTube Channel': 'youtubeUrl',
                     'Admin Name': 'adminName',
-                    'Master Admin Password': 'adminPassword',
                     'Admin Email ID': 'adminEmail',
                     'Lead Dev Email': 'leadDevEmail',
                     'Lead Developer Email': 'leadDevEmail',
                     'LEAD_DEV_EMAIL': 'leadDevEmail',
-                    'LEAD_DEV_PASSWORD': 'leadDevPassword',
-                    'Lead Developer Password': 'leadDevPassword',
                     'UPI Payment ID': 'upiId',
                     'Facebook Page': 'facebookUrl',
                     'Instagram Profile': 'instagramUrl',
@@ -913,7 +925,6 @@
                     'sheets_mirror_enabled': 'sheetsMirrorEnabled',
                     'drive_folder_url': 'driveFolderUrl',
                     'admin_name': 'adminName',
-                    'admin_password': 'adminPassword',
                     'admin_email': 'adminEmail',
                     'facebook_url': 'facebookUrl',
                     'instagram_url': 'instagramUrl',
@@ -922,6 +933,7 @@
                 const settingsObj = {};
                 settingsData.forEach(function(s) {
                     if (s && s.setting_parameter) {
+                        if (/^(master admin password|admin password|admin login password|admin_password|lead developer password|lead dev password|lead_dev_password)$/i.test(s.setting_parameter)) return;
                         const k = settingsKeyMap[s.setting_parameter] || s.setting_parameter;
                         settingsObj[k] = s.configured_value;
                     } else if (s && s.key) {
@@ -1084,7 +1096,7 @@
         const snapshotResponse = await supabaseFetch('db_json?snapshot_key=eq.main', {
             method: 'PATCH',
             headers: { 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ payload: state, updated_at: new Date().toISOString() })
+            body: JSON.stringify({ payload: createSupabaseSafeSnapshot(state), updated_at: new Date().toISOString() })
         });
         if (!snapshotResponse.ok) failures.push(`db_json snapshot: ${snapshotResponse.status} ${await snapshotResponse.text()}`);
         if (failures.length) throw new Error(`Supabase dummy-data cleanup failed: ${failures.join('; ')}`);
@@ -1113,10 +1125,8 @@
             { setting_parameter: 'Address', configured_value: s.address || '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063', description: 'Center Location' },
             { setting_parameter: 'YouTube Channel', configured_value: s.youtubeUrl || 'https://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8', description: 'Official Video Channel' },
             { setting_parameter: 'Admin Name', configured_value: s.adminName || 'Ravi Shankar', description: 'Display Name of Institute Admin' },
-            { setting_parameter: 'Master Admin Password', configured_value: s.adminPassword || 'admin123', description: 'Password to access Admin portal' },
             { setting_parameter: 'Admin Email ID', configured_value: s.adminEmail || 'divineclasses1010@gmail.com', description: 'Official Admin Contact / Login Email' },
             { setting_parameter: 'Lead Developer Email', configured_value: s.leadDevEmail || 'anil.chahar170@gmail.com', description: 'Lead Developer login email' },
-            { setting_parameter: 'Lead Developer Password', configured_value: s.leadDevPassword || '', description: 'Lead Developer login password' },
             { setting_parameter: 'UPI Payment ID', configured_value: s.upiId || 'divineclasses@upi', description: 'Fee Collection UPI' },
             { setting_parameter: 'Facebook Page', configured_value: s.facebookUrl || 'https://www.facebook.com/edivineclasses/?_rdr', description: 'Social Channel' },
             { setting_parameter: 'Instagram Profile', configured_value: s.instagramUrl || 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq', description: 'Social Channel' },
@@ -1140,7 +1150,7 @@
                 body: JSON.stringify(configUpdates)
             });
             const duplicateRowsResponse = await fetch(
-                `${base}/settings_config?setting_parameter=in.(LEAD_DEV_EMAIL,LEAD_DEV_PASSWORD)`,
+                `${base}/settings_config?setting_parameter=${encodeURIComponent('in.(Master Admin Password,Admin Password,Admin Login Password,admin_password,Lead Developer Password,Lead Dev Password,LEAD_DEV_PASSWORD)')}`,
                 { method: 'DELETE', headers: headers }
             );
             if (!duplicateRowsResponse.ok) {
@@ -1160,7 +1170,7 @@
                     'Content-Type': 'application/json',
                     Prefer: 'return=minimal'
                 },
-                body: JSON.stringify({ payload: state, updated_at: new Date().toISOString() })
+                body: JSON.stringify({ payload: createSupabaseSafeSnapshot(state), updated_at: new Date().toISOString() })
             });
         } catch (e) {}
     }
@@ -1283,13 +1293,10 @@
                 'Address': 'address',
                 'YouTube Channel': 'youtubeUrl',
                 'Admin Name': 'adminName',
-                'Master Admin Password': 'adminPassword',
                 'Admin Email ID': 'adminEmail',
                 'Lead Dev Email': 'leadDevEmail',
                 'Lead Developer Email': 'leadDevEmail',
                 'LEAD_DEV_EMAIL': 'leadDevEmail',
-                'LEAD_DEV_PASSWORD': 'leadDevPassword',
-                'Lead Developer Password': 'leadDevPassword',
                 'UPI Payment ID': 'upiId',
                 'Facebook Page': 'facebookUrl',
                 'Instagram Profile': 'instagramUrl',
@@ -1305,6 +1312,7 @@
             let changed = false;
             rawData.forEach(function(item) {
                 if (!item || !item.setting_parameter) return;
+                if (/^(master admin password|admin password|admin login password|admin_password|lead developer password|lead dev password|lead_dev_password)$/i.test(item.setting_parameter)) return;
                 const k = settingsKeyMap[item.setting_parameter];
                 if (!k) return;
                 let val = item.configured_value;

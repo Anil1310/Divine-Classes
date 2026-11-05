@@ -247,10 +247,28 @@ DROP POLICY IF EXISTS "Public full access" ON public.notifications;
 CREATE POLICY "Public full access" ON public.notifications FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Public full access" ON public.settings_config;
-CREATE POLICY "Public full access" ON public.settings_config FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public noncredential settings access" ON public.settings_config
+    FOR ALL TO public, anon, authenticated
+    USING (setting_parameter NOT IN (
+        'Master Admin Password', 'Admin Password', 'Admin Login Password', 'admin_password',
+        'Lead Developer Password', 'Lead Dev Password', 'LEAD_DEV_PASSWORD'
+    ))
+    WITH CHECK (setting_parameter NOT IN (
+        'Master Admin Password', 'Admin Password', 'Admin Login Password', 'admin_password',
+        'Lead Developer Password', 'Lead Dev Password', 'LEAD_DEV_PASSWORD'
+    ));
 
 DROP POLICY IF EXISTS "Public full access" ON public.db_json;
-CREATE POLICY "Public full access" ON public.db_json FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public credential-free snapshot access" ON public.db_json
+    FOR ALL TO public, anon, authenticated
+    USING (NOT (COALESCE(payload->'settings', '{}'::jsonb) ?| ARRAY[
+        'adminPassword', 'admin_password', 'Master Admin Password', 'Admin Password',
+        'leadDevPassword', 'LEAD_DEV_PASSWORD', 'Lead Developer Password', 'Lead Dev Password', 'devPassword'
+    ]))
+    WITH CHECK (NOT (COALESCE(payload->'settings', '{}'::jsonb) ?| ARRAY[
+        'adminPassword', 'admin_password', 'Master Admin Password', 'Admin Password',
+        'leadDevPassword', 'LEAD_DEV_PASSWORD', 'Lead Developer Password', 'Lead Dev Password', 'devPassword'
+    ]));
 
 -- 4. CREATE BACKWARD COMPATIBLE VIEWS (WITH SECURITY INVOKER ENFORCED)
 CREATE OR REPLACE VIEW public.batches_roster WITH (security_invoker = true) AS
@@ -404,12 +422,9 @@ INSERT INTO public.settings_config (setting_parameter, configured_value, descrip
 ('Address', '235 Paschimpuri Pocket 2, Club Rd New Delhi 110063', 'Center Location'),
 ('YouTube Channel', 'https://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8', 'Official Video Channel'),
 ('Admin Name', 'Ravi Shankar', 'Display Name of Institute Admin'),
-('Master Admin Password', 'admin123', 'Password to access Admin portal'),
 ('Admin Email ID', 'edivineclasses@gmail.com', 'Official Admin Contact / Login Email'),
 ('LEAD_DEV_EMAIL', 'anil.chahar170@gmail.com', 'Lead Developer login email'),
 ('Lead Developer Email', 'anil.chahar170@gmail.com', 'Lead Developer login email'),
-('LEAD_DEV_PASSWORD', 'Anil@1310', 'Lead Developer login password'),
-('Lead Developer Password', 'Anil@1310', 'Lead Developer login password'),
 ('UPI Payment ID', 'divineclasses@upi', 'Fee Collection UPI'),
 ('Facebook Page', 'https://www.facebook.com/edivineclasses/?_rdr', 'Social Channel'),
 ('Instagram Profile', 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq', 'Social Channel'),
@@ -454,3 +469,20 @@ INSERT INTO public.db_json (snapshot_key, payload, updated_at) VALUES
 }'::jsonb, NOW())
 ON CONFLICT (snapshot_key) DO UPDATE
 SET payload = EXCLUDED.payload, updated_at = NOW();
+
+DELETE FROM public.settings_config
+WHERE setting_parameter IN (
+    'Master Admin Password', 'Admin Password', 'Admin Login Password', 'admin_password',
+    'Lead Developer Password', 'Lead Dev Password', 'LEAD_DEV_PASSWORD'
+);
+
+UPDATE public.db_json
+SET payload = jsonb_set(
+    payload,
+    '{settings}',
+    COALESCE(payload->'settings', '{}'::jsonb) - 'adminPassword' - 'admin_password' -
+        'Master Admin Password' - 'Admin Password' - 'Lead Developer Password' -
+        'leadDevPassword' - 'LEAD_DEV_PASSWORD' - 'devPassword',
+    true
+)
+WHERE payload ? 'settings';

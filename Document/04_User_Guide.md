@@ -38,8 +38,11 @@ At the top of the interface, a demo/switch pill bar lets you switch between pers
 ### 2.1 Logging In as Administrator
 1. Click the **Profile / Login** button in the header.
 2. Select **Admin Portal**.
-3. Enter your configured **Admin Email** and **Password** (defaults: `admin@divineclasses.in` / `admin123`).
+3. On GitHub Pages, enter the Admin email and password for the Supabase Auth user whose app metadata contains `{"portal_role":"admin"}`. On the Apps Script portal, use the configured Admin email and password.
 4. Click **Sign In as Administrator**.
+
+### 2.1.1 Developer login on GitHub Pages
+Create a Supabase Auth user for the configured Lead Developer email and set its app metadata to `{"portal_role":"developer"}`. The Developer role is not granted by a database setting or editable user metadata. Before enabling this login, run [`../Supabase/Developer_Auth_Migration.sql`](../Supabase/Developer_Auth_Migration.sql) in the Supabase SQL Editor and rotate any credentials that were previously stored in public settings or shared in screenshots.
 
 ### 2.2 Managing Batches & Student Rosters
 1. Navigate to **Batches & Students** from the sidebar.
@@ -311,4 +314,3 @@ If the system displays *"Microphone Access is Blocked"*:
 - The **Gemini Key** button (`🪄`) in the chatbot header is visible exclusively in Developer mode.
 - Non-developers (Admins, Teachers, Students) can use AI doubt resolution through the server-managed key, but cannot inspect or modify API keys.
 - The shared Gemini key is stored in Apps Script **Project Settings → Script Properties** as `DIVINE_GEMINI_API_KEY`; never place it in browser code or shared portal settings.
-

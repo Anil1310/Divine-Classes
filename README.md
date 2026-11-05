@@ -691,3 +691,14 @@ The portal integrates an interactive AI Assistant & Doubts Helpdesk:
 - **Master Chatbot Toggle**: Located in Developer Settings (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
 - **State Storage & Persistence**: Saved immediately to `state.settings.chatbotEnabled` and `localStorage ('DIVINE_CHATBOT_ENABLED')`, surviving browser reloads and syncing through normal settings persistence.
 - **Complete Disablement**: When toggled OFF, the floating button and drawer are completely hidden, active voice recognition is stopped, and the navigation link is removed from the sidebar. Toggling it back ON restores access without a reload.
+
+## 16. GitHub Pages Admin & Developer Authentication
+
+The static GitHub Pages portal verifies Admin and Developer sign-ins with Supabase Auth. It does not authenticate these roles using password values stored in `settings_config` or browser code.
+
+1. Run [`Supabase/Developer_Auth_Migration.sql`](./Supabase/Developer_Auth_Migration.sql) in the Supabase SQL Editor to remove legacy password settings and strip cached snapshot values.
+2. In Supabase Authentication, create an Auth user for each portal account using the desired email and a newly rotated password.
+3. Set the user's **app metadata** to `{"portal_role":"admin"}` or `{"portal_role":"developer"}`. Do not use editable user metadata for role authorization.
+4. Ensure the configured Admin Email and Lead Developer Email match those Auth user emails. Sign in on GitHub Pages with the email and password.
+
+The Apps Script portal retains its server-side Developer verification through Script Properties. This migration does not make the portal's other public Supabase tables private; those require a separate RLS and server-authorization review.

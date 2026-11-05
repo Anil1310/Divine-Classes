@@ -397,8 +397,7 @@
                 instagramUrl: 'https://www.instagram.com/divineclasses_paschimpuri?utm_source=qr&dlrf=enk4MXRodTU3YTdq',
                 youtubeUrl: 'https://www.youtube.com/@chemcrush?si=VyfGmd_WwqQiU7j8',
                 adminName: 'Er. Rajesh Chahar',
-                adminPassword: 'admin123',
-                adminEmail: '',
+                adminEmail: 'divineclasses1010@gmail.com',
                 driveEmail: '',
                 drivePassword: '',
                 driveUrl: '',
@@ -760,6 +759,10 @@
             } catch (e) {}
             if (Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS) {
                 console.warn('[Auth] Automatically logged out after 2 hours of inactivity (Browser & Mobile APK).');
+                if (!isAppsScriptAuthAvailable() &&
+                    (state.currentRole === 'admin' || state.currentRole === 'developer')) {
+                    signOutSupabasePortalSessions();
+                }
                 if (typeof stopChatbotVoiceInput === 'function') stopChatbotVoiceInput();
                 try {
                     localStorage.removeItem('DIVINE_AUTH_SESSION');
@@ -846,9 +849,11 @@
                 }
                 // 10-day Credential Remember (compatible with Browser & Mobile APK WebView)
                 if (rememberMe && (identifier || password)) {
+                    const usesSupabasePortalAuth = !isAppsScriptAuthAvailable() &&
+                        (state.currentRole === 'admin' || state.currentRole === 'developer');
                     const credData = JSON.stringify({
                         identifier: identifier || '',
-                        password: password || '',
+                        password: usesSupabasePortalAuth ? '' : (password || ''),
                         expiresAt: Date.now() + TEN_DAYS_MS
                     });
                     localStorage.setItem('DIVINE_SAVED_CREDS', credData);
@@ -885,6 +890,11 @@
                         return;
                     }
                     if (sess && sess.isAuthenticated) {
+                        if ((sess.role === 'developer' || sess.role === 'admin') && !isAppsScriptAuthAvailable()) {
+                            localStorage.removeItem('DIVINE_AUTH_SESSION');
+                            sessionStorage.removeItem('DIVINE_AUTH_SESSION');
+                            return;
+                        }
                         recordUserActivity();
                         if (sess.role === 'developer') {
                             state.isAuthenticated = true;
@@ -923,6 +933,10 @@
         }
 
         function handleLogout() {
+            if (!isAppsScriptAuthAvailable() &&
+                (state.currentRole === 'admin' || state.currentRole === 'developer')) {
+                signOutSupabasePortalSessions();
+            }
             if (typeof stopChatbotVoiceInput === 'function') stopChatbotVoiceInput();
             state.isAuthenticated = false;
             state.currentUser = null;
@@ -6843,6 +6857,14 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         }
 
         function renderAdminPasswordSection() {
+            if (!isAppsScriptAuthAvailable()) {
+                return `
+                    <div class="rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sm text-sky-900">
+                        GitHub Pages Admin and Developer passwords are managed in Supabase Auth. Set the trusted
+                        <code>app_metadata.portal_role</code> claim to grant a portal role.
+                    </div>
+                `;
+            }
             const isRevealed = !!window.revealedPasswords['admin_pwd'];
             const adminPwd = (state.settings && state.settings.adminPassword) ? state.settings.adminPassword : 'admin123';
 
@@ -7278,6 +7300,161 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             `;
         }
 
+        const SUPABASE_PORTAL_AUTH_KEYS = {
+            local: 'DIVINE_PORTAL_AUTH_LOCAL',
+            session: 'DIVINE_PORTAL_AUTH_SESSION'
+        };
+        let supabasePortalAuthClients = {};
+
+        function isAppsScriptAuthAvailable() {
+            return typeof google !== 'undefined' && !!google.script && !!google.script.run;
+        }
+
+        function ensureSupabaseAuthLibrary() {
+            if (window.supabase && typeof window.supabase.createClient === 'function') return Promise.resolve();
+            return new Promise(function (resolve, reject) {
+                let script = document.querySelector('script[src*="@supabase/supabase-js"]');
+                if (!script) {
+                    script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+                    document.head.appendChild(script);
+                }
+                script.addEventListener('load', resolve, { once: true });
+                script.addEventListener('error', function () {
+                    reject(new Error('Supabase authentication library failed to load. Check your connection and retry.'));
+                }, { once: true });
+                if (window.supabase && typeof window.supabase.createClient === 'function') resolve();
+            });
+        }
+
+        function getSupabasePortalAuthClient(rememberMe) {
+            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+                throw new Error('Supabase authentication is unavailable. Refresh the page and try again.');
+            }
+            const storageType = rememberMe ? 'local' : 'session';
+            if (supabasePortalAuthClients[storageType]) return supabasePortalAuthClients[storageType];
+
+            const projectUrl = String(state.settings && state.settings.supabaseUrl || '')
+                .replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+            const anonKey = String(state.settings && state.settings.supabaseKey || '');
+            if (!projectUrl || !anonKey) {
+                throw new Error('Supabase authentication is not configured for this portal.');
+            }
+            supabasePortalAuthClients[storageType] = window.supabase.createClient(projectUrl, anonKey, {
+                auth: {
+                    autoRefreshToken: true,
+                    detectSessionInUrl: false,
+                    persistSession: true,
+                    storage: rememberMe ? window.localStorage : window.sessionStorage,
+                    storageKey: SUPABASE_PORTAL_AUTH_KEYS[storageType]
+                }
+            });
+            return supabasePortalAuthClients[storageType];
+        }
+
+        function getSupabasePortalRole(user) {
+            const metadata = user && user.app_metadata;
+            const role = metadata && (metadata.portal_role || metadata.role);
+            return role === 'admin' || role === 'developer' ? role : '';
+        }
+
+        function finishSupabasePortalLogin(user, role, rememberMe, identifier, showSuccess) {
+            state.isAuthenticated = true;
+            state.currentRole = role;
+            state.isDeveloper = role === 'developer';
+            state.currentUser = {
+                role: role,
+                id: user.id,
+                name: role === 'developer'
+                    ? (user.user_metadata && user.user_metadata.full_name) || 'Anil'
+                    : (state.settings && state.settings.adminName) || 'Administrator',
+                identifier: user.email || identifier
+            };
+            saveAuthSession(rememberMe, identifier, '');
+            closeModal();
+            updateRoleUI();
+            renderSidebar();
+            renderMainContent();
+            if (showSuccess !== false) {
+                showToast(role === 'developer' ? 'Lead Dev sign-in successful.' : 'Welcome, ' + state.currentUser.name + '!', 'success');
+            }
+        }
+
+        async function signInSupabasePortalUser(email, password, rememberMe, expectedRole) {
+            try {
+                await ensureSupabaseAuthLibrary();
+                const remembered = JSON.parse(localStorage.getItem('DIVINE_SAVED_CREDS') || 'null');
+                if (remembered && remembered.password) {
+                    remembered.password = '';
+                    localStorage.setItem('DIVINE_SAVED_CREDS', JSON.stringify(remembered));
+                }
+                const client = getSupabasePortalAuthClient(rememberMe);
+                const result = await client.auth.signInWithPassword({ email: email, password: password });
+                if (result.error || !result.data || !result.data.user) {
+                    showToast('Sign-in failed. Check your email and password, then try again.', 'error');
+                    return;
+                }
+                const user = result.data.user;
+                if (getSupabasePortalRole(user) !== expectedRole ||
+                    String(user.email || '').trim().toLowerCase() !== String(email || '').trim().toLowerCase()) {
+                    await client.auth.signOut();
+                    showToast('This account is not authorized for that portal role.', 'error');
+                    return;
+                }
+                finishSupabasePortalLogin(user, expectedRole, rememberMe, email, true);
+            } catch (error) {
+                console.error('Supabase portal sign-in failed.', error);
+                showToast((error && error.message) || 'Sign-in could not be completed. Please try again.', 'error');
+            }
+        }
+
+        async function restoreSupabasePortalSession() {
+            if (isAppsScriptAuthAvailable() || !window.supabase ||
+                typeof window.supabase.createClient !== 'function') return;
+
+            for (const storageType of ['local', 'session']) {
+                try {
+                    const client = getSupabasePortalAuthClient(storageType === 'local');
+                    const result = await client.auth.getSession();
+                    const session = result && result.data && result.data.session;
+                    if (!session) continue;
+
+                    const role = getSupabasePortalRole(session.user);
+                    if (!role) {
+                        await client.auth.signOut();
+                        continue;
+                    }
+                    finishSupabasePortalLogin(session.user, role, storageType === 'local', session.user.email || '', false);
+                    return;
+                } catch (error) {
+                    console.error('Could not restore the Supabase portal session.', error);
+                }
+            }
+        }
+
+        async function signOutSupabasePortalSessions() {
+            const signOutRequests = [];
+            for (const storageType of ['local', 'session']) {
+                try {
+                    const client = getSupabasePortalAuthClient(storageType === 'local');
+                    signOutRequests.push(client.auth.signOut().then(function (result) {
+                        if (result.error) console.warn('Supabase portal sign-out reported an error.', result.error);
+                    }).catch(function (error) {
+                        console.warn('Could not revoke a Supabase portal session.', error);
+                    }));
+                } catch (error) {
+                    console.warn('Could not clear a Supabase portal session.', error);
+                }
+            }
+            try {
+                localStorage.removeItem(SUPABASE_PORTAL_AUTH_KEYS.local);
+                sessionStorage.removeItem(SUPABASE_PORTAL_AUTH_KEYS.session);
+            } catch (error) {
+                console.warn('Could not remove Supabase portal session storage.', error);
+            }
+            await Promise.all(signOutRequests);
+        }
+
         function handleAuthLogin(e) {
             e.preventDefault();
             const pwdInput = document.getElementById('login-password');
@@ -7298,19 +7475,13 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
             const lowerId = idVal.toLowerCase();
 
-            // Developer credentials are checked server-side against Script Properties.
-            const isDevLogin = lowerId === 'anil.chahar170@gmail.com';
+            // Static-hosted Admin and Developer credentials are verified by Supabase Auth.
+            // Apps Script continues to verify Developer credentials server-side.
+            const developerEmail = String(state.settings && state.settings.leadDevEmail || 'anil.chahar170@gmail.com').trim().toLowerCase();
+            const isDevLogin = lowerId === developerEmail;
             if (isDevLogin) {
-                if (typeof google === 'undefined' || !google.script || !google.script.run) {
-                    openModal(`
-                        <div class="w-full max-w-md text-center">
-                            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700"><i class="fa-solid fa-lock" aria-hidden="true"></i></div>
-                            <h2 class="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">Use the secure Developer portal</h2>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Developer sign-in is not available on this static GitHub Pages site. Open the secure Apps Script portal and enter your credentials there.</p>
-                            <a href="https://script.google.com/macros/s/AKfycbySJOW4-AlwDHziPVoLCsz-X3LAf9CWurzGsJtyyxa4qIi7n9yh-A3lLatRUsOaN_sf/exec" target="_top" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open secure sign-in</a>
-                            <button type="button" onclick="closeModal()" class="ml-2 min-h-11 rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
-                        </div>
-                    `);
+                if (!isAppsScriptAuthAvailable()) {
+                    signInSupabasePortalUser(idVal, pwd, rememberMe, 'developer');
                     return;
                 }
                 google.script.run
@@ -7336,8 +7507,19 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             }
 
             // 1. Admin Login (admin, anil, anil chahar, admin@divineclasses.in)
-            const isAdmin = lowerId === 'admin' || lowerId === 'admin@divineclasses.in' || lowerId === 'anil' || lowerId === 'anil chahar';
+            const adminEmailForLogin = String(state.settings && state.settings.adminEmail || '').trim().toLowerCase();
+            const isAdmin = lowerId === 'admin' || lowerId === 'admin@divineclasses.in' ||
+                lowerId === adminEmailForLogin || lowerId === 'anil' || lowerId === 'anil chahar';
             if (isAdmin) {
+                if (!isAppsScriptAuthAvailable()) {
+                    const adminEmail = String(state.settings && state.settings.adminEmail || '').trim();
+                    if (!adminEmail) {
+                        showToast('Administrator Supabase Auth is not configured. Contact the portal developer.', 'error');
+                        return;
+                    }
+                    signInSupabasePortalUser(adminEmail, pwd, rememberMe, 'admin');
+                    return;
+                }
                 const adminPwd = (state.settings && state.settings.adminPassword) ? state.settings.adminPassword : 'admin123';
                 if (pwd !== adminPwd && pwd !== 'admin') {
                     showToast('Invalid Password for Administrator.', 'error');
@@ -7750,9 +7932,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
                             ${sectionCard('Portal Security & Passwords', 'fa-key', 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300', `
                                 ${inputField('adminName', 'Admin Name', s.adminName, 'text', 'e.g. Er. Rajesh Chahar')}
-                                ${inputField('adminPassword', 'Master Admin Password', s.adminPassword, 'password', 'admin123')}
+                                ${isAppsScriptAuthAvailable() ? inputField('adminPassword', 'Master Admin Password', s.adminPassword, 'password') : ''}
                                 ${inputField('adminEmail', 'Admin Email ID', s.adminEmail, 'text', 'admin@divineclasses.in')}
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1 text-amber-500"></i> Admin password unlocks the Admin portal. Lead Dev credentials are stored in server-side Script Properties and are never sent to this page.</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1 text-amber-500"></i> ${isAppsScriptAuthAvailable() ? 'The Apps Script portal uses its configured Admin password; Developer credentials are verified server-side.' : 'GitHub Pages Admin and Developer sign-ins are verified by Supabase Auth; manage passwords there.'}</p>
                             `)}
 
                             ${sectionCard('Database Connections', 'fa-database', 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300', `
@@ -9701,6 +9883,9 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             } catch (e) { console.warn('Supabase local config restore warning:', e); }
 
             try { loadAuthSession(); } catch (e) { console.warn('Auth session load warning:', e); }
+            if (window.supabase && typeof restoreSupabasePortalSession === 'function') {
+                restoreSupabasePortalSession();
+            }
             try { initInactivityTracker(); } catch (e) { console.warn('Inactivity tracker warning:', e); }
             try { updateRoleUI(); } catch (e) { console.warn('Role UI update warning:', e); }
             try { renderSidebar(); } catch (e) { console.warn('Sidebar render warning:', e); }
