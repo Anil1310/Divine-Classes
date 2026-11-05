@@ -872,6 +872,7 @@
                 const lastAct = parseInt(localStorage.getItem('DIVINE_LAST_ACTIVITY') || '0', 10);
                 if (lastAct && (Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS)) {
                     console.log('[Auth] Prior session expired due to 2 hours of inactivity.');
+                    if (!isAppsScriptAuthAvailable()) signOutSupabasePortalSessions();
                     localStorage.removeItem('DIVINE_AUTH_SESSION');
                     sessionStorage.removeItem('DIVINE_AUTH_SESSION');
                     return;
@@ -7302,7 +7303,8 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
 
         const SUPABASE_PORTAL_AUTH_KEYS = {
             local: 'DIVINE_PORTAL_AUTH_LOCAL',
-            session: 'DIVINE_PORTAL_AUTH_SESSION'
+            session: 'DIVINE_PORTAL_AUTH_SESSION',
+            rememberUntil: 'DIVINE_PORTAL_AUTH_EXPIRES'
         };
         let supabasePortalAuthClients = {};
 
@@ -7370,7 +7372,16 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     : (state.settings && state.settings.adminName) || 'Administrator',
                 identifier: user.email || identifier
             };
-            saveAuthSession(rememberMe, identifier, '');
+            if (showSuccess === false) {
+                recordUserActivity();
+            } else {
+                if (rememberMe) {
+                    localStorage.setItem(SUPABASE_PORTAL_AUTH_KEYS.rememberUntil, String(Date.now() + TEN_DAYS_MS));
+                } else {
+                    localStorage.removeItem(SUPABASE_PORTAL_AUTH_KEYS.rememberUntil);
+                }
+                saveAuthSession(rememberMe, identifier, '');
+            }
             closeModal();
             updateRoleUI();
             renderSidebar();
@@ -7397,7 +7408,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                 const user = result.data.user;
                 if (getSupabasePortalRole(user) !== expectedRole ||
                     String(user.email || '').trim().toLowerCase() !== String(email || '').trim().toLowerCase()) {
-                    await client.auth.signOut();
+                    await signOutSupabasePortalSessions();
                     showToast('This account is not authorized for that portal role.', 'error');
                     return;
                 }
@@ -7415,13 +7426,24 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             for (const storageType of ['local', 'session']) {
                 try {
                     const client = getSupabasePortalAuthClient(storageType === 'local');
+                    if (storageType === 'local') {
+                        const expiresAt = Number(localStorage.getItem(SUPABASE_PORTAL_AUTH_KEYS.rememberUntil) || 0);
+                        if (!expiresAt || Date.now() >= expiresAt) {
+                            const signOutRequest = client.auth.signOut();
+                            localStorage.removeItem(SUPABASE_PORTAL_AUTH_KEYS.local);
+                            localStorage.removeItem(SUPABASE_PORTAL_AUTH_KEYS.rememberUntil);
+                            localStorage.removeItem('DIVINE_SAVED_CREDS');
+                            await signOutRequest;
+                            continue;
+                        }
+                    }
                     const result = await client.auth.getSession();
                     const session = result && result.data && result.data.session;
                     if (!session) continue;
 
                     const role = getSupabasePortalRole(session.user);
                     if (!role) {
-                        await client.auth.signOut();
+                        await signOutSupabasePortalSessions();
                         continue;
                     }
                     finishSupabasePortalLogin(session.user, role, storageType === 'local', session.user.email || '', false);

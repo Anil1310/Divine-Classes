@@ -696,9 +696,12 @@ The portal integrates an interactive AI Assistant & Doubts Helpdesk:
 
 The static GitHub Pages portal verifies Admin and Developer sign-ins with Supabase Auth. It does not authenticate these roles using password values stored in `settings_config` or browser code.
 
-1. Run [`Supabase/Developer_Auth_Migration.sql`](./Supabase/Developer_Auth_Migration.sql) in the Supabase SQL Editor to remove legacy password settings and strip cached snapshot values.
-2. In Supabase Authentication, create an Auth user for each portal account using the desired email and a newly rotated password.
-3. Set the user's **app metadata** to `{"portal_role":"admin"}` or `{"portal_role":"developer"}`. Do not use editable user metadata for role authorization.
-4. Ensure the configured Admin Email and Lead Developer Email match those Auth user emails. Sign in on GitHub Pages with the email and password.
+1. If the Apps Script portal still syncs to this Supabase project, redeploy the updated Apps Script source first; GitHub Pages publishing does not update the Apps Script deployment.
+2. Run [`Supabase/Developer_Auth_Migration.sql`](./Supabase/Developer_Auth_Migration.sql) in the Supabase SQL Editor to remove legacy password settings and strip cached snapshot values.
+3. In Supabase Authentication, create an Auth user for each portal account using the desired email and a newly rotated password.
+4. Set the user's **app metadata** to `{"portal_role":"admin"}` or `{"portal_role":"developer"}`. Do not use editable user metadata for role authorization.
+5. Ensure the configured Admin Email and Lead Developer Email match those Auth user emails. Sign in on GitHub Pages with the email and password.
+
+“Remember Me” persists the Supabase Auth session for up to 10 days; the portal never stores these users' passwords in browser storage.
 
 The Apps Script portal retains its server-side Developer verification through Script Properties. This migration does not make the portal's other public Supabase tables private; those require a separate RLS and server-authorization review.
