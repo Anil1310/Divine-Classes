@@ -328,7 +328,7 @@ function mergeStudentsFromSheet_(dbData) {
 > - **Student/Parent Feedback**: Students and parents can access the `Faculty & Feedback` portal directly at the top to browse active mentors and submit 5-star ratings and reviews.
 > - **Universal Footers**: All views, login, and logout portals include streamlined developer attribution: `© 2026 Designed & Engineered by Dev. Anil Kumar Chahar • 8126390611 • v2.5 Cloud Edition`.
 > - **Strict 4-Control Header**: Top header contains strictly 4 controls (Sync, Theme, Bell, Profile Badge); duplicate cloud icons are located exclusively in the sidebar under Developer Tools.
-> - **Developer-Only Gemini AI Configuration**: The Gemini API key drawer and setup wand icon (`🪄`) are strictly restricted to Developer mode (`isDev`) and hidden for all other roles.
+> - **Developer-Only AI Configuration**: The Gemini/ChatGPT API key drawer and setup wand icon (`🪄`) are strictly restricted to Developer mode (`isDev`) and hidden for all other roles.
 > - **Microphone Voice Engine & Recovery**: Direct Web Speech execution with an interactive permission guide modal (`showMicrophonePermissionHelpModal()`) for Chrome and macOS.
 
 ### 7.2 Google Apps Script Compiler Defense (Lexer Safety)
@@ -667,14 +667,18 @@ The script locates `DummyData.js` and runs Git/Clasp from the directory containi
 
 The portal integrates an interactive AI Assistant & Doubts Helpdesk:
 - **Multi-Mode Interface**:
-  - Persistent floating launcher (`#divine-chatbot-btn`) and responsive chat drawer (`#divine-chatbot-window`).
+  - Persistent floating launcher (`#chatbot-launcher`) and responsive chat drawer (`#chatbot-overlay`).
   - Standalone dedicated route (`?page=chatbot`) and page module (`Pages/Chatbot/`).
+- **Gemini & ChatGPT API Settings**:
+  - Developer-only **AI Keys** control opens the Gemini/OpenAI provider drawer with model selection, connection testing, and key removal.
+  - API keys are saved in the current browser's local storage only; they are not added to shared portal settings or cloud sync.
+  - Chat requests are forwarded by Apps Script to the selected provider using the chosen Gemini 2.5 or GPT-4o model.
 - **Real-Time State & Institute Intelligence**:
   - Live student queries: fee dues, total payments, enrolled batch, attendance, test marks.
   - Institute knowledge base: Paschimpuri address, contact numbers, Director Er. Rajesh Chahar, Lead Developer Dev. Anil Kumar Chahar.
   - Academic doubt solving: Physics, Chemistry, Maths & Biology with pedagogical Markdown formatting.
-- **Auto-Connected Google Gemini Engine**:
-  - Direct connection to Gemini API (`gemini-2.5-flash` and `gemini-2.5-pro`) with inline developer API key drawer (`#gemini-config-drawer`).
+- **AI Chat Engine**:
+  - Supports Gemini 2.5 Flash/Pro and GPT-4o Mini/GPT-4o through the Apps Script endpoint in `Chatbot/Backend.js`.
   - Text-to-speech audio feedback (`speakChatbotResponse`) and Markdown-to-HTML parser.
 - **Oral Speech & Voice-Powered Student Admission**:
   - Web Speech API microphone input allowing oral speech queries and enrollment.

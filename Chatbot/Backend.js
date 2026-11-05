@@ -1,4 +1,4 @@
-function apiChatbotReply(history, apiKey) {
+function apiChatbotReply(history, configOrApiKey) {
   let settings = dbGetTable('settings') || {};
   if (settings.chatbotEnabled === undefined) {
     const appData = apiGetInitialData();
@@ -8,25 +8,40 @@ function apiChatbotReply(history, apiKey) {
     settings.chatbotEnabled === 'on' || settings.chatbotEnabled === 'true' || settings.chatbotEnabled === 1;
   if (!enabled) return { success: false, error: 'The chatbot is currently disabled.' };
 
-  if (typeof apiKey !== 'string' || apiKey.trim().length < 20 ||
-      apiKey.trim().length > 500 || /\s/.test(apiKey.trim())) {
-    return { success: false, error: 'Connect a valid Gemini API key from Google AI Studio to continue.' };
+  const config = typeof configOrApiKey === 'string'
+    ? { provider: 'gemini', apiKey: configOrApiKey, model: 'gemini-2.5-flash' }
+    : configOrApiKey;
+  const provider = config && config.provider === 'openai' ? 'openai' : 'gemini';
+  const apiKey = config && typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+  const allowedModels = provider === 'openai'
+    ? ['gpt-4o-mini', 'gpt-4o']
+    : ['gemini-2.5-flash', 'gemini-2.5-pro'];
+  const model = config && allowedModels.indexOf(config.model) !== -1 ? config.model : allowedModels[0];
+  if (!config || (config.provider && config.provider !== 'gemini' && config.provider !== 'openai')) {
+    return { success: false, error: 'Choose a supported AI provider.' };
   }
-  apiKey = apiKey.trim();
+  if (apiKey.length < 20 || apiKey.length > 500 || /\s/.test(apiKey)) {
+    return { success: false, error: 'Add a valid API key for the selected AI provider.' };
+  }
   if (!Array.isArray(history) || history.length === 0) {
     return { success: false, error: 'Enter a message to start chatting.' };
   }
 
   let messages = history.slice(-8);
   while (messages.length && messages[0] && messages[0].role === 'model') messages.shift();
-  const contents = messages.map(function (message) {
+  const conversation = [];
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
     if (!message || (message.role !== 'user' && message.role !== 'model') ||
         typeof message.text !== 'string' || !message.text.trim() || message.text.length > 1000) {
-      throw new Error('Invalid chatbot message.');
+      return { success: false, error: 'The conversation contains an invalid message. Please try again.' };
     }
-    return { role: message.role, parts: [{ text: message.text.trim() }] };
-  });
-  if (!contents.length || contents[contents.length - 1].role !== 'user') {
+    conversation.push({
+      role: provider === 'openai' ? (message.role === 'model' ? 'assistant' : 'user') : message.role,
+      text: message.text.trim()
+    });
+  }
+  if (!conversation.length || conversation[conversation.length - 1].role !== 'user') {
     return { success: false, error: 'Send a message to continue.' };
   }
 
@@ -66,34 +81,54 @@ function apiChatbotReply(history, apiKey) {
 
   let response;
   try {
-    response = UrlFetchApp.fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-      {
-        method: 'post',
-        contentType: 'application/json',
-        headers: { 'x-goog-api-key': apiKey },
-        payload: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents: contents,
-          generationConfig: { maxOutputTokens: 500, temperature: 0.4 }
-        }),
-        muteHttpExceptions: true
-      }
-    );
+    const requestOptions = provider === 'openai'
+      ? {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { Authorization: 'Bearer ' + apiKey },
+          payload: JSON.stringify({
+            model: model,
+            messages: [{ role: 'system', content: systemInstruction }].concat(
+              conversation.map(function (message) {
+                return { role: message.role, content: message.text };
+              })
+            ),
+            max_tokens: 500,
+            temperature: 0.4
+          }),
+          muteHttpExceptions: true
+        }
+      : {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { 'x-goog-api-key': apiKey },
+          payload: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents: conversation.map(function (message) {
+              return { role: message.role, parts: [{ text: message.text }] };
+            }),
+            generationConfig: { maxOutputTokens: 500, temperature: 0.4 }
+          }),
+          muteHttpExceptions: true
+        };
+    const endpoint = provider === 'openai'
+      ? 'https://api.openai.com/v1/chat/completions'
+      : 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+    response = UrlFetchApp.fetch(endpoint, requestOptions);
   } catch (error) {
-    Logger.log('Gemini chatbot request failed: ' + error.toString());
+    Logger.log(provider + ' chatbot request failed: ' + error.toString());
     return { success: false, error: 'The chatbot could not connect right now. Please try again later.' };
   }
 
   const status = response.getResponseCode();
   if (status < 200 || status >= 300) {
-    Logger.log('Gemini chatbot returned HTTP ' + status + '.');
+    Logger.log(provider + ' chatbot returned HTTP ' + status + '.');
     return {
       success: false,
       error: status === 429
-        ? 'This Gemini account has reached its current free-tier limit. Try again later or check your Google AI Studio quota.'
+        ? 'The selected AI account has reached its current usage limit. Check its provider quota or try again later.'
         : status === 400 || status === 403
-          ? 'Gemini rejected this key. Check that it is an AI Studio key with Gemini API access enabled.'
+          ? 'The AI provider rejected this key or model. Check the key and selected model.'
           : 'The chatbot could not answer right now. Please try again later.'
     };
   }
@@ -102,12 +137,15 @@ function apiChatbotReply(history, apiKey) {
   try {
     result = JSON.parse(response.getContentText());
   } catch (error) {
-    Logger.log('Gemini chatbot response could not be parsed.');
+    Logger.log(provider + ' chatbot response could not be parsed.');
     return { success: false, error: 'The chatbot returned an unreadable response. Please try again.' };
   }
-  const answer = result && result.candidates && result.candidates[0] &&
-    result.candidates[0].content && result.candidates[0].content.parts &&
-    result.candidates[0].content.parts.map(function (part) { return part.text || ''; }).join('').trim();
+  const answer = provider === 'openai'
+    ? result && result.choices && result.choices[0] && result.choices[0].message &&
+      typeof result.choices[0].message.content === 'string' && result.choices[0].message.content.trim()
+    : result && result.candidates && result.candidates[0] &&
+      result.candidates[0].content && result.candidates[0].content.parts &&
+      result.candidates[0].content.parts.map(function (part) { return part.text || ''; }).join('').trim();
   if (!answer) return { success: false, error: 'The chatbot did not return an answer. Please try again.' };
   return { success: true, answer: answer.slice(0, 4000) };
 }

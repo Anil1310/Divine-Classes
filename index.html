@@ -773,8 +773,8 @@
         z-index: 45;
         right: max(24px, env(safe-area-inset-right));
         bottom: max(82px, calc(72px + env(safe-area-inset-bottom)));
-        width: min(440px, calc(100vw - 32px));
-        height: min(620px, calc(100dvh - 112px - env(safe-area-inset-bottom)));
+        width: min(410px, calc(100vw - 32px));
+        height: min(550px, calc(100dvh - 112px - env(safe-area-inset-bottom)));
         min-height: 0;
         overflow: hidden;
         border-radius: 20px;
@@ -815,19 +815,59 @@
     #chatbot-overlay .chatbot-header-actions .chatbot-new-chat:hover:not(:disabled) { background: rgba(255,255,255,.22); }
     #chatbot-overlay .chatbot-overlay-close { width: 32px; min-width: 32px; padding: 0; justify-content: center; }
     #chatbot-overlay .chatbot-overlay-close span { display: none; }
-    #chatbot-overlay .chatbot-welcome { min-height: 100%; align-items: flex-start; justify-content: center; padding: 22px 18px; text-align: left; }
-    #chatbot-overlay .chatbot-welcome-mark { width: 44px; height: 44px; margin-bottom: 12px; border-radius: 15px; }
-    #chatbot-overlay .chatbot-welcome h3 { font-size: 22px; }
-    #chatbot-overlay .chatbot-welcome-copy { margin-top: 7px; font-size: 11px; }
-    #chatbot-overlay .chatbot-suggestions { margin-top: 18px; }
-    #chatbot-overlay .chatbot-suggestions-label { margin-bottom: 7px; }
-    #chatbot-overlay .chatbot-suggestion-grid { grid-template-columns: 1fr; gap: 7px; }
-    #chatbot-overlay .chatbot-suggestion { min-height: 43px; padding: 7px 10px; }
-    #chatbot-overlay .chatbot-suggestion-icon { width: 27px; height: 27px; }
+    #chatbot-overlay .chatbot-suggestions { width: 100%; flex: 0 0 auto; margin: 0; padding: 7px 9px; overflow-x: auto; border-bottom: 1px solid #eceef3; background: #f7f8fb; scrollbar-width: none; }
+    #chatbot-overlay .chatbot-suggestions::-webkit-scrollbar { display: none; }
+    #chatbot-overlay .chatbot-suggestion-grid { display: flex; width: max-content; min-width: 100%; gap: 6px; }
+    #chatbot-overlay .chatbot-suggestion { min-height: 31px; flex: 0 0 auto; gap: 5px; padding: 5px 8px; color: #536074; font-size: 9px !important; border-radius: 999px; }
+    #chatbot-overlay .chatbot-suggestion-icon { width: 18px; height: 18px; font-size: 9px; border-radius: 50%; }
+    #chatbot-overlay .chatbot-suggestion-arrow { margin-left: 1px; font-size: 8px; }
+    #chatbot-overlay .chatbot-conversation { background: #f7f8fc; }
+    #chatbot-overlay .chatbot-thread { width: 100%; padding: 14px 12px 18px; }
+    #chatbot-overlay .chatbot-message { gap: 8px; margin-bottom: 15px; }
+    #chatbot-overlay .chatbot-avatar { width: 25px; height: 25px; margin-top: 18px; border-radius: 50%; }
+    #chatbot-overlay .chatbot-message-content { max-width: calc(100% - 34px); }
+    #chatbot-overlay .chatbot-message-meta { margin-bottom: 4px; font-size: 9px; }
+    #chatbot-overlay .chatbot-bubble { padding: 10px 12px; font-size: 10px; line-height: 1.65; }
+    #chatbot-overlay .chatbot-bubble p { margin: 0 0 6px; }
+    #chatbot-overlay .chatbot-bubble p:last-of-type { margin-bottom: 5px; }
+    #chatbot-overlay .chatbot-bubble ul { margin: 4px 0 0; padding-left: 15px; list-style: disc; }
+    #chatbot-overlay .chatbot-bubble li { margin: 2px 0; }
+    #chatbot-overlay .chatbot-welcome-hint { color: #69758a; font-size: 9px; }
     #chatbot-overlay .chatbot-composer-wrap { padding: 10px 12px 8px; }
     #chatbot-overlay .chatbot-privacy-note { font-size: 8px; }
     #chatbot-overlay .chatbot-thread { padding: 17px 14px 20px; }
     #chatbot-overlay .chatbot-message { margin-bottom: 15px; }
+
+    #chatbot-overlay .chatbot-key-drawer {
+        max-height: 290px;
+        flex: 0 0 auto;
+        overflow-y: auto;
+        padding: 12px 14px;
+        color: #384153;
+        border-bottom: 1px solid #e8e4f2;
+        background: #f8f7fc;
+    }
+    #chatbot-overlay .chatbot-key-drawer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    #chatbot-overlay .chatbot-key-drawer-heading strong { display: block; color: #272d3b; font-size: 11px; }
+    #chatbot-overlay .chatbot-key-drawer-heading small { display: block; margin-top: 2px; color: #737d90; font-size: 9px; }
+    #chatbot-overlay .chatbot-drawer-close { display: inline-flex; width: 25px; height: 25px; align-items: center; justify-content: center; color: #737d90; border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
+    #chatbot-overlay .chatbot-provider-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px; padding: 3px; border-radius: 9px; background: #eceaf2; }
+    #chatbot-overlay .chatbot-provider-tabs button { display: flex; min-height: 30px; align-items: center; justify-content: center; gap: 6px; color: #667085; font-size: 10px; font-weight: 700; border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
+    #chatbot-overlay .chatbot-provider-tabs button.is-active { color: #5145cd; background: #fff; box-shadow: 0 1px 3px rgba(27, 35, 55, .1); }
+    #chatbot-overlay .chatbot-key-drawer [data-chatbot-provider-panel][hidden] { display: none; }
+    #chatbot-overlay .chatbot-key-drawer label { display: block; margin: 8px 0 4px; color: #4c5568; font-size: 9px; font-weight: 750; }
+    #chatbot-overlay .chatbot-key-drawer input,
+    #chatbot-overlay .chatbot-key-drawer select { width: 100%; min-height: 32px; padding: 6px 9px; color: #30394c; font-size: 10px; border: 1px solid #dfe2e9; border-radius: 8px; background: #fff; }
+    #chatbot-overlay .chatbot-key-drawer input:focus,
+    #chatbot-overlay .chatbot-key-drawer select:focus { outline: 2px solid rgba(99, 102, 241, .2); border-color: #aaa5f2; }
+    #chatbot-overlay .chatbot-key-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 7px; }
+    #chatbot-overlay .chatbot-key-actions a,
+    #chatbot-overlay .chatbot-key-actions button { padding: 2px 0; color: #5b52d4; font-size: 9px; font-weight: 650; text-decoration: none; border: 0; background: transparent; cursor: pointer; }
+    #chatbot-overlay .chatbot-key-actions button { color: #be4351; }
+    #chatbot-overlay .chatbot-drawer-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid #e7e4ed; }
+    #chatbot-overlay .chatbot-drawer-footer button { min-height: 29px; padding: 0 9px; color: #596276; font-size: 9px; font-weight: 700; border: 1px solid #e1e3e9; border-radius: 7px; background: #fff; cursor: pointer; }
+    #chatbot-overlay .chatbot-drawer-footer button[type="submit"] { color: #fff; border-color: #5148d7; background: #5148d7; }
+    #chatbot-overlay .chatbot-drawer-footer button:disabled { opacity: .6; cursor: wait; }
 
     #chatbot-shell {
         --chatbot-accent: #4f46e5;
@@ -1066,13 +1106,12 @@
         #chatbot-overlay .chatbot-title-row { flex-wrap: nowrap; gap: 5px; }
         #chatbot-overlay .chatbot-title-row h2 { font-size: 11px; white-space: nowrap; }
         #chatbot-overlay .chatbot-brand-copy > p { gap: 4px; font-size: 9px; white-space: nowrap; }
-        #chatbot-overlay .chatbot-welcome { padding: 17px 14px; }
-        #chatbot-overlay .chatbot-welcome h3 { font-size: 20px; }
-        #chatbot-overlay .chatbot-welcome-copy { font-size: 10px; }
-        #chatbot-overlay .chatbot-suggestions { margin-top: 14px; }
-        #chatbot-overlay .chatbot-suggestion { min-height: 39px; font-size: 10px !important; }
+        #chatbot-overlay .chatbot-suggestions { padding: 6px 7px; }
+        #chatbot-overlay .chatbot-suggestion { min-height: 30px; font-size: 9px !important; }
+        #chatbot-overlay .chatbot-thread { padding: 12px 9px 16px; }
         #chatbot-overlay .chatbot-composer-wrap { padding: 8px 9px 7px; }
         #chatbot-overlay .chatbot-privacy-note { margin-top: 6px; font-size: 7px; }
+        #chatbot-overlay .chatbot-key-drawer { max-height: 270px; padding: 10px; }
         #chatbot-shell { width: 100%; height: calc(100dvh - 245px); min-height: 430px; border-radius: 18px; }
         .chatbot-header { min-height: 68px; padding: 11px 13px; }
         .chatbot-header-actions { gap: 5px; }
@@ -14094,93 +14133,172 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         return 'DIVINE_CHATBOT_HISTORY_' + encodeURIComponent(String(user.role || state.currentRole) + ':' + String(identity).trim().toLowerCase());
     }
 
-    function getChatbotApiKeyStorageKey() {
-        const historyKey = getChatbotHistoryStorageKey();
-        return historyKey ? historyKey.replace('DIVINE_CHATBOT_HISTORY_', 'DIVINE_CHATBOT_API_KEY_') : '';
+    function getChatbotAiProvider() {
+        try {
+            return localStorage.getItem('DIVINE_AI_PROVIDER') === 'openai' ? 'openai' : 'gemini';
+        } catch (error) {
+            console.warn('Could not read the selected chatbot provider.', error);
+            return 'gemini';
+        }
     }
 
-    function getChatbotApiKey() {
-        const key = getChatbotApiKeyStorageKey();
-        if (!key) return '';
+    function getChatbotProviderApiKey(provider) {
+        const storageKey = provider === 'openai' ? 'DIVINE_OPENAI_API_KEY' : 'DIVINE_GEMINI_API_KEY';
         try {
-            return localStorage.getItem(key) || '';
+            return localStorage.getItem(storageKey) || (provider === 'gemini' ? localStorage.getItem('DIVINE_DEV_GEMINI_KEY') || '' : '');
         } catch (error) {
-            console.warn('Could not read the Gemini API key from this browser.', error);
+            console.warn('Could not read the saved chatbot API key.', error);
             return '';
         }
     }
 
-    function openChatbotKeyDialog() {
-        if (!state.isAuthenticated || !state.currentUser) {
-            showToast('Sign in to connect your Gemini API key.', 'error');
-            return;
-        }
-        const connected = !!getChatbotApiKey();
-        openModal(`
-            <form onsubmit="saveChatbotApiKey(event)" class="w-full max-w-lg">
-                <div class="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">Connect your Gemini account</h2>
-                        <p class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Create a Gemini API key in Google AI Studio while signed in with your Google account. Eligible free-tier use is subject to Google's quotas and terms; exceeding free limits may require waiting or a paid plan. This is not Google OAuth or Vertex AI.</p>
-                    </div>
-                    <button type="button" onclick="closeModal()" aria-label="Close" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="mb-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
-                    <i class="fa-brands fa-google"></i> Create a Gemini API key in Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                </a>
-                <label for="chatbot-user-api-key" class="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">Your Gemini API key</label>
-                <input id="chatbot-user-api-key" type="password" autocomplete="new-password" spellcheck="false" maxlength="500" placeholder="${connected ? 'Enter a new key to replace your saved key' : 'Paste your AI Studio key'}" class="mb-2 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-mono text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                <p class="mb-4 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">Saved only in this browser profile for your portal account. It is sent through Apps Script only to forward your request to Gemini and is not saved in the shared app database. Anyone using this browser profile may access it. Google AI Studio free-tier quotas apply.</p>
-                <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-                    ${connected ? '<button type="button" onclick="removeChatbotApiKey()" class="mr-auto rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">Disconnect</button>' : ''}
-                    <button type="button" onclick="closeModal()" class="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
-                    <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save key</button>
-                </div>
-            </form>
-        `);
-    }
-
-    function saveChatbotApiKey(event) {
-        event.preventDefault();
-        const input = document.getElementById('chatbot-user-api-key');
-        const apiKey = input ? input.value.trim() : '';
-        if (apiKey.length < 20 || apiKey.length > 500 || /\s/.test(apiKey)) {
-            showToast('Paste a valid Gemini API key from Google AI Studio.', 'warning');
-            return;
-        }
-        const storageKey = getChatbotApiKeyStorageKey();
-        if (!storageKey) {
-            showToast('Sign in again before saving your Gemini key.', 'error');
-            return;
-        }
+    function getChatbotProviderModel(provider) {
+        const storageKey = provider === 'openai' ? 'DIVINE_OPENAI_MODEL' : 'DIVINE_GEMINI_MODEL';
+        const allowedModels = provider === 'openai'
+            ? ['gpt-4o-mini', 'gpt-4o']
+            : ['gemini-2.5-flash', 'gemini-2.5-pro'];
         try {
-            localStorage.setItem(storageKey, apiKey);
+            const model = localStorage.getItem(storageKey);
+            return allowedModels.includes(model) ? model : (provider === 'gemini' && state.currentRole === 'developer' ? 'gemini-2.5-pro' : allowedModels[0]);
         } catch (error) {
-            console.error('Could not save the Gemini API key in this browser.', error);
-            showToast('The key could not be saved in this browser. Check storage availability and try again.', 'error');
-            return;
+            console.warn('Could not read the saved chatbot model.', error);
+            return allowedModels[0];
         }
-        closeModal();
-        renderChatbotSurface();
-        showToast('Your Gemini API key is connected in this browser.', 'success');
     }
 
-    function removeChatbotApiKey() {
-        const storageKey = getChatbotApiKeyStorageKey();
-        if (!storageKey) {
-            showToast('Sign in again before disconnecting your Gemini key.', 'error');
+    function getChatbotRequestConfig() {
+        const isDeveloper = state.currentRole === 'developer' || state.isDeveloper;
+        const provider = isDeveloper ? (state.chatbotAiProvider || getChatbotAiProvider()) : 'gemini';
+        return {
+            provider: provider,
+            apiKey: isDeveloper ? getChatbotProviderApiKey(provider) : '',
+            model: isDeveloper ? getChatbotProviderModel(provider) : 'gemini-2.5-flash'
+        };
+    }
+
+    function canManageChatbotAiKeys() {
+        return !!state.isAuthenticated && (state.currentRole === 'developer' || state.isDeveloper);
+    }
+
+    function toggleChatbotKeyDrawer(forceState) {
+        if (!canManageChatbotAiKeys()) {
+            showToast('Gemini and ChatGPT key settings are restricted to Developer mode.', 'warning');
             return;
         }
+        state.chatbotKeyDrawerOpen = typeof forceState === 'boolean' ? forceState : !state.chatbotKeyDrawerOpen;
+        renderChatbotSurface();
+    }
+
+    function selectChatbotProvider(provider) {
+        if (!canManageChatbotAiKeys() || !['gemini', 'openai'].includes(provider)) {
+            showToast('Gemini and ChatGPT key settings are restricted to Developer mode.', 'warning');
+            return;
+        }
+        state.chatbotAiProvider = provider;
+        document.querySelectorAll('[data-chatbot-provider-tab]').forEach(function (button) {
+            const active = button.dataset.chatbotProviderTab === provider;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', String(active));
+        });
+        document.querySelectorAll('[data-chatbot-provider-panel]').forEach(function (panel) {
+            panel.hidden = panel.dataset.chatbotProviderPanel !== provider;
+        });
+    }
+
+    function saveChatbotAiSettings(event) {
+        if (event) event.preventDefault();
+        if (!canManageChatbotAiKeys()) {
+            showToast('Gemini and ChatGPT key settings are restricted to Developer mode.', 'warning');
+            return;
+        }
+
+        const geminiKeyInput = document.getElementById('chatbot-gemini-api-key');
+        const openAiKeyInput = document.getElementById('chatbot-openai-api-key');
+        const geminiKey = geminiKeyInput ? geminiKeyInput.value.trim() : '';
+        const openAiKey = openAiKeyInput ? openAiKeyInput.value.trim() : '';
+        if ((geminiKey && (geminiKey.length < 20 || geminiKey.length > 500 || /\s/.test(geminiKey))) ||
+            (openAiKey && (openAiKey.length < 20 || openAiKey.length > 500 || /\s/.test(openAiKey)))) {
+            showToast('Check the API key format. Keys must be 20–500 characters with no spaces.', 'warning');
+            return;
+        }
+
+        try {
+            if (geminiKey) localStorage.setItem('DIVINE_GEMINI_API_KEY', geminiKey);
+            if (openAiKey) localStorage.setItem('DIVINE_OPENAI_API_KEY', openAiKey);
+            localStorage.setItem('DIVINE_GEMINI_MODEL', document.getElementById('chatbot-gemini-model').value);
+            localStorage.setItem('DIVINE_OPENAI_MODEL', document.getElementById('chatbot-openai-model').value);
+            localStorage.setItem('DIVINE_AI_PROVIDER', state.chatbotAiProvider || getChatbotAiProvider());
+        } catch (error) {
+            console.error('Could not save chatbot provider settings in this browser.', error);
+            showToast('AI settings could not be saved in this browser. Check storage availability and try again.', 'error');
+            return;
+        }
+
+        state.chatbotKeyDrawerOpen = false;
+        renderChatbotSurface();
+        showToast('AI provider settings saved in this browser only.', 'success');
+    }
+
+    function removeChatbotProviderKey(provider) {
+        if (!canManageChatbotAiKeys() || !['gemini', 'openai'].includes(provider)) {
+            showToast('Gemini and ChatGPT key settings are restricted to Developer mode.', 'warning');
+            return;
+        }
+        const storageKey = provider === 'openai' ? 'DIVINE_OPENAI_API_KEY' : 'DIVINE_GEMINI_API_KEY';
         try {
             localStorage.removeItem(storageKey);
+            if (provider === 'gemini') localStorage.removeItem('DIVINE_DEV_GEMINI_KEY');
         } catch (error) {
-            console.error('Could not remove the Gemini API key from this browser.', error);
-            showToast('The key could not be removed from this browser.', 'error');
+            console.error('Could not remove the chatbot API key from this browser.', error);
+            showToast('The API key could not be removed from this browser.', 'error');
             return;
         }
-        closeModal();
         renderChatbotSurface();
-        showToast('Gemini disconnected for this portal account on this browser.', 'info');
+        showToast((provider === 'openai' ? 'ChatGPT' : 'Gemini') + ' key removed from this browser.', 'info');
+    }
+
+    function testChatbotAiConnection(button) {
+        if (!canManageChatbotAiKeys()) {
+            showToast('Gemini and ChatGPT key settings are restricted to Developer mode.', 'warning');
+            return;
+        }
+        const provider = state.chatbotAiProvider || getChatbotAiProvider();
+        const input = document.getElementById(provider === 'openai' ? 'chatbot-openai-api-key' : 'chatbot-gemini-api-key');
+        const modelInput = document.getElementById(provider === 'openai' ? 'chatbot-openai-model' : 'chatbot-gemini-model');
+        const config = {
+            provider: provider,
+            apiKey: input && input.value.trim() ? input.value.trim() : getChatbotProviderApiKey(provider),
+            model: modelInput ? modelInput.value : getChatbotProviderModel(provider)
+        };
+        if (!config.apiKey) {
+            showToast('Add and save a key for the selected AI provider first.', 'warning');
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+            button.dataset.originalText = button.textContent;
+            button.textContent = 'Testing…';
+        }
+        google.script.run
+            .withSuccessHandler(function (result) {
+                if (button && button.isConnected) {
+                    button.disabled = false;
+                    button.textContent = button.dataset.originalText || 'Test connection';
+                }
+                if (result && result.success) {
+                    showToast((config.provider === 'openai' ? 'ChatGPT' : 'Gemini') + ' connection succeeded.', 'success');
+                } else {
+                    showToast((result && result.error) || 'The AI provider connection failed.', 'error');
+                }
+            })
+            .withFailureHandler(function (error) {
+                if (button && button.isConnected) {
+                    button.disabled = false;
+                    button.textContent = button.dataset.originalText || 'Test connection';
+                }
+                showToast((error && error.message) || 'The AI provider connection failed.', 'error');
+            })
+            .apiChatbotReply([{ role: 'user', text: 'Reply with the words: Connection successful.' }], config);
     }
 
     function loadChatbotHistoryForCurrentUser() {
@@ -14477,7 +14595,53 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         loadChatbotHistoryForCurrentUser();
         const history = Array.isArray(state.chatbotHistory) ? state.chatbotHistory : [];
         const hasMessages = history.length > 0;
-        const connected = !!getChatbotApiKey();
+        const isDeveloper = state.currentRole === 'developer' || state.isDeveloper;
+        const selectedProvider = isDeveloper ? (state.chatbotAiProvider || getChatbotAiProvider()) : 'gemini';
+        const selectedModel = isDeveloper ? getChatbotProviderModel(selectedProvider) : 'gemini-2.5-flash';
+        const connected = !!getChatbotRequestConfig().apiKey;
+        const geminiKeySaved = !!getChatbotProviderApiKey('gemini');
+        const openAiKeySaved = !!getChatbotProviderApiKey('openai');
+        const keyDrawer = isDeveloper && state.chatbotKeyDrawerOpen ? `<form class="chatbot-key-drawer" onsubmit="saveChatbotAiSettings(event)">
+            <div class="chatbot-key-drawer-heading">
+                <div><strong>AI Models &amp; Subscription Keys</strong><small>Keys are saved in this browser only, not shared portal settings.</small></div>
+                <button type="button" class="chatbot-drawer-close" onclick="toggleChatbotKeyDrawer(false)" aria-label="Close AI settings"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="chatbot-provider-tabs" role="tablist" aria-label="AI provider">
+                <button type="button" role="tab" data-chatbot-provider-tab="gemini" aria-selected="${selectedProvider === 'gemini'}" class="${selectedProvider === 'gemini' ? 'is-active' : ''}" onclick="selectChatbotProvider('gemini')"><i class="fa-brands fa-google"></i> Google Gemini</button>
+                <button type="button" role="tab" data-chatbot-provider-tab="openai" aria-selected="${selectedProvider === 'openai'}" class="${selectedProvider === 'openai' ? 'is-active' : ''}" onclick="selectChatbotProvider('openai')"><i class="fa-solid fa-robot"></i> ChatGPT</button>
+            </div>
+            <div data-chatbot-provider-panel="gemini" ${selectedProvider === 'openai' ? 'hidden' : ''}>
+                <label for="chatbot-gemini-api-key">Gemini API key</label>
+                <input id="chatbot-gemini-api-key" type="password" maxlength="500" autocomplete="new-password" placeholder="${geminiKeySaved ? 'Saved key — leave blank to keep it' : 'Paste your Gemini API key'}">
+                <label for="chatbot-gemini-model">Gemini model</label>
+                <select id="chatbot-gemini-model">
+                    <option value="gemini-2.5-flash" ${selectedModel === 'gemini-2.5-flash' || getChatbotProviderModel('gemini') === 'gemini-2.5-flash' ? 'selected' : ''}>Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-pro" ${selectedModel === 'gemini-2.5-pro' || getChatbotProviderModel('gemini') === 'gemini-2.5-pro' ? 'selected' : ''}>Gemini 2.5 Pro</option>
+                </select>
+                <div class="chatbot-key-actions">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get Gemini key</a>
+                    ${geminiKeySaved ? '<button type="button" data-provider="gemini" onclick="removeChatbotProviderKey(this.dataset.provider)">Remove key</button>' : ''}
+                </div>
+            </div>
+            <div data-chatbot-provider-panel="openai" ${selectedProvider !== 'openai' ? 'hidden' : ''}>
+                <label for="chatbot-openai-api-key">ChatGPT API key</label>
+                <input id="chatbot-openai-api-key" type="password" maxlength="500" autocomplete="new-password" placeholder="${openAiKeySaved ? 'Saved key — leave blank to keep it' : 'Paste your OpenAI API key'}">
+                <label for="chatbot-openai-model">ChatGPT model</label>
+                <select id="chatbot-openai-model">
+                    <option value="gpt-4o-mini" ${getChatbotProviderModel('openai') === 'gpt-4o-mini' ? 'selected' : ''}>GPT-4o Mini</option>
+                    <option value="gpt-4o" ${getChatbotProviderModel('openai') === 'gpt-4o' ? 'selected' : ''}>GPT-4o</option>
+                </select>
+                <div class="chatbot-key-actions">
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Get OpenAI key</a>
+                    ${openAiKeySaved ? '<button type="button" data-provider="openai" onclick="removeChatbotProviderKey(this.dataset.provider)">Remove key</button>' : ''}
+                </div>
+            </div>
+            <div class="chatbot-drawer-footer">
+                <button type="button" onclick="toggleChatbotKeyDrawer(false)">Cancel</button>
+                <button type="button" onclick="testChatbotAiConnection(this)">Test connection</button>
+                <button type="submit">Save &amp; Remember</button>
+            </div>
+        </form>` : '';
         const voiceTypingNote = chatbotNativeAndroidApp
             ? 'Voice typing uses Android speech recognition and puts the transcript in the message box; it is not sent until you submit.'
             : 'Voice typing uses your browser’s speech recognition and puts the transcript in the message box; it is not sent until you submit.';
@@ -14496,8 +14660,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             </article>`;
         }).join('');
 
-        const suggestions = !hasMessages ? `<div class="chatbot-suggestions" aria-label="Suggested questions">
-            <p class="chatbot-suggestions-label">Try asking</p>
+        const suggestions = `<div class="chatbot-suggestions" aria-label="Quick questions">
             <div class="chatbot-suggestion-grid">${CHATBOT_PROMPTS.map(function (item) {
                 const action = item.voice ? 'toggleChatbotVoiceInput()' : `sendChatbotPrompt('${escapeAttr(item.prompt)}')`;
                 return `<button type="button" class="chatbot-suggestion" onclick="${action}">
@@ -14506,7 +14669,25 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
                     <i class="fa-solid ${item.voice ? 'fa-microphone' : 'fa-arrow-up-right-from-square'} chatbot-suggestion-arrow" aria-hidden="true"></i>
                 </button>`;
             }).join('')}</div>
-        </div>` : '';
+        </div>`;
+        const welcomeName = state.currentRole === 'student' && state.currentUser && state.currentUser.name
+            ? `<b>${escapeHtml(state.currentUser.name)}</b>`
+            : '<b>Divine Classes</b>';
+        const welcomeTopics = state.currentRole === 'student'
+            ? '<li>Your monthly fees, due date, and total paid</li><li>Your enrolled batch, teacher, and schedule</li>'
+            : '<li><b>Oral Student Admission:</b> Speak “Add student Rahul, phone 9876543210, batch Class 10”</li><li>Fee Structure &amp; Policies</li><li>Batches, Timings &amp; Admissions</li>';
+        const welcomeMessage = `<div class="chatbot-thread">
+            <article class="chatbot-message chatbot-message-assistant">
+                <span class="chatbot-avatar chatbot-avatar-assistant" aria-hidden="true"><i class="fa-solid fa-graduation-cap"></i></span>
+                <div class="chatbot-message-content">
+                    <div class="chatbot-message-meta"><span>Divine Assistant</span></div>
+                    <div class="chatbot-bubble chatbot-bubble-assistant">
+                        <p>Welcome to ${welcomeName}! I am your AI Assistant &amp; Voice Helpdesk.</p>
+                        <p class="chatbot-welcome-hint">Ask anything or tap the microphone to speak.</p>
+                        <ul>${welcomeTopics}<li>Physics, Chemistry &amp; Math concept doubts and quizzes</li><li>Institute address, timings, and Director Er. Rajesh Chahar</li></ul>
+                    </div>
+                </div>
+            </article>`;
 
         const errorMessage = state.chatbotError
             ? `<div class="chatbot-inline-error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>${escapeHtml(state.chatbotError)}</span></div>`
@@ -14521,31 +14702,28 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
         return `<section id="chatbot-shell" class="chatbot-shell" aria-label="Divine Classes AI assistant">
             <header class="chatbot-header">
                 <div class="chatbot-brand">
-                    <span class="chatbot-brand-icon"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></span>
+                    <span class="chatbot-brand-icon"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
                     <div class="chatbot-brand-copy">
-                        <div class="chatbot-title-row"><h2>Divine Assistant</h2><span class="chatbot-version-badge">GEMINI AI</span></div>
-                        <p><span class="chatbot-status-dot ${connected ? '' : 'chatbot-status-dot-offline'}"></span> Gemini 2.5 Flash <span class="chatbot-header-divider">·</span> ${connected ? 'Connected' : 'Ready when connected'}</p>
+                        <div class="chatbot-title-row"><h2>Divine Assistant</h2><span class="chatbot-version-badge">${selectedProvider === 'openai' ? selectedModel : (isDeveloper ? 'Gemini Pro' : 'GEMINI AI')}</span></div>
+                        <p><span class="chatbot-status-dot ${connected ? '' : 'chatbot-status-dot-offline'}"></span> ${connected ? 'Connected · ' + selectedModel : (isDeveloper ? 'Add provider API key' : 'AI key managed by Developer')}</p>
                     </div>
                 </div>
                 <div class="chatbot-header-actions">
-                    <button type="button" class="chatbot-new-chat" onclick="startNewChatbotConversation()" ${!hasMessages || state.chatbotBusy ? 'disabled' : ''}>
-                        <i class="fa-solid fa-plus" aria-hidden="true"></i><span>New chat</span>
+                    <button type="button" class="chatbot-new-chat chatbot-reset-button" onclick="startNewChatbotConversation()" ${!hasMessages || state.chatbotBusy ? 'disabled' : ''} title="Clear chat history" aria-label="Clear chat history">
+                        <i class="fa-solid fa-rotate-right" aria-hidden="true"></i><span>Clear</span>
                     </button>
-                    <button type="button" class="chatbot-new-chat chatbot-connect-button" onclick="openChatbotKeyDialog()" title="${connected ? 'Manage your Gemini API key' : 'Connect your Gemini API key'}" aria-label="${connected ? 'Manage connected Gemini API key' : 'Connect Gemini API key'}">
-                        <i class="fa-solid ${connected ? 'fa-link' : 'fa-plug'}" aria-hidden="true"></i><span>${connected ? 'Gemini connected' : 'Connect Gemini'}</span>
-                    </button>
+                    ${isDeveloper
+                        ? `<button type="button" class="chatbot-new-chat chatbot-connect-button" onclick="toggleChatbotKeyDrawer()" title="AI Models & Subscription Keys" aria-label="AI Models and Gemini or ChatGPT API keys" aria-expanded="${!!state.chatbotKeyDrawerOpen}"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>AI Keys</span></button>`
+                        : ''}
                     ${isChatbotOverlayOpen() ? '<button type="button" class="chatbot-new-chat chatbot-overlay-close" onclick="toggleChatbotOverlay(false)" aria-label="Close Divine Assistant" title="Close chat"><i class="fa-solid fa-xmark" aria-hidden="true"></i><span>Close</span></button>' : ''}
                 </div>
             </header>
 
+            ${keyDrawer}
+            ${suggestions}
+
             <div id="chatbot-conversation" class="chatbot-conversation" aria-live="polite" aria-relevant="additions text">
-                ${!hasMessages ? `<div class="chatbot-welcome">
-                    <span class="chatbot-welcome-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
-                    <p class="chatbot-eyebrow">YOUR DIVINE CLASSES ASSISTANT</p>
-                    <h3>Welcome to Divine Classes!</h3>
-                    <p class="chatbot-welcome-copy">Ask about fee structure, batches, and class schedules—or speak your question using the microphone.</p>
-                    ${suggestions}
-                </div>` : `<div class="chatbot-thread">${messages}${typing}${errorMessage}</div>`}
+                ${!hasMessages ? `${welcomeMessage}${typing}${errorMessage}</div>` : `<div class="chatbot-thread">${messages}${typing}${errorMessage}</div>`}
             </div>
 
             <div class="chatbot-composer-wrap">
@@ -14663,10 +14841,14 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             showToast('Please keep your message under 1,000 characters.', 'warning');
             return;
         }
-        const apiKey = getChatbotApiKey();
-        if (!apiKey) {
-            showToast('Connect your Gemini API key before starting a chat.', 'warning');
-            openChatbotKeyDialog();
+        const requestConfig = getChatbotRequestConfig();
+        if (!requestConfig.apiKey) {
+            if (canManageChatbotAiKeys()) {
+                showToast('Add and save an API key for the selected AI provider before chatting.', 'warning');
+                toggleChatbotKeyDrawer(true);
+            } else {
+                showToast('Gemini AI configuration is restricted to Developer mode.', 'warning');
+            }
             return;
         }
 
@@ -14720,7 +14902,7 @@ _Tamper-evident record synced with Divine Classes cloud database._`;
             })
             .apiChatbotReply(state.chatbotHistory.slice(-8).map(function (message) {
                 return { role: message.role, text: message.text };
-            }), apiKey);
+            }), requestConfig);
     }
 </script>
 
