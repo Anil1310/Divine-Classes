@@ -70,7 +70,7 @@ This architecture turns **Google Apps Script (GAS)** into an enterprise serverle
 
 1. **Zero-Lag UI (Optimistic Rendering):** Client state updates locally in 0ms (`state` object + `localStorage`), rendering instant UI changes without screen flicker, while background workers synchronize with Google Cloud in 50ms.
 2. **Dual-Platform Portability:** Runs seamlessly inside Google Apps Script (`google.script.run`) as well as standalone environments (Vercel, GitHub Pages, Netlify) with automatic REST fallback (`doPost` / `doGet`).
-3. **Zero Build Overhead:** Pure Vanilla JavaScript (ES6+), Tailwind CSS CDN, and FontAwesome icons ensure zero build overhead (`npm run build` is not required).
+3. **No Package Build Toolchain:** The app uses Vanilla JavaScript (ES6+), Tailwind CSS CDN, and FontAwesome without an npm build. Run `Build-Static.ps1` before publishing to flatten the modular Home page into the shared raw `index.html`.
 
 ---
 
@@ -526,7 +526,17 @@ To eliminate this focus-scroll jump completely:
 
 ## 12. CI/CD, Clasp & Dual Deployment (GAS + Vercel)
 
-### 12.1 Whitelist Configuration (`.claspignore`)
+### 12.1 Generate the shared homepage
+
+The Apps Script Home page is composed from modular partials. Before publishing, flatten those partials into the raw `index.html` used by GitHub Pages and the Apps Script root route:
+
+```powershell
+.\Build-Static.ps1
+```
+
+This is a build-time step; Apps Script must continue serving `index.html` as raw HTML rather than evaluating it as a template.
+
+### 12.2 Whitelist Configuration (`.claspignore`)
 
 ```
 *
@@ -539,7 +549,7 @@ To eliminate this focus-scroll jump completely:
 !logout.html
 ```
 
-### 12.2 Pre-Push Syntax Verification & Clasp Deploy
+### 12.3 Pre-Push Syntax Verification & Clasp Deploy
 
 ```bash
 # 1. Verify Code.js
@@ -555,7 +565,7 @@ npx @google/clasp push -f
 npx @google/clasp deploy -i "<DEPLOYMENT_ID>" -d "Production Release"
 ```
 
-### 12.3 Dual Hosting on Vercel
+### 12.4 Dual Hosting on Vercel
 
 Because `index.html` contains the full standalone bundle, deploy to Vercel for instant worldwide CDN caching:
 
@@ -676,4 +686,3 @@ The portal integrates an interactive AI Assistant & Doubts Helpdesk:
 - **Master Chatbot Toggle**: Located in Developer Settings (`AI Assistant & Chatbot Control`) with `id="set-chatbotEnabled"`.
 - **State Storage & Persistence**: Saved to `state.settings.chatbotEnabled` (default: `true`) and `localStorage ('DIVINE_CHATBOT_ENABLED')`, surviving browser reloads and syncing to the cloud database.
 - **Complete Disablement**: When toggled OFF, the floating button and drawer are completely hidden, active voice recognition is cancelled, and the navigation link is removed from the sidebar.
-

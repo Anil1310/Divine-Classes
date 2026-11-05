@@ -2210,7 +2210,7 @@ function syncDummySeedRecordsToSupabase_(data, excessDummyIds) {
     batches: ['b7', 'b8', 'b9', 'b10'],
     students: ['s3', 's4', 's7', 's10', 's11'],
     materials: ['m7', 'm8', 'm9', 'm10'],
-    offlineTests: ['t7', 't8', 't9', 't10'],
+    offlineTests: ['t7', 't8', 't9', 't10', 't1793673241001', 't1793673262116'],
     teachers: ['tr7', 'tr8', 'tr9', 'tr10'],
     gallery: ['g7', 'g8', 'g9', 'g10'],
     feedbacks: ['f7', 'f8', 'f9', 'f10']
@@ -2992,7 +2992,7 @@ function clearDummyDataFromSupabase_(data, removedIds, dummyNotificationIds) {
       'DC-101','DC-102','DC-201','DC-202','DC-301','DC-302'
     ],
     materials: ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10'],
-    offline_tests: ['t1','t2','t3','t4','t5','t6','t7','t8','t9','t10'],
+    offline_tests: ['t1','t2','t3','t4','t5','t6','t7','t8','t9','t10','t1793673241001','t1793673262116'],
     teachers: ['tr1','tr2','tr3','tr4','tr5','tr6','tr7','tr8','tr9','tr10'],
     gallery: ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'],
     feedbacks: ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10']
